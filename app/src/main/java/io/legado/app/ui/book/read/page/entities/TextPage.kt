@@ -1,7 +1,6 @@
 package io.legado.app.ui.book.read.page.entities
 
 import android.graphics.Canvas
-import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.DashPathEffect
 import android.graphics.Paint
@@ -29,7 +28,6 @@ import io.legado.app.model.localBook.EpubLinkArea
 import io.legado.app.model.localBook.EpubPageColor
 import io.legado.app.model.localBook.EpubRuleLine
 import io.legado.app.model.localBook.EpubTextRun
-import io.legado.app.ui.book.read.page.AdvancedTitleBitmapRenderer
 import io.legado.app.ui.book.read.page.ContentTextView
 import io.legado.app.ui.book.read.page.entities.TextChapter.Companion.emptyTextChapter
 import io.legado.app.ui.book.read.page.entities.column.TextBaseColumn
@@ -93,11 +91,6 @@ data class TextPage(
     var epubDrawOffsetX: Float = ChapterProvider.paddingLeft.toFloat()
     var epubDrawOffsetY: Float = ChapterProvider.paddingTop.toFloat()
     var fallbackChapterPosition: Int = 0
-    var advancedTitleHtml: String? = null
-    var advancedTitleTop: Float = 0f
-    var advancedTitleHeight: Float = 0f
-    var advancedTitleBitmap: Bitmap? = null
-    var advancedTitleBitmapKey: String? = null
     val epubDecorations = arrayListOf<EpubDecoration>()
     internal val epubEmbeddedBlocks = arrayListOf<EpubEmbeddedBlock>()
     internal val epubNativeCommands = arrayListOf<EpubDrawCommand>()
@@ -188,7 +181,7 @@ data class TextPage(
      */
     @Suppress("DEPRECATION")
     fun format(): TextPage {
-        if (isNativeEpubPage() || hasAdvancedTitleWeb()) {
+        if (isNativeEpubPage()) {
             return this
         }
         if (textLines.isEmpty()) isMsgPage = true
@@ -353,14 +346,6 @@ data class TextPage(
 
     fun hasEpubContent(): Boolean {
         return hasEpubBackground() || epubNativeCommands.isNotEmpty() || epubEmbeddedBlocks.isNotEmpty()
-    }
-
-    fun hasAdvancedTitleWeb(): Boolean {
-        return !advancedTitleHtml.isNullOrBlank() && advancedTitleHeight > 0f
-    }
-
-    fun hasRenderableContent(): Boolean {
-        return textLines.isNotEmpty() || hasEpubContent() || hasAdvancedTitleWeb()
     }
 
     fun isNativeEpubPage(): Boolean {
@@ -564,47 +549,11 @@ data class TextPage(
         drawEpubBackground(view, canvas)
         drawEpubEmbeddedBlocks(view, canvas)
         drawEpubNativeCommands(view, canvas)
-        drawAdvancedTitleBitmap(view, canvas)
         drawEpubDecorations(canvas)
         for (i in lines.indices) {
             val line = lines[i]
             canvas.withTranslation(0f, line.lineTop) {
                 line.draw(view, this)
-            }
-        }
-    }
-
-    private fun drawAdvancedTitleBitmap(view: ContentTextView, canvas: Canvas) {
-        val html = advancedTitleHtml
-        if (html.isNullOrBlank() || advancedTitleHeight <= 0f) return
-        val width = view.width
-        val bitmapHeight = advancedTitleHeight.toInt().coerceAtLeast(1)
-        if (width <= 0 || bitmapHeight <= 0) return
-        val key = AdvancedTitleBitmapRenderer.key(html, width, bitmapHeight)
-        val bitmap = when {
-            advancedTitleBitmapKey == key && advancedTitleBitmap != null -> advancedTitleBitmap
-            else -> AdvancedTitleBitmapRenderer.cached(key)?.also {
-                advancedTitleBitmap = it
-                advancedTitleBitmapKey = key
-            }
-        }
-        if (bitmap != null && !bitmap.isRecycled) {
-            canvas.drawBitmap(
-                bitmap,
-                null,
-                RectF(0f, advancedTitleTop, width.toFloat(), advancedTitleTop + advancedTitleHeight),
-                null
-            )
-        } else {
-            AdvancedTitleBitmapRenderer.request(
-                context = view.context,
-                page = this,
-                key = key,
-                html = html,
-                width = width,
-                height = bitmapHeight
-            ) {
-                view.postInvalidateOnAnimation()
             }
         }
     }
@@ -1208,9 +1157,6 @@ data class TextPage(
             block.offsetY + block.height
         }?.let { nativeBottom ->
             renderHeight = max(renderHeight, ceil(nativeBottom).toInt())
-        }
-        if (hasAdvancedTitleWeb()) {
-            renderHeight = max(renderHeight, ceil(advancedTitleTop + advancedTitleHeight).toInt())
         }
         epubNativeCommands.maxOfOrNull { command ->
             when (command) {
