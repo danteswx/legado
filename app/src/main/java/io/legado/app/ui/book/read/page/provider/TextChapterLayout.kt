@@ -753,9 +753,9 @@ class TextChapterLayout(
                 viewportHeight = maxTitleHeight,
                 basePaint = contentPaint
             )
-            val layoutPage = layout.pages.firstOrNull()
-                ?: error("高级标题 EPUB 布局没有生成页面")
-            val commands = layoutPage.commands
+            val commands = layout.pages
+                .flatMap { it.commands }
+                .filterNot { it is EpubPageColor }
             if (commands.isEmpty()) {
                 error("高级标题 EPUB 布局没有生成绘制命令")
             }
