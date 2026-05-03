@@ -71,6 +71,7 @@ class DiscoverySubscriptionConfigFragment : PreferenceFragment(),
         defaultValue: Boolean
     ) {
         preference ?: return
+        preference.isPersistent = false
         val useModern = preferenceManager.sharedPreferences
             ?.getBoolean(booleanKey, defaultValue) ?: defaultValue
         preference.value = if (useModern) PAGE_MODE_MODERN else PAGE_MODE_LEGACY

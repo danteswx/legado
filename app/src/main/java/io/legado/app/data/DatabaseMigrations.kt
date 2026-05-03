@@ -40,6 +40,11 @@ object DatabaseMigrations {
                 INSERT OR REPLACE INTO `readRecentBooks` (`bookUrl`, `lastRead`)
                 SELECT `bookUrl`, `durChapterTime` FROM `books`
                 WHERE `durChapterTime` > 0
+                  AND (
+                    `durChapterIndex` > 0
+                    OR `durChapterPos` > 0
+                    OR (`durChapterTitle` IS NOT NULL AND `durChapterTitle` != '')
+                  )
                 """
             )
         }

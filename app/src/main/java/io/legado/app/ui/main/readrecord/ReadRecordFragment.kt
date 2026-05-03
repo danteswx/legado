@@ -55,13 +55,13 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
 
     private val binding by viewBinding(ActivityReadRecordBinding::bind)
     private val headlineFormatter by lazy {
-        DateTimeFormatter.ofPattern("yyyy年MM月dd日", Locale.getDefault())
+        DateTimeFormatter.ofPattern(getString(R.string.read_record_date_pattern), Locale.getDefault())
     }
     private val fullDayFormatter by lazy {
-        DateTimeFormatter.ofPattern("yyyy年MM月dd日", Locale.getDefault())
+        DateTimeFormatter.ofPattern(getString(R.string.read_record_date_pattern), Locale.getDefault())
     }
     private val monthFormatter by lazy {
-        DateTimeFormatter.ofPattern("M月", Locale.getDefault())
+        DateTimeFormatter.ofPattern(getString(R.string.read_record_month_pattern), Locale.getDefault())
     }
     private val lastOpenFormatter by lazy {
         SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())

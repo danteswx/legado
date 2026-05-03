@@ -1,5 +1,6 @@
 package io.legado.app.help.config
 
+import io.legado.app.R
 import com.airbnb.lottie.LottieCompositionFactory
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.entities.Book
@@ -96,7 +97,7 @@ object AdvancedTitleConfig {
 
     fun renderValidLottieJson(book: Book, title: String): String? {
         val json = renderLottieJson(book, title)?.takeIf { it.isNotBlank() } ?: return null
-        return json.takeIf { isValidLottieJson(it) }
+        return json.takeIf { hasRenderableLayers(it) }
     }
 
     fun isValidLottieJson(json: String): Boolean {
@@ -111,9 +112,20 @@ object AdvancedTitleConfig {
         }.getOrDefault(false)
     }
 
+    fun hasRenderableLayers(json: String): Boolean {
+        return runCatching {
+            val obj = JSONObject(json)
+            obj.optJSONArray("layers")?.length()?.let { it > 0 } == true
+        }.getOrDefault(false)
+    }
+
     fun preview(title: String, book: Book? = null): String {
         val parts = split(title, book)
-        return "s1: ${parts.s1.ifBlank { "空" }}\ns2: ${parts.s2.ifBlank { "空" }}"
+        return appCtx.getString(
+            R.string.advanced_title_preview_template,
+            parts.s1.ifBlank { appCtx.getString(R.string.empty) },
+            parts.s2.ifBlank { appCtx.getString(R.string.empty) }
+        )
     }
 
     private fun splitByDelimiter(title: String, delimiter: String): Parts {
@@ -171,13 +183,7 @@ object AdvancedTitleConfig {
             value
                 .replace("\${${entry.key}}", replacement)
                 .replace("{{${entry.key}}}", replacement)
-        }.replace(
-            "章节名",
-            parts.s2.ifBlank { parts.title }
-        ).replace(
-            "章节数",
-            parts.s1
-        )
+        }
     }
 
     private fun variables(book: Book, parts: Parts): Map<String, String> {

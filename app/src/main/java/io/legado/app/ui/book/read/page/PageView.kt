@@ -30,7 +30,6 @@ import io.legado.app.help.config.AdvancedTitleConfig
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ReadTipConfig
-import io.legado.app.help.http.okHttpClient
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.ReadBookActivity
 import io.legado.app.ui.book.read.page.entities.TextLine
@@ -47,7 +46,6 @@ import io.legado.app.utils.gone
 import io.legado.app.utils.SvgUtils
 import io.legado.app.utils.setOnApplyWindowInsetsListenerCompat
 import io.legado.app.utils.setTextIfNotEqual
-import okhttp3.Request
 import splitties.views.backgroundColor
 import java.io.ByteArrayInputStream
 import java.util.Date
@@ -734,7 +732,9 @@ class PageView(context: Context) : FrameLayout(context) {
         val source = resolveLottieAssetSource(asset) ?: return@ImageAssetDelegate null
         lottieImageCache[source]?.let { return@ImageAssetDelegate it }
         val bitmap = loadLottieAssetBitmap(source)
-        lottieImageCache[source] = bitmap
+        if (bitmap != null) {
+            lottieImageCache[source] = bitmap
+        }
         bitmap
     }
 
@@ -746,25 +746,13 @@ class PageView(context: Context) : FrameLayout(context) {
         }
         return candidates.firstOrNull { candidate ->
             candidate.startsWith("data:image", ignoreCase = true)
-                || candidate.startsWith("http://", ignoreCase = true)
-                || candidate.startsWith("https://", ignoreCase = true)
         }
     }
 
     private fun loadLottieAssetBitmap(source: String): android.graphics.Bitmap? {
         return runCatching {
-            if (source.startsWith("data:image", ignoreCase = true)) {
-                val bytes = source.decodeBase64DataUrlBytes() ?: return@runCatching null
-                decodeBitmapByType(source, bytes)
-            } else {
-                val bytes = okHttpClient.newCall(
-                    Request.Builder().url(source).build()
-                ).execute().use { response ->
-                    if (!response.isSuccessful) return@use null
-                    response.body?.bytes()
-                } ?: return@runCatching null
-                decodeBitmapByType(source, bytes)
-            }
+            val bytes = source.decodeBase64DataUrlBytes() ?: return@runCatching null
+            decodeBitmapByType(source, bytes)
         }.getOrNull()
     }
 

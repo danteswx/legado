@@ -49,7 +49,7 @@ class AdvancedTitleConfigDialog : DialogFragment() {
         get() = ReadBook.book
     private var jsonEdit: EditText? = null
     private var currentJson: String = AdvancedTitleConfig.lottieJson.orEmpty()
-    private val importFormNet = "网络导入"
+    private val importFromNet by lazy { getString(R.string.advanced_title_import_from_net) }
 
     private val jsonEditLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) {
@@ -62,7 +62,7 @@ class AdvancedTitleConfigDialog : DialogFragment() {
 
     private val importJson = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
-            if (uri.path == "/$importFormNet") {
+            if (uri.path == "/$importFromNet") {
                 importNetJsonAlert()
             } else {
                 runCatching {
@@ -71,7 +71,9 @@ class AdvancedTitleConfigDialog : DialogFragment() {
                     currentJson = text
                     jsonEdit?.setText(text)
                 }.onFailure { error ->
-                    context?.toastOnUi("导入失败：${error.localizedMessage}")
+                    context?.toastOnUi(
+                        getString(R.string.advanced_title_import_failed, error.localizedMessage.orEmpty())
+                    )
                 }
             }
         }
@@ -82,7 +84,7 @@ class AdvancedTitleConfigDialog : DialogFragment() {
         if (uri != null) {
             val url = uri.toString()
             if (url.startsWith("http://", true) || url.startsWith("https://", true)) {
-                context?.alert("上传成功") {
+                context?.alert(R.string.advanced_title_upload_success) {
                     setMessage(url)
                     positiveButton(R.string.copy_text) {
                         requireContext().sendToClip(url)
@@ -91,7 +93,7 @@ class AdvancedTitleConfigDialog : DialogFragment() {
                     negativeButton(R.string.cancel)
                 }
             } else {
-                context?.toastOnUi("已导出")
+                context?.toastOnUi(getString(R.string.advanced_title_exported))
             }
         }
     }
@@ -114,6 +116,7 @@ class AdvancedTitleConfigDialog : DialogFragment() {
         val globalRule = AdvancedTitleConfig.globalRule
         val bookRule = AdvancedTitleConfig.bookRule(book)
         val startRule = bookRule ?: globalRule
+        val emptyText = getString(R.string.empty)
 
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -146,11 +149,11 @@ class AdvancedTitleConfigDialog : DialogFragment() {
             orientation = RadioGroup.HORIZONTAL
         }
         val rbGlobal = RadioButton(context).apply {
-            text = "全局生效"
+            text = getString(R.string.advanced_title_scope_global)
             id = 1
         }
         val rbBook = RadioButton(context).apply {
-            text = "仅本书生效"
+            text = getString(R.string.advanced_title_scope_book)
             id = 2
             isEnabled = book != null
         }
@@ -159,7 +162,7 @@ class AdvancedTitleConfigDialog : DialogFragment() {
         scopeGroup.check(if (bookRule != null) rbBook.id else rbGlobal.id)
 
         val useRegexCheck = CheckBox(context).apply {
-            text = "使用正则"
+            text = getString(R.string.advanced_title_use_regex)
             isChecked = startRule.mode == AdvancedTitleConfig.SPLIT_REGEX
         }
         val ruleEdit = edit(
@@ -169,9 +172,9 @@ class AdvancedTitleConfigDialog : DialogFragment() {
                 startRule.delimiter
             }
         )
-        val sampleEdit = edit("第一章 接生")
+        val sampleEdit = edit(getString(R.string.advanced_title_sample_default))
         val heightFactorEdit = edit(AdvancedTitleConfig.heightFactor.toString()).apply {
-            hint = "30-120，默认55（按可视高度百分比）"
+            hint = getString(R.string.advanced_title_height_factor_hint)
         }
         val lottieJsonEdit = edit(currentJson, minLines = 6).apply {
             layoutParams = LinearLayout.LayoutParams(
@@ -182,7 +185,7 @@ class AdvancedTitleConfigDialog : DialogFragment() {
             setSingleLine(false)
         }
         jsonEdit = lottieJsonEdit
-        val openEditorButton = button("打开编辑器").apply {
+        val openEditorButton = button(getString(R.string.advanced_title_open_editor)).apply {
             setOnClickListener { openJsonEditor() }
         }
         val preview = TextView(context).apply {
@@ -205,9 +208,13 @@ class AdvancedTitleConfigDialog : DialogFragment() {
             val rule = buildRule()
             preview.text = runCatching {
                 val parts = AdvancedTitleConfig.split(sampleEdit.text?.toString().orEmpty(), rule)
-                "s1: ${parts.s1.ifBlank { "空" }}\ns2: ${parts.s2.ifBlank { "空" }}"
+                getString(
+                    R.string.advanced_title_preview_template,
+                    parts.s1.ifBlank { emptyText },
+                    parts.s2.ifBlank { emptyText }
+                )
             }.getOrElse {
-                "规则错误：${it.localizedMessage}"
+                getString(R.string.advanced_title_rule_error, it.localizedMessage.orEmpty())
             }
         }
 
@@ -221,24 +228,24 @@ class AdvancedTitleConfigDialog : DialogFragment() {
         }
 
         root.addView(TextView(context).apply {
-            text = "高级标题设置"
+            text = getString(R.string.advanced_title_dialog_title)
             textSize = 18f
             setPadding(0, 2.dpToPx(), 0, 8.dpToPx())
         })
-        root.addView(label("作用范围"))
+        root.addView(label(getString(R.string.advanced_title_scope_label)))
         root.addView(scopeGroup)
-        root.addView(label("分隔规则"))
+        root.addView(label(getString(R.string.advanced_title_rule_label)))
         root.addView(useRegexCheck)
         root.addView(ruleEdit)
-        root.addView(label("预览"))
+        root.addView(label(getString(R.string.preview)))
         root.addView(sampleEdit)
         root.addView(preview)
-        root.addView(label("高级标题占位高度系数"))
+        root.addView(label(getString(R.string.advanced_title_height_factor_label)))
         root.addView(heightFactorEdit)
         root.addView(LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            addView(label("高级标题 JSON").apply {
+            addView(label(getString(R.string.advanced_title_json_label)).apply {
                 layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
                 setPadding(0, 10.dpToPx(), 0, 4.dpToPx())
             })
@@ -246,7 +253,7 @@ class AdvancedTitleConfigDialog : DialogFragment() {
         })
         root.addView(lottieJsonEdit)
         root.addView(TextView(context).apply {
-            text = "支持 ${'$'}{s1}/${'$'}{s2}"
+            text = getString(R.string.advanced_title_json_hint)
             textSize = 12f
             setPadding(0, 4.dpToPx(), 0, 6.dpToPx())
             setTextColor(ContextCompat.getColor(context, android.R.color.darker_gray))
@@ -254,19 +261,19 @@ class AdvancedTitleConfigDialog : DialogFragment() {
         root.addView(LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            addView(button("导入").apply {
+            addView(button(getString(R.string.import_str)).apply {
                 layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
                 (layoutParams as LinearLayout.LayoutParams).marginEnd = 6.dpToPx()
                 setOnClickListener {
                     importJson.launch {
                         mode = HandleFileContract.FILE
-                        title = "导入高级标题"
+                        title = getString(R.string.advanced_title_import_title)
                         allowExtensions = arrayOf("json")
-                        otherActions = arrayListOf(SelectItem(importFormNet, -1))
+                        otherActions = arrayListOf(SelectItem(importFromNet, -1))
                     }
                 }
             })
-            addView(button("导出").apply {
+            addView(button(getString(R.string.export_str)).apply {
                 layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
                 (layoutParams as LinearLayout.LayoutParams).marginStart = 6.dpToPx()
                 setOnClickListener {
@@ -295,7 +302,7 @@ class AdvancedTitleConfigDialog : DialogFragment() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, 10.dpToPx(), 0, 6.dpToPx())
-            addView(button("恢复默认").apply {
+            addView(button(getString(R.string.restore_default)).apply {
                 layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
                 (layoutParams as LinearLayout.LayoutParams).marginEnd = 6.dpToPx()
                 setOnClickListener {
@@ -313,16 +320,21 @@ class AdvancedTitleConfigDialog : DialogFragment() {
                     dismissAllowingStateLoss()
                 }
             })
-            addView(button("取消").apply {
+            addView(button(getString(R.string.cancel)).apply {
                 layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
                 setOnClickListener { dismissAllowingStateLoss() }
             })
-            addView(button("确认").apply {
+            addView(button(getString(R.string.confirm)).apply {
                 layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
                 (layoutParams as LinearLayout.LayoutParams).marginStart = 6.dpToPx()
                 setOnClickListener {
                     val rule = buildRule()
-                    AdvancedTitleConfig.lottieJson = lottieJsonEdit.text?.toString().orEmpty()
+                    val json = lottieJsonEdit.text?.toString().orEmpty().trim()
+                    if (json.isNotEmpty() && !AdvancedTitleConfig.isValidLottieJson(json)) {
+                        context.toastOnUi(getString(R.string.advanced_title_invalid_json))
+                        return@setOnClickListener
+                    }
+                    AdvancedTitleConfig.lottieJson = json
                     AdvancedTitleConfig.lottiePath = null
                     val parsedHeight = heightFactorEdit.text?.toString()?.trim()?.toIntOrNull()
                     AdvancedTitleConfig.heightFactor = (parsedHeight
@@ -376,7 +388,7 @@ class AdvancedTitleConfigDialog : DialogFragment() {
     }
 
     private fun importNetJsonAlert() {
-        context?.alert("输入地址") {
+        context?.alert(R.string.advanced_title_input_url) {
             val input = EditText(requireContext()).apply { hint = "https://..." }
             customView { input }
             okButton {
@@ -397,7 +409,9 @@ class AdvancedTitleConfigDialog : DialogFragment() {
                 currentJson = text
                 jsonEdit?.setText(text)
             }.onFailure { error ->
-                context?.toastOnUi("网络导入失败：${error.localizedMessage}")
+                context?.toastOnUi(
+                    getString(R.string.advanced_title_import_net_failed, error.localizedMessage.orEmpty())
+                )
             }
         }
     }
@@ -407,7 +421,7 @@ class AdvancedTitleConfigDialog : DialogFragment() {
         currentJson = editText.text?.toString().orEmpty()
         jsonEditLauncher.launch(Intent(requireActivity(), CodeEditActivity::class.java).apply {
             putExtra("text", currentJson)
-            putExtra("title", "高级标题 JSON")
+            putExtra("title", getString(R.string.advanced_title_json_label))
             putExtra("cursorPosition", editText.selectionStart.coerceAtLeast(0))
         })
     }
