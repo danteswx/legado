@@ -78,8 +78,8 @@
         app:layout_constraintBottom_toTopOf="@id/vw_bottom_divider"
         app:layout_constraintTop_toBottomOf="@id/vw_top_divider" />
 
-    <io.legado.app.ui.widget.PassiveWebView
-        android:id="@+id/epub_special_page_webview"
+    <FrameLayout
+        android:id="@+id/epub_special_page_host"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:visibility="gone"

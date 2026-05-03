@@ -10,6 +10,7 @@ import android.graphics.drawable.LayerDrawable
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import android.view.View
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -80,6 +81,7 @@ class PageView(context: Context) : FrameLayout(context) {
     private var currentTextPage: TextPage? = null
     private var advancedTitleLottieKey: String? = null
     private var specialPageKey: String? = null
+    private val specialPageWebView by lazy { io.legado.app.ui.widget.PassiveWebView(context) }
     private val lottieImageCache = ConcurrentHashMap<String, android.graphics.Bitmap?>()
     var isScroll = false
 
@@ -110,8 +112,8 @@ class PageView(context: Context) : FrameLayout(context) {
 
     override fun onDetachedFromWindow() {
         binding.advancedTitleLottie.cancelAnimation()
-        binding.epubSpecialPageWebview.stopLoading()
-        binding.epubSpecialPageWebview.loadUrl("about:blank")
+        specialPageWebView.stopLoading()
+        specialPageWebView.loadUrl("about:blank")
         super.onDetachedFromWindow()
     }
 
@@ -673,7 +675,15 @@ class PageView(context: Context) : FrameLayout(context) {
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun initSpecialPageWebView() {
-        binding.epubSpecialPageWebview.apply {
+        binding.epubSpecialPageHost.removeAllViews()
+        binding.epubSpecialPageHost.addView(
+            specialPageWebView,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
+        specialPageWebView.apply {
             setBackgroundColor(Color.TRANSPARENT)
             isVerticalScrollBarEnabled = false
             isHorizontalScrollBarEnabled = false
@@ -720,17 +730,17 @@ class PageView(context: Context) : FrameLayout(context) {
     }
 
     private fun upSpecialPage(textPage: TextPage) {
-        val webView = binding.epubSpecialPageWebview
+        val webView = specialPageWebView
         val html = textPage.epubSpecialPageHtml
         val baseUrl = textPage.epubSpecialPageBaseUrl
         if (html.isNullOrBlank() || baseUrl.isNullOrBlank()) {
             specialPageKey = null
-            webView.visibility = GONE
+            binding.epubSpecialPageHost.visibility = GONE
             binding.contentTextView.visibility = VISIBLE
             return
         }
-        binding.contentTextView.visibility = INVISIBLE
-        webView.visibility = VISIBLE
+        binding.contentTextView.visibility = View.GONE
+        binding.epubSpecialPageHost.visibility = VISIBLE
         val key = "$baseUrl#${html.hashCode()}"
         if (specialPageKey == key) return
         specialPageKey = key
