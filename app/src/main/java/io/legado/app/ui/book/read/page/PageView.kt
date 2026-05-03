@@ -2,11 +2,14 @@ package io.legado.app.ui.book.read.page
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.LayerDrawable
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import com.airbnb.lottie.ImageAssetDelegate
 import android.widget.FrameLayout
+import com.airbnb.lottie.LottieImageAsset
 import com.airbnb.lottie.LottieDrawable
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toDrawable
@@ -24,7 +27,6 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ReadTipConfig
 import io.legado.app.model.ReadBook
-import io.legado.app.model.localBook.EpubImageBox
 import io.legado.app.ui.book.read.ReadBookActivity
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.book.read.page.entities.TextPage
@@ -34,6 +36,7 @@ import io.legado.app.ui.widget.BatteryView
 import io.legado.app.utils.activity
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.applyStatusBarPadding
+import io.legado.app.utils.decodeBase64DataUrlBytes
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.gone
 import io.legado.app.utils.setOnApplyWindowInsetsListenerCompat
@@ -62,6 +65,7 @@ class PageView(context: Context) : FrameLayout(context) {
     private var tvTimeBatteryP: BatteryView? = null
     private var isMainView = false
     private var currentTextPage: TextPage? = null
+    private var advancedTitleLottieKey: String? = null
     var isScroll = false
 
     val headerHeight: Int
@@ -562,36 +566,57 @@ class PageView(context: Context) : FrameLayout(context) {
 
     private fun upAdvancedTitleLottie(textPage: TextPage) {
         val lottieView = binding.advancedTitleLottie
-        if (ReadBookConfig.titleMode != AdvancedTitleConfig.TITLE_MODE_ADVANCED || isScroll) {
+        fun hide() {
             lottieView.cancelAnimation()
+            advancedTitleLottieKey = null
             lottieView.visibility = GONE
+        }
+        if (ReadBookConfig.titleMode != AdvancedTitleConfig.TITLE_MODE_ADVANCED ||
+            AdvancedTitleConfig.renderMode != AdvancedTitleConfig.RENDER_LOTTIE ||
+            isScroll
+        ) {
+            hide()
             return
         }
-        val block = textPage.epubEmbeddedBlocks.firstOrNull() ?: run {
-            lottieView.cancelAnimation()
-            lottieView.visibility = GONE
+        val block = textPage.epubEmbeddedBlocks.firstOrNull {
+            it.role == AdvancedTitleConfig.LOTTIE_BLOCK_ROLE
+        } ?: run {
+            hide()
             return
         }
-        if (block.commands.none { it is EpubImageBox }) {
-            lottieView.cancelAnimation()
-            lottieView.visibility = GONE
-            return
-        }
-        val targetWidth = (block.width * 0.78f).toInt().coerceAtLeast(120)
-        val targetHeight = (targetWidth * 112f / 720f).toInt().coerceAtLeast(24)
+        val targetWidth = (block.width * 0.86f).toInt().coerceAtLeast(160)
+        val targetHeight = block.height.toInt().coerceAtLeast((targetWidth * 120f / 720f).toInt())
         val params = lottieView.layoutParams as ViewGroup.LayoutParams
         if (params.width != targetWidth || params.height != targetHeight) {
             params.width = targetWidth
             params.height = targetHeight
             lottieView.layoutParams = params
         }
-        lottieView.translationY = block.offsetY + block.height * 0.16f
+        lottieView.translationY = block.offsetY
         lottieView.repeatCount = LottieDrawable.INFINITE
-        lottieView.setAnimation(R.raw.advanced_title_lottie)
+        lottieView.setImageAssetDelegate(dataUriImageAssetDelegate)
+        val json = block.payload?.takeIf { it.isNotBlank() }
+        val nextKey = json?.let { "advanced_title:${it.hashCode()}" } ?: "advanced_title:raw"
+        if (advancedTitleLottieKey != nextKey) {
+            advancedTitleLottieKey = nextKey
+            if (json != null) {
+                lottieView.setAnimationFromJson(json, nextKey)
+            } else {
+                lottieView.setAnimation(R.raw.advanced_title_lottie)
+            }
+        }
         lottieView.visibility = VISIBLE
         if (!lottieView.isAnimating) {
             lottieView.playAnimation()
         }
+    }
+
+    private val dataUriImageAssetDelegate = ImageAssetDelegate { asset: LottieImageAsset ->
+        val source = listOf(asset.fileName, asset.dirName.orEmpty() + asset.fileName)
+            .firstOrNull { it.startsWith("data:image", ignoreCase = true) }
+            ?: return@ImageAssetDelegate null
+        val bytes = source.decodeBase64DataUrlBytes() ?: return@ImageAssetDelegate null
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
     }
 
     val textPage get() = binding.contentTextView.textPage

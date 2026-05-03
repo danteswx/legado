@@ -5,15 +5,21 @@ import io.legado.app.constant.PreferKey
 import io.legado.app.data.entities.Book
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
+import io.legado.app.utils.getPrefInt
 import io.legado.app.utils.getPrefString
+import io.legado.app.utils.putPrefInt
 import io.legado.app.utils.putPrefString
 import splitties.init.appCtx
+import java.io.File
 
 object AdvancedTitleConfig {
 
     const val TITLE_MODE_ADVANCED = 3
     const val SPLIT_DELIMITER = 0
     const val SPLIT_REGEX = 1
+    const val RENDER_EPUB = 0
+    const val RENDER_LOTTIE = 1
+    const val LOTTIE_BLOCK_ROLE = "advanced_title_lottie"
     private const val BOOK_RULE_KEY = "advancedTitleRule"
 
     data class SplitRule(
@@ -49,6 +55,29 @@ object AdvancedTitleConfig {
             appCtx.putPrefString(PreferKey.advancedTitleTemplate, GSON.toJson(value))
         }
 
+    var renderMode: Int
+        get() = appCtx.getPrefInt(PreferKey.advancedTitleRenderMode, RENDER_EPUB)
+            .takeIf { it == RENDER_EPUB || it == RENDER_LOTTIE }
+            ?: RENDER_EPUB
+        set(value) {
+            appCtx.putPrefInt(
+                PreferKey.advancedTitleRenderMode,
+                if (value == RENDER_LOTTIE) RENDER_LOTTIE else RENDER_EPUB
+            )
+        }
+
+    var lottieJson: String?
+        get() = appCtx.getPrefString(PreferKey.advancedTitleLottieJson)
+        set(value) {
+            appCtx.putPrefString(PreferKey.advancedTitleLottieJson, value?.takeIf { it.isNotBlank() })
+        }
+
+    var lottiePath: String?
+        get() = appCtx.getPrefString(PreferKey.advancedTitleLottiePath)
+        set(value) {
+            appCtx.putPrefString(PreferKey.advancedTitleLottiePath, value?.takeIf { it.isNotBlank() })
+        }
+
     fun bookRule(book: Book?): SplitRule? {
         val value = book?.getVariable(BOOK_RULE_KEY)?.takeIf { it.isNotBlank() } ?: return null
         return GSON.fromJsonObject<SplitRule>(value).getOrNull()
@@ -77,13 +106,7 @@ object AdvancedTitleConfig {
     fun renderHtml(book: Book, title: String): String {
         val parts = split(title, book)
         val tpl = template
-        val variables = mapOf(
-            "title" to parts.title,
-            "s1" to parts.s1,
-            "s2" to parts.s2,
-            "bookName" to book.name,
-            "author" to book.author
-        )
+        val variables = variables(book, parts)
         val html = variables.entries.fold(tpl.html) { value, entry ->
             value
                 .replace("\${${entry.key}}", TextUtils.htmlEncode(entry.value))
@@ -102,6 +125,14 @@ object AdvancedTitleConfig {
             <body>$html</body>
             </html>
         """.trimIndent()
+    }
+
+    fun renderLottieJson(book: Book, title: String): String? {
+        val raw = lottieJson?.takeIf { it.isNotBlank() }
+            ?: lottiePath?.takeIf { it.isNotBlank() }?.let { path ->
+                runCatching { File(path).takeIf { it.isFile }?.readText() }.getOrNull()
+            }
+        return raw?.let { replaceVariables(it, book, title, htmlEncode = false) }
     }
 
     fun preview(title: String, book: Book? = null): String {
@@ -150,6 +181,38 @@ object AdvancedTitleConfig {
 
     private fun MatchGroupCollection.getOrNull(index: Int): MatchGroup? {
         return if (index in 0 until size) get(index) else null
+    }
+
+    private fun replaceVariables(
+        source: String,
+        book: Book,
+        title: String,
+        htmlEncode: Boolean
+    ): String {
+        val parts = split(title, book)
+        val variables = variables(book, parts)
+        return variables.entries.fold(source) { value, entry ->
+            val replacement = if (htmlEncode) TextUtils.htmlEncode(entry.value) else entry.value
+            value
+                .replace("\${${entry.key}}", replacement)
+                .replace("{{${entry.key}}}", replacement)
+        }.replace(
+            "章节名",
+            if (htmlEncode) TextUtils.htmlEncode(parts.s2.ifBlank { parts.title }) else parts.s2.ifBlank { parts.title }
+        ).replace(
+            "章节数",
+            if (htmlEncode) TextUtils.htmlEncode(parts.s1) else parts.s1
+        )
+    }
+
+    private fun variables(book: Book, parts: Parts): Map<String, String> {
+        return mapOf(
+            "title" to parts.title,
+            "s1" to parts.s1,
+            "s2" to parts.s2,
+            "bookName" to book.name,
+            "author" to book.author
+        )
     }
 
     const val DEFAULT_REGEX = "^\\s*(第\\S+[章节回卷部篇集])\\s+(.+?)\\s*$"

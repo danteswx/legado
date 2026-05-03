@@ -740,6 +740,9 @@ class TextChapterLayout(
 
     private suspend fun setTypeAdvancedTitle(book: Book, title: String): Boolean {
         if (title.isBlank()) return false
+        if (AdvancedTitleConfig.renderMode == AdvancedTitleConfig.RENDER_LOTTIE) {
+            return setTypeAdvancedTitleLottie(book, title)
+        }
         return runCatching {
             currentCoroutineContext().ensureActive()
             val maxTitleHeight = (visibleHeight * 0.42f)
@@ -787,6 +790,30 @@ class TextChapterLayout(
             setTypeEpubDiagnosticPage("高级标题 EPUB 渲染失败", it.localizedMessage.orEmpty())
             true
         }
+    }
+
+    private suspend fun setTypeAdvancedTitleLottie(book: Book, title: String): Boolean {
+        currentCoroutineContext().ensureActive()
+        val blockHeight = (titlePaintTextHeight * 5.5f)
+            .coerceAtLeast(80f)
+            .coerceAtMost(visibleHeight * 0.35f)
+        prepareNextPageIfNeed(durY + blockHeight)
+        pendingTextPage.epubEmbeddedBlocks.add(
+            TextPage.EpubEmbeddedBlock(
+                offsetX = paddingLeft.toFloat(),
+                offsetY = paddingTop + durY,
+                width = visibleWidth.toFloat(),
+                height = blockHeight,
+                commands = emptyList(),
+                role = AdvancedTitleConfig.LOTTIE_BLOCK_ROLE,
+                payload = AdvancedTitleConfig.renderLottieJson(book, title)
+            )
+        )
+        durY += blockHeight + titleBottomSpacing
+        if (pendingTextPage.height < durY) {
+            pendingTextPage.height = durY
+        }
+        return true
     }
 
     private suspend fun setTypeNativeEpubLayout(layout: EpubLayoutDocument) {

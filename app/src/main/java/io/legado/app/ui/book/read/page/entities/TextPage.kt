@@ -1221,6 +1221,8 @@ data class TextPage(
         val offsetY: Float,
         val width: Float,
         val height: Float,
-        val commands: List<EpubDrawCommand>
+        val commands: List<EpubDrawCommand>,
+        val role: String? = null,
+        val payload: String? = null
     )
 }

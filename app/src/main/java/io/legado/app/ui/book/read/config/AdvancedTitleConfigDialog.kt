@@ -36,6 +36,7 @@ class AdvancedTitleConfigDialog : DialogFragment() {
         val bookRule = AdvancedTitleConfig.bookRule(book)
         val startRule = bookRule ?: globalRule
         val template = AdvancedTitleConfig.template
+        val startRenderMode = AdvancedTitleConfig.renderMode
 
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -71,6 +72,23 @@ class AdvancedTitleConfigDialog : DialogFragment() {
         scopeGroup.addView(rbBook)
         scopeGroup.check(if (bookRule != null) rbBook.id else rbGlobal.id)
 
+        val renderModeGroup = RadioGroup(context).apply {
+            orientation = RadioGroup.HORIZONTAL
+        }
+        val rbEpub = RadioButton(context).apply {
+            text = "EPUB核心"
+            id = 3
+        }
+        val rbLottie = RadioButton(context).apply {
+            text = "纯Lottie"
+            id = 4
+        }
+        renderModeGroup.addView(rbEpub)
+        renderModeGroup.addView(rbLottie)
+        renderModeGroup.check(
+            if (startRenderMode == AdvancedTitleConfig.RENDER_LOTTIE) rbLottie.id else rbEpub.id
+        )
+
         val useRegexCheck = CheckBox(context).apply {
             text = "使用正则"
             isChecked = startRule.mode == AdvancedTitleConfig.SPLIT_REGEX
@@ -85,6 +103,8 @@ class AdvancedTitleConfigDialog : DialogFragment() {
         val sampleEdit = edit("第一章 接生")
         val htmlEdit = edit(template.html, minLines = 4)
         val cssEdit = edit(template.css, minLines = 6)
+        val lottieJsonEdit = edit(AdvancedTitleConfig.lottieJson.orEmpty(), minLines = 6)
+        val lottiePathEdit = edit(AdvancedTitleConfig.lottiePath.orEmpty())
         val preview = TextView(context).apply {
             setPadding(0, 8.dpToPx(), 0, 0)
         }
@@ -122,6 +142,8 @@ class AdvancedTitleConfigDialog : DialogFragment() {
 
         root.addView(label("作用范围"))
         root.addView(scopeGroup)
+        root.addView(label("标题渲染方式"))
+        root.addView(renderModeGroup)
         root.addView(label("分隔规则，不勾选时按符号分隔，勾选后按正则分隔"))
         root.addView(useRegexCheck)
         root.addView(ruleEdit)
@@ -132,6 +154,10 @@ class AdvancedTitleConfigDialog : DialogFragment() {
         root.addView(htmlEdit)
         root.addView(label("标题 CSS 样式"))
         root.addView(cssEdit)
+        root.addView(label("Lottie JSON 字符串，纯Lottie模式生效，支持 ${'$'}{s1}/${'$'}{s2} 和 data:image"))
+        root.addView(lottieJsonEdit)
+        root.addView(label("Lottie JSON 文件路径，JSON字符串为空时生效"))
+        root.addView(lottiePathEdit)
 
         updatePreview()
 
@@ -154,6 +180,14 @@ class AdvancedTitleConfigDialog : DialogFragment() {
                     html = htmlEdit.text?.toString().orEmpty(),
                     css = cssEdit.text?.toString().orEmpty()
                 )
+                AdvancedTitleConfig.renderMode =
+                    if (renderModeGroup.checkedRadioButtonId == rbLottie.id) {
+                        AdvancedTitleConfig.RENDER_LOTTIE
+                    } else {
+                        AdvancedTitleConfig.RENDER_EPUB
+                    }
+                AdvancedTitleConfig.lottieJson = lottieJsonEdit.text?.toString().orEmpty()
+                AdvancedTitleConfig.lottiePath = lottiePathEdit.text?.toString().orEmpty()
                 if (scopeGroup.checkedRadioButtonId == rbBook.id && book != null) {
                     AdvancedTitleConfig.setBookRule(book, rule)
                     lifecycleScope.launch {
@@ -168,6 +202,9 @@ class AdvancedTitleConfigDialog : DialogFragment() {
             .setNeutralButton("恢复默认") { _, _ ->
                 AdvancedTitleConfig.globalRule = AdvancedTitleConfig.SplitRule()
                 AdvancedTitleConfig.template = AdvancedTitleConfig.Template()
+                AdvancedTitleConfig.renderMode = AdvancedTitleConfig.RENDER_EPUB
+                AdvancedTitleConfig.lottieJson = null
+                AdvancedTitleConfig.lottiePath = null
                 book?.let {
                     AdvancedTitleConfig.setBookRule(it, null)
                     lifecycleScope.launch {
