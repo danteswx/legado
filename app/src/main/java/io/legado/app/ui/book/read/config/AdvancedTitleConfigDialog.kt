@@ -170,6 +170,9 @@ class AdvancedTitleConfigDialog : DialogFragment() {
             }
         )
         val sampleEdit = edit("第一章 接生")
+        val heightFactorEdit = edit(AdvancedTitleConfig.heightFactor.toString()).apply {
+            hint = "30-120，默认55"
+        }
         val lottieJsonEdit = edit(currentJson, minLines = 6).apply {
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -230,6 +233,8 @@ class AdvancedTitleConfigDialog : DialogFragment() {
         root.addView(label("预览"))
         root.addView(sampleEdit)
         root.addView(preview)
+        root.addView(label("渲染区域比例"))
+        root.addView(heightFactorEdit)
         root.addView(LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -319,7 +324,9 @@ class AdvancedTitleConfigDialog : DialogFragment() {
                     val rule = buildRule()
                     AdvancedTitleConfig.lottieJson = lottieJsonEdit.text?.toString().orEmpty()
                     AdvancedTitleConfig.lottiePath = null
-                    AdvancedTitleConfig.heightFactor = AdvancedTitleConfig.DEFAULT_HEIGHT_FACTOR
+                    val parsedHeight = heightFactorEdit.text?.toString()?.trim()?.toIntOrNull()
+                    AdvancedTitleConfig.heightFactor = (parsedHeight
+                        ?: AdvancedTitleConfig.DEFAULT_HEIGHT_FACTOR).coerceIn(30, 120)
                     if (scopeGroup.checkedRadioButtonId == rbBook.id && book != null) {
                         AdvancedTitleConfig.setBookRule(book, rule)
                         lifecycleScope.launch {

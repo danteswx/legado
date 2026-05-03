@@ -3,6 +3,7 @@ package io.legado.app.ui.book.read.page
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.LayerDrawable
@@ -51,6 +52,7 @@ import splitties.views.backgroundColor
 import java.io.ByteArrayInputStream
 import java.util.Date
 import java.util.concurrent.ConcurrentHashMap
+import org.json.JSONObject
 
 /**
  * 页面视图
@@ -602,9 +604,7 @@ class PageView(context: Context) : FrameLayout(context) {
             fallbackView.text = textPage.title
             fallbackView.visibility = VISIBLE
         }
-        if (ReadBookConfig.titleMode != AdvancedTitleConfig.TITLE_MODE_ADVANCED ||
-            isScroll
-        ) {
+        if (ReadBookConfig.titleMode != AdvancedTitleConfig.TITLE_MODE_ADVANCED) {
             hide()
             return
         }
@@ -627,12 +627,13 @@ class PageView(context: Context) : FrameLayout(context) {
         lottieView.setFontAssetDelegate(defaultFontAssetDelegate)
         lottieView.setImageAssetDelegate(dataUriImageAssetDelegate)
         val json = block.payload?.takeIf { it.isNotBlank() }
-        val nextKey = json?.let { "advanced_title:${it.hashCode()}" } ?: "advanced_title:raw"
+        val resolvedJson = json?.let { applyLottieTextFallbackStyle(it) }
+        val nextKey = resolvedJson?.let { "advanced_title:${it.hashCode()}" } ?: "advanced_title:raw"
         if (advancedTitleLottieKey != nextKey) {
             advancedTitleLottieKey = nextKey
             runCatching {
-                if (json != null) {
-                    lottieView.setAnimationFromJson(json, nextKey)
+                if (resolvedJson != null) {
+                    lottieView.setAnimationFromJson(resolvedJson, nextKey)
                 } else {
                     lottieView.setAnimation(R.raw.advanced_title_lottie)
                 }
@@ -644,11 +645,69 @@ class PageView(context: Context) : FrameLayout(context) {
         fallbackView.visibility = GONE
         lottieView.visibility = VISIBLE
         runCatching {
-            if (!lottieView.isAnimating) {
+            if (!isScroll && !lottieView.isAnimating) {
                 lottieView.playAnimation()
+            } else if (isScroll) {
+                lottieView.pauseAnimation()
+                lottieView.progress = 1f
             }
         }.onFailure {
             showFallback(block)
+        }
+    }
+
+    private fun applyLottieTextFallbackStyle(rawJson: String): String {
+        val fallbackColor = ReadBookConfig.textColor
+        val fallbackHex = String.format("#%06X", 0xFFFFFF and fallbackColor)
+        val fallbackFont = "legado_default_font"
+        return runCatching {
+            val root = JSONObject(rawJson)
+            val layers = root.optJSONArray("layers") ?: return rawJson
+            for (i in 0 until layers.length()) {
+                val layer = layers.optJSONObject(i) ?: continue
+                if (layer.optInt("ty") != 5) continue
+                val text = layer.optJSONObject("t") ?: continue
+                val d = text.optJSONObject("d") ?: continue
+                val kArr = d.optJSONArray("k") ?: continue
+                for (j in 0 until kArr.length()) {
+                    val keyFrame = kArr.optJSONObject(j) ?: continue
+                    val style = keyFrame.optJSONObject("s") ?: continue
+                    if (!style.has("f") || style.optString("f").isBlank()) {
+                        style.put("f", fallbackFont)
+                    }
+                    if (!style.has("fc") || style.optJSONArray("fc") == null) {
+                        style.put("fc", parseColorArray(fallbackHex))
+                    }
+                }
+            }
+            val fonts = root.optJSONObject("fonts") ?: JSONObject().also { root.put("fonts", it) }
+            val list = fonts.optJSONArray("list") ?: org.json.JSONArray().also { fonts.put("list", it) }
+            var hasFont = false
+            for (i in 0 until list.length()) {
+                val item = list.optJSONObject(i) ?: continue
+                if (item.optString("fName") == fallbackFont) {
+                    hasFont = true
+                    break
+                }
+            }
+            if (!hasFont) {
+                list.put(JSONObject().apply {
+                    put("fName", fallbackFont)
+                    put("fFamily", fallbackFont)
+                    put("fStyle", "Regular")
+                    put("ascent", 75)
+                })
+            }
+            root.toString()
+        }.getOrDefault(rawJson)
+    }
+
+    private fun parseColorArray(hex: String): org.json.JSONArray {
+        val color = Color.parseColor(hex)
+        return org.json.JSONArray().apply {
+            put(Color.red(color) / 255.0)
+            put(Color.green(color) / 255.0)
+            put(Color.blue(color) / 255.0)
         }
     }
 
@@ -701,7 +760,7 @@ class PageView(context: Context) : FrameLayout(context) {
 
     private val defaultFontAssetDelegate = object : FontAssetDelegate() {
         override fun fetchFont(fontFamily: String): Typeface {
-            return Typeface.DEFAULT
+            return ChapterProvider.titlePaint.typeface ?: ChapterProvider.typeface ?: Typeface.DEFAULT
         }
     }
 
