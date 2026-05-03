@@ -14,7 +14,7 @@ fun String.decodeBase64DataUrlBytes(): ByteArray? {
             if (commaIndex < 0) return null
             val meta = clean.substring(0, commaIndex).lowercase()
             if (!meta.contains(";base64")) return null
-            clean.substring(commaIndex + 1)
+            clean.substring(commaIndex + 1).substringBefore(",{")
         }
         clean.startsWith("data64:", ignoreCase = true) -> {
             clean.substringAfter(':').substringBefore(",{")
