@@ -15,6 +15,10 @@ import com.airbnb.lottie.ImageAssetDelegate
 import android.widget.FrameLayout
 import com.airbnb.lottie.LottieImageAsset
 import com.airbnb.lottie.LottieDrawable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.view.ViewCompat
@@ -74,6 +78,8 @@ class PageView(context: Context) : FrameLayout(context) {
     private var isMainView = false
     private var currentTextPage: TextPage? = null
     private var advancedTitleLottieKey: String? = null
+    private var epubComposeFrame = 0
+    private var epubComposePageState by mutableStateOf<EpubComposePageState?>(null)
     private val lottieImageCache = ConcurrentHashMap<String, android.graphics.Bitmap?>()
     var isScroll = false
 
@@ -90,6 +96,15 @@ class PageView(context: Context) : FrameLayout(context) {
 
     init {
         if (!isInEditMode) {
+            binding.contentTextView.externalInvalidateCallback = { invalidateEpubComposeView() }
+            binding.epubComposeView.setViewCompositionStrategy(
+                ViewCompositionStrategy.DisposeOnDetachedFromWindow
+            )
+            binding.epubComposeView.setContent {
+                epubComposePageState?.let { state ->
+                    EpubComposePage(state)
+                }
+            }
             upStyle()
             binding.vwStatusBar.applyStatusBarPadding()
             binding.vwNavigationBar.applyNavigationBarPadding()
@@ -103,6 +118,7 @@ class PageView(context: Context) : FrameLayout(context) {
 
     override fun onDetachedFromWindow() {
         binding.advancedTitleLottie.cancelAnimation()
+        binding.contentTextView.externalInvalidateCallback = null
         super.onDetachedFromWindow()
     }
 
@@ -399,6 +415,7 @@ class PageView(context: Context) : FrameLayout(context) {
             resetPageOffset()
         }
         binding.contentTextView.setContent(textPage, resetPageOffset)
+        upEpubComposeLayer(textPage)
     }
 
     fun invalidateContentView() {
@@ -460,6 +477,7 @@ class PageView(context: Context) : FrameLayout(context) {
         if (changed && AppConfig.readScrollFollowBackground) {
             upBg()
         }
+        invalidateEpubComposeView()
     }
 
     /**
@@ -574,6 +592,32 @@ class PageView(context: Context) : FrameLayout(context) {
 
     fun relativePage(relativePagePos: Int): TextPage {
         return binding.contentTextView.relativePage(relativePagePos)
+    }
+
+    private fun upEpubComposeLayer(textPage: TextPage?) {
+        val useCompose = textPage != null && ReadBook.book?.isEpub == true
+        binding.epubComposeView.visibility = if (useCompose) VISIBLE else GONE
+        binding.contentTextView.isInvisible = useCompose
+        epubComposePageState = if (useCompose && textPage != null) {
+            EpubComposePageState(
+                contentView = binding.contentTextView,
+                textPage = textPage,
+                frame = ++epubComposeFrame
+            )
+        } else {
+            null
+        }
+    }
+
+    private fun invalidateEpubComposeView() {
+        val textPage = currentTextPage ?: return
+        if (binding.epubComposeView.visibility != VISIBLE) return
+        epubComposePageState = EpubComposePageState(
+            contentView = binding.contentTextView,
+            textPage = textPage,
+            frame = ++epubComposeFrame
+        )
+        binding.epubComposeView.invalidate()
     }
 
     private fun upAdvancedTitleLottie(textPage: TextPage) {

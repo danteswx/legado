@@ -78,6 +78,14 @@
         app:layout_constraintBottom_toTopOf="@id/vw_bottom_divider"
         app:layout_constraintTop_toBottomOf="@id/vw_top_divider" />
 
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/epub_compose_view"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/content_text_view"
+        app:layout_constraintTop_toTopOf="@id/content_text_view" />
+
     <com.airbnb.lottie.LottieAnimationView
         android:id="@+id/advanced_title_lottie"
         android:layout_width="220dp"
