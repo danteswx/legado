@@ -47,15 +47,15 @@ class AdvancedTitleConfigDialog : DialogFragment() {
 
     private val currentBook: Book?
         get() = ReadBook.book
-    private var jsonEdit: EditText? = null
     private var currentJson: String = AdvancedTitleConfig.lottieJson.orEmpty()
+    private var jsonCursorPosition: Int = 0
     private val importFromNet by lazy { getString(R.string.advanced_title_import_from_net) }
 
     private val jsonEditLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) {
             result.data?.getStringExtra("text")?.let { text ->
                 currentJson = text
-                jsonEdit?.setText(text)
+                jsonCursorPosition = result.data?.getIntExtra("cursorPosition", text.length) ?: text.length
             }
         }
     }
@@ -69,7 +69,7 @@ class AdvancedTitleConfigDialog : DialogFragment() {
                     uri.readText(requireContext())
                 }.onSuccess { text ->
                     currentJson = text
-                    jsonEdit?.setText(text)
+                    jsonCursorPosition = text.length
                 }.onFailure { error ->
                     context?.toastOnUi(
                         getString(R.string.advanced_title_import_failed, error.localizedMessage.orEmpty())
@@ -176,15 +176,6 @@ class AdvancedTitleConfigDialog : DialogFragment() {
         val heightFactorEdit = edit(AdvancedTitleConfig.heightFactor.toString()).apply {
             hint = getString(R.string.advanced_title_height_factor_hint)
         }
-        val lottieJsonEdit = edit(currentJson, minLines = 6).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                150.dpToPx()
-            )
-            setHorizontallyScrolling(true)
-            setSingleLine(false)
-        }
-        jsonEdit = lottieJsonEdit
         val openEditorButton = button(getString(R.string.advanced_title_open_editor)).apply {
             setOnClickListener { openJsonEditor() }
         }
@@ -251,7 +242,6 @@ class AdvancedTitleConfigDialog : DialogFragment() {
             })
             addView(openEditorButton)
         })
-        root.addView(lottieJsonEdit)
         root.addView(TextView(context).apply {
             text = getString(R.string.advanced_title_json_hint)
             textSize = 12f
@@ -277,7 +267,7 @@ class AdvancedTitleConfigDialog : DialogFragment() {
                 layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
                 (layoutParams as LinearLayout.LayoutParams).marginStart = 6.dpToPx()
                 setOnClickListener {
-                    val json = lottieJsonEdit.text?.toString().orEmpty()
+                    val json = currentJson.trim()
                     exportJson.launch {
                         mode = HandleFileContract.EXPORT
                         fileData = HandleFileContract.FileData(
@@ -329,7 +319,7 @@ class AdvancedTitleConfigDialog : DialogFragment() {
                 (layoutParams as LinearLayout.LayoutParams).marginStart = 6.dpToPx()
                 setOnClickListener {
                     val rule = buildRule()
-                    val json = lottieJsonEdit.text?.toString().orEmpty().trim()
+                    val json = currentJson.trim()
                     if (json.isNotEmpty() && !AdvancedTitleConfig.isValidLottieJson(json)) {
                         context.toastOnUi(getString(R.string.advanced_title_invalid_json))
                         return@setOnClickListener
@@ -407,7 +397,7 @@ class AdvancedTitleConfigDialog : DialogFragment() {
                 }.string()
             }.onSuccess { text ->
                 currentJson = text
-                jsonEdit?.setText(text)
+                jsonCursorPosition = text.length
             }.onFailure { error ->
                 context?.toastOnUi(
                     getString(R.string.advanced_title_import_net_failed, error.localizedMessage.orEmpty())
@@ -417,12 +407,10 @@ class AdvancedTitleConfigDialog : DialogFragment() {
     }
 
     private fun openJsonEditor() {
-        val editText = jsonEdit ?: return
-        currentJson = editText.text?.toString().orEmpty()
         jsonEditLauncher.launch(Intent(requireActivity(), CodeEditActivity::class.java).apply {
             putExtra("text", currentJson)
             putExtra("title", getString(R.string.advanced_title_json_label))
-            putExtra("cursorPosition", editText.selectionStart.coerceAtLeast(0))
+            putExtra("cursorPosition", jsonCursorPosition.coerceIn(0, currentJson.length))
         })
     }
 }
