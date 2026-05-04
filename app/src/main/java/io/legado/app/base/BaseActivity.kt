@@ -11,15 +11,10 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
-import android.view.ViewGroup
 import android.widget.FrameLayout
-import android.widget.ImageView
 import androidx.activity.addCallback
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
-import com.airbnb.lottie.LottieDrawable
-import com.airbnb.lottie.LottieAnimationView
-import com.bumptech.glide.Glide
 import androidx.viewbinding.ViewBinding
 import io.legado.app.R
 import io.legado.app.constant.AppConst
@@ -32,7 +27,6 @@ import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.widget.TitleBar
 import io.legado.app.utils.ColorUtils
-import io.legado.app.utils.FileUtils
 import io.legado.app.utils.applyBackgroundTint
 import io.legado.app.utils.applyOpenTint
 import io.legado.app.utils.applyTint
@@ -55,9 +49,6 @@ abstract class BaseActivity<VB : ViewBinding>(
 ) : AppCompatActivity() {
 
     protected abstract val binding: VB
-    private var dynamicBackgroundHost: FrameLayout? = null
-    private var dynamicBackgroundImageView: ImageView? = null
-    private var dynamicBackgroundLottieView: LottieAnimationView? = null
 
     val isInMultiWindow: Boolean
         @SuppressLint("ObsoleteSdkInt")
@@ -108,17 +99,6 @@ abstract class BaseActivity<VB : ViewBinding>(
     override fun onResume() {
         super.onResume()
         applyPreferredRefreshRate()
-        dynamicBackgroundLottieView?.resumeAnimation()
-    }
-
-    override fun onPause() {
-        dynamicBackgroundLottieView?.pauseAnimation()
-        super.onPause()
-    }
-
-    override fun onDestroy() {
-        clearDynamicBackground()
-        super.onDestroy()
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -189,121 +169,20 @@ abstract class BaseActivity<VB : ViewBinding>(
     open fun upBackgroundImage() {
         if (imageBg) {
             try {
-                val dynamicBackground = ThemeConfig.getDynamicBackground(this)
-                if (dynamicBackground != null) {
-                    window.decorView.applyBackgroundTint(backgroundColor)
-                    showDynamicBackground(dynamicBackground)
+                val drawable = ThemeConfig.getBgImage(this, windowManager.windowSize)
+                if (drawable != null) {
+                    window.decorView.background = drawable
                 } else {
-                    clearDynamicBackground()
-                    val drawable = ThemeConfig.getBgImage(this, windowManager.windowSize)
-                    if (drawable != null) {
-                        window.decorView.background = drawable
-                    } else {
-                        window.decorView.applyBackgroundTint(backgroundColor)
-                    }
+                    window.decorView.applyBackgroundTint(backgroundColor)
                 }
             } catch (_: OutOfMemoryError) {
-                clearDynamicBackground()
                 window.decorView.applyBackgroundTint(backgroundColor)
                 toastOnUi("背景图片太大,内存溢出")
             } catch (e: Exception) {
-                clearDynamicBackground()
                 window.decorView.applyBackgroundTint(backgroundColor)
                 AppLog.put("加载背景出错\n${e.localizedMessage}", e)
             }
         }
-    }
-
-    private fun showDynamicBackground(spec: ThemeConfig.DynamicBackgroundSpec) {
-        val host = ensureDynamicBackgroundHost()
-        host.visibility = View.VISIBLE
-        when (spec.type) {
-            ThemeConfig.DynamicBackgroundType.GIF -> {
-                val imageView = ensureDynamicBackgroundImageView(host)
-                dynamicBackgroundLottieView?.apply {
-                    cancelAnimation()
-                    visibility = View.GONE
-                }
-                Glide.with(this)
-                    .asGif()
-                    .load(spec.path)
-                    .into(imageView)
-                imageView.visibility = View.VISIBLE
-            }
-            ThemeConfig.DynamicBackgroundType.LOTTIE -> {
-                val lottieView = ensureDynamicBackgroundLottieView(host)
-                dynamicBackgroundImageView?.let {
-                    Glide.with(this).clear(it)
-                    it.setImageDrawable(null)
-                    it.visibility = View.GONE
-                }
-                lottieView.cancelAnimation()
-                lottieView.setAnimationFromJson(
-                    FileUtils.readText(spec.path),
-                    "theme-dynamic-${spec.path.hashCode()}"
-                )
-                lottieView.playAnimation()
-                lottieView.visibility = View.VISIBLE
-            }
-        }
-    }
-
-    private fun ensureDynamicBackgroundHost(): FrameLayout {
-        dynamicBackgroundHost?.let { return it }
-        val decorView = window.decorView as? ViewGroup ?: return FrameLayout(this)
-        return FrameLayout(this).apply {
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-            isClickable = false
-            isFocusable = false
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            decorView.addView(this, 0)
-            dynamicBackgroundHost = this
-        }
-    }
-
-    private fun ensureDynamicBackgroundImageView(host: FrameLayout): ImageView {
-        dynamicBackgroundImageView?.let { return it }
-        return ImageView(this).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            host.addView(this)
-            dynamicBackgroundImageView = this
-        }
-    }
-
-    private fun ensureDynamicBackgroundLottieView(host: FrameLayout): LottieAnimationView {
-        dynamicBackgroundLottieView?.let { return it }
-        return LottieAnimationView(this).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-            repeatCount = LottieDrawable.INFINITE
-            repeatMode = LottieDrawable.RESTART
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            host.addView(this)
-            dynamicBackgroundLottieView = this
-        }
-    }
-
-    private fun clearDynamicBackground() {
-        dynamicBackgroundLottieView?.cancelAnimation()
-        dynamicBackgroundImageView?.let {
-            Glide.with(this).clear(it)
-            it.setImageDrawable(null)
-        }
-        dynamicBackgroundHost?.let { host ->
-            (host.parent as? ViewGroup)?.removeView(host)
-        }
-        dynamicBackgroundHost = null
-        dynamicBackgroundImageView = null
-        dynamicBackgroundLottieView = null
     }
 
     open fun setupSystemBar() {

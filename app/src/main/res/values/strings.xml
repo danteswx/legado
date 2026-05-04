@@ -1696,9 +1696,6 @@
     <string name="theme_image_book_info_background">Book detail background</string>
     <string name="theme_image_blur">Background image blur</string>
     <string name="theme_image_select">Select image</string>
-    <string name="theme_select_image_gif">Select image / GIF</string>
-    <string name="theme_select_lottie">Select Lottie JSON</string>
-    <string name="theme_select_background_asset">Select image / GIF / Lottie</string>
     <string name="theme_image_delete">Delete image</string>
     <string name="theme_image_value_unselected">Not selected</string>
     <string name="theme_image_value_unselected_blur">Not selected · blur %d</string>

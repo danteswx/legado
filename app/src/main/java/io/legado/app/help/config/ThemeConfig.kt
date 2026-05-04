@@ -88,76 +88,18 @@ object ThemeConfig {
         AppCompatDelegate.setDefaultNightMode(targetMode)
     }
 
-    private fun getAssetSuffix(url: String, contentType: String? = null): String {
-        val lowerUrl = url.lowercase()
-        val lowerContentType = contentType?.lowercase().orEmpty()
-        return when {
-            lowerUrl.contains(".9.png") -> ".9.png"
-            lowerUrl.contains(".json") || lowerContentType.contains("json") -> ".json"
-            lowerUrl.contains(".png") || lowerContentType.contains("png") -> ".png"
-            lowerUrl.contains(".gif") || lowerContentType.contains("gif") -> ".gif"
-            lowerUrl.contains(".webp") || lowerContentType.contains("webp") -> ".webp"
+    /**
+     * 获取链接获取图片文件名
+     */
+    private fun getUrlToFile(url: String): String {
+        val suffix = when {
+            url.contains(".9.png", ignoreCase = true) -> ".9.png"
+            url.contains(".png", ignoreCase = true) -> ".png"
+            url.contains(".gif", ignoreCase = true) -> ".gif"
+            url.contains("webp", ignoreCase = true) -> ".webp"
             else -> ".jpg"
         }
-    }
-
-    /**
-     * 获取链接获取背景资源文件名
-     */
-    private fun getUrlToFile(url: String, contentType: String? = null): String {
-        val suffix = getAssetSuffix(url, contentType)
         return MD5Utils.md5Encode16(url) + suffix
-    }
-
-    private fun resolveBackgroundPath(context: Context, preferenceKey: String): String? {
-        var path = context.getPrefString(preferenceKey)
-        if (path.isNullOrBlank()) return null
-        if (path.startsWith("http")) {
-            val fileRoot = context.externalFiles
-            val cachedFile = findCachedUrlFile(fileRoot.getFile(preferenceKey), path)
-            if (cachedFile == null) {
-                appCtx.toastOnUi("未缓存在线背景资源\n请重新应用主题")
-                return null
-            }
-            path = cachedFile.absolutePath
-        }
-        return path
-    }
-
-    private fun findCachedUrlFile(root: File, url: String): File? {
-        val hash = MD5Utils.md5Encode16(url)
-        val exact = File(root, getUrlToFile(url))
-        if (exact.exists()) return exact
-        return root.listFiles()?.firstOrNull { it.isFile && it.name.startsWith(hash) }
-    }
-
-    private fun isDynamicBackground(path: String): Boolean {
-        val lowerPath = path.lowercase()
-        return lowerPath.endsWith(".gif") || lowerPath.endsWith(".json")
-    }
-
-    enum class DynamicBackgroundType {
-        GIF,
-        LOTTIE
-    }
-
-    data class DynamicBackgroundSpec(
-        val path: String,
-        val type: DynamicBackgroundType
-    )
-
-    fun getDynamicBackground(context: Context): DynamicBackgroundSpec? {
-        val preferenceKey = when (getTheme()) {
-            Theme.Light -> PreferKey.bgImage
-            Theme.Dark -> PreferKey.bgImageN
-            else -> return null
-        }
-        val path = resolveBackgroundPath(context, preferenceKey) ?: return null
-        return when {
-            path.endsWith(".gif", true) -> DynamicBackgroundSpec(path, DynamicBackgroundType.GIF)
-            path.endsWith(".json", true) -> DynamicBackgroundSpec(path, DynamicBackgroundType.LOTTIE)
-            else -> null
-        }
     }
 
     fun getBgImage(context: Context, metrics: DisplayMetrics): Drawable? {
@@ -167,8 +109,18 @@ object ThemeConfig {
             Theme.Dark -> PreferKey.bgImageN
             else -> return  null
         }
-        val path = resolveBackgroundPath(context, preferenceKey) ?: return null
-        if (isDynamicBackground(path)) return null
+        var path = context.getPrefString(preferenceKey)
+        if (path.isNullOrBlank()) return null
+        if (path.startsWith("http")) {
+            val name = getUrlToFile(path)
+            val fileRoot = context.externalFiles
+            val filePath = FileUtils.getPath(fileRoot, preferenceKey, name)
+            if (!FileUtils.exist(filePath)) {
+                appCtx.toastOnUi("未缓存在线背景图\n请重新应用主题")
+                return null
+            }
+            path = filePath
+        }
         if (path.endsWith(".9.png")) {
             val bgDrawable = BitmapUtils.decodeNinePatchDrawable(path)
             return bgDrawable
@@ -303,22 +255,21 @@ object ThemeConfig {
                 if (!fileFold.exists()) {
                     fileFold.mkdirs()
                 }
-                if (findCachedUrlFile(fileFold, backgroundPath) == null) {
-                    appCtx.toastOnUi("下载背景资源中...")
+                val fileImg = File(fileFold, name)
+                if (!fileImg.exists()) {
+                    appCtx.toastOnUi("下载背景图片中...")
                     Coroutine.async {
                         kotlin.runCatching {
                             val res = okHttpClient.newCallResponse(0) {
                                 url(backgroundPath)
                             }
-                            val contentType = res.header("Content-Type")
-                            val resolvedFile = File(fileFold, getUrlToFile(backgroundPath, contentType))
                             res.body.byteStream().use { inputStream ->
-                                FileOutputStream(resolvedFile).use { outputStream ->
+                                FileOutputStream(fileImg).use { outputStream ->
                                     inputStream.copyTo(outputStream)
                                 }
                             }
                         }.onSuccess {
-                            appCtx.toastOnUi("背景资源下载成功\n请重新应用主题")
+                            appCtx.toastOnUi("背景图下载成功\n请重新应用主题")
                         }.onFailure {
                             appCtx.toastOnUi(it.localizedMessage)
                         }
@@ -570,7 +521,8 @@ object ThemeConfig {
         val nightBackgroundImgPaths = nightConfigs.mapNotNull {
             val path = it.backgroundImgPath ?: return@mapNotNull null
             if (path.startsWith("http")) {
-                findCachedUrlFile(fileRoot.getFile(PreferKey.bgImageN), path)?.absolutePath
+                val name = getUrlToFile(path)
+                FileUtils.getPath(fileRoot, PreferKey.bgImageN, name)
             } else {
                 path
             }
@@ -578,7 +530,8 @@ object ThemeConfig {
         val dayBackgroundImgPaths = dayConfigs.mapNotNull {
             val path = it.backgroundImgPath ?: return@mapNotNull null
             if (path.startsWith("http")) {
-                findCachedUrlFile(fileRoot.getFile(PreferKey.bgImage), path)?.absolutePath
+                val name = getUrlToFile(path)
+                FileUtils.getPath(fileRoot, PreferKey.bgImage, name)
             } else {
                 path
             }

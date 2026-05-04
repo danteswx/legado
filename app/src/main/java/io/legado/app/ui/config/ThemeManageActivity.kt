@@ -78,11 +78,8 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(), ColorPic
     private var appliedNightThemeOverride: String? = null
     private val selectImage = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
-            val targetPath = copySelectedAsset(uri, if (it.requestCode == requestMainBackground || it.requestCode == requestMainBackgroundLottie) "main" else "book_info")
+            val targetPath = copySelectedImage(uri, if (it.requestCode == requestMainBackground) "main" else "book_info")
             if (it.requestCode == requestMainBackground) {
-                pendingMainBackgroundPath = targetPath
-                editDialogBinding?.let { binding -> updateImageRow(binding.rowMainBackground, true) }
-            } else if (it.requestCode == requestMainBackgroundLottie) {
                 pendingMainBackgroundPath = targetPath
                 editDialogBinding?.let { binding -> updateImageRow(binding.rowMainBackground, true) }
             } else {
@@ -303,11 +300,9 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(), ColorPic
 
     private fun updateImageRow(row: ItemThemePackageOptionBinding, isMain: Boolean) {
         val path = if (isMain) pendingMainBackgroundPath else pendingBookInfoBackgroundPath
-        val isDynamic = path?.endsWith(".gif", true) == true || path?.endsWith(".json", true) == true
         row.tvValue.text = when {
             path.isNullOrBlank() && isMain -> getString(R.string.theme_image_value_unselected_blur, pendingBlur)
             path.isNullOrBlank() -> getString(R.string.theme_image_value_unselected)
-            isMain && isDynamic -> File(path).name
             isMain -> getString(R.string.theme_image_value_file_blur, File(path).name, pendingBlur)
             else -> File(path).name
         }
@@ -317,8 +312,7 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(), ColorPic
         val hasImage = if (isMain) !pendingMainBackgroundPath.isNullOrBlank() else !pendingBookInfoBackgroundPath.isNullOrBlank()
         val actions = buildList {
             if (isMain) add(ThemeImageAction.BLUR)
-            add(ThemeImageAction.SELECT_IMAGE)
-            if (isMain) add(ThemeImageAction.SELECT_LOTTIE)
+            add(ThemeImageAction.SELECT)
             if (hasImage) add(ThemeImageAction.DELETE)
         }
         selector(
@@ -327,15 +321,9 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(), ColorPic
         ) { _, index ->
             when (actions[index]) {
                 ThemeImageAction.BLUR -> showBlurDialog()
-                ThemeImageAction.SELECT_IMAGE -> selectImage.launch {
+                ThemeImageAction.SELECT -> selectImage.launch {
                     requestCode = if (isMain) requestMainBackground else requestBookInfoBackground
-                    mode = HandleFileContract.FILE
-                    allowExtensions = arrayOf("png", "jpg", "jpeg", "gif", "webp")
-                }
-                ThemeImageAction.SELECT_LOTTIE -> selectImage.launch {
-                    requestCode = requestMainBackgroundLottie
-                    mode = HandleFileContract.FILE
-                    allowExtensions = arrayOf("json")
+                    mode = HandleFileContract.IMAGE
                 }
                 ThemeImageAction.DELETE -> {
                     if (isMain) {
@@ -496,24 +484,10 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(), ColorPic
         return normalizeColor(text)
     }
 
-    private fun copySelectedAsset(uri: Uri, prefix: String): String? {
+    private fun copySelectedImage(uri: Uri, prefix: String): String? {
         return kotlin.runCatching {
             val dir = externalFiles.getFile("themePackageTemp").apply { mkdirs() }
-            val fileNameFromUri = uri.lastPathSegment?.substringAfterLast('/')
-            val suffix = when {
-                fileNameFromUri?.contains(".9.png", true) == true -> ".9.png"
-                fileNameFromUri?.endsWith(".json", true) == true -> ".json"
-                contentResolver.getType(uri)?.contains("json", true) == true -> ".json"
-                fileNameFromUri?.endsWith(".gif", true) == true -> ".gif"
-                contentResolver.getType(uri)?.contains("gif", true) == true -> ".gif"
-                fileNameFromUri?.endsWith(".webp", true) == true -> ".webp"
-                contentResolver.getType(uri)?.contains("webp", true) == true -> ".webp"
-                fileNameFromUri?.endsWith(".png", true) == true -> ".png"
-                contentResolver.getType(uri)?.contains("png", true) == true -> ".png"
-                fileNameFromUri?.endsWith(".jpeg", true) == true -> ".jpeg"
-                contentResolver.getType(uri)?.contains("jpeg", true) == true -> ".jpeg"
-                else -> ".jpg"
-            }
+            val suffix = contentResolver.getType(uri)?.substringAfterLast("/")?.let { ".$it" } ?: ".jpg"
             val file = File(dir, "${prefix}_${System.currentTimeMillis()}$suffix")
             contentResolver.openInputStream(uri)?.use { input ->
                 FileOutputStream(file).use { output -> input.copyTo(output) }
@@ -894,7 +868,6 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(), ColorPic
         private val themeRemoteSyncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         private const val requestMainBackground = 301
         private const val requestBookInfoBackground = 302
-        private const val requestMainBackgroundLottie = 303
         private const val colorPrimary = 401
         private const val colorAccent = 402
         private const val colorBackground = 403
@@ -916,8 +889,7 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(), ColorPic
 
     private enum class ThemeImageAction(val titleRes: Int) {
         BLUR(R.string.theme_image_blur),
-        SELECT_IMAGE(R.string.theme_select_image_gif),
-        SELECT_LOTTIE(R.string.theme_select_lottie),
+        SELECT(R.string.theme_image_select),
         DELETE(R.string.theme_image_delete)
     }
 

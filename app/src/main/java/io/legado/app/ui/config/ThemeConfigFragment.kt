@@ -306,8 +306,7 @@ class ThemeConfigFragment : PreferenceFragment(),
         val blurringKey = if (isNight) PreferKey.bgImageNBlurring else PreferKey.bgImageBlurring
         val actions = arrayListOf(
             getString(R.string.background_image_blurring),
-            getString(R.string.theme_select_image_gif),
-            getString(R.string.theme_select_lottie)
+            getString(R.string.select_image)
         )
         if (!getPrefString(bgKey).isNullOrEmpty()) {
             actions.add(getString(R.string.delete))
@@ -322,35 +321,17 @@ class ThemeConfigFragment : PreferenceFragment(),
                     if (isNight) {
                         selectImage.launch {
                             requestCode = requestCodeBgDark
-                            mode = HandleFileContract.FILE
-                            allowExtensions = arrayOf("png", "jpg", "jpeg", "gif", "webp")
+                            mode = HandleFileContract.IMAGE
                         }
                     } else {
                         selectImage.launch {
                             requestCode = requestCodeBgLight
-                            mode = HandleFileContract.FILE
-                            allowExtensions = arrayOf("png", "jpg", "jpeg", "gif", "webp")
+                            mode = HandleFileContract.IMAGE
                         }
                     }
                 }
 
                 2 -> {
-                    if (isNight) {
-                        selectImage.launch {
-                            requestCode = requestCodeBgDark
-                            mode = HandleFileContract.FILE
-                            allowExtensions = arrayOf("json")
-                        }
-                    } else {
-                        selectImage.launch {
-                            requestCode = requestCodeBgLight
-                            mode = HandleFileContract.FILE
-                            allowExtensions = arrayOf("json")
-                        }
-                    }
-                }
-
-                3 -> {
                     removePref(bgKey)
                     upTheme(isNight)
                 }
@@ -453,12 +434,7 @@ class ThemeConfigFragment : PreferenceFragment(),
             }
 
             PreferKey.bgImage,
-            PreferKey.bgImageN -> preference.summary = if (value.isNullOrBlank()) {
-                getString(R.string.theme_select_background_asset)
-            } else {
-                value
-            }
-
+            PreferKey.bgImageN,
             PreferKey.bookInfoBgImage,
             PreferKey.bookInfoBgImageN -> preference.summary = if (value.isNullOrBlank()) {
                 getString(R.string.select_image)
@@ -480,7 +456,7 @@ class ThemeConfigFragment : PreferenceFragment(),
         if (uri.scheme?.lowercase() in listOf("http", "https")) {
             lifecycleScope.launch {
                 kotlin.runCatching {
-                    appCtx.toastOnUi("下载背景资源中...")
+                    appCtx.toastOnUi("下载背景图片中...")
                     val analyzeUrl = AnalyzeUrl(uri.toString())
                     val url = analyzeUrl.urlNoQuery
                     var file = requireContext().externalFiles
@@ -490,7 +466,6 @@ class ThemeConfigFragment : PreferenceFragment(),
                     }
                     val contentType = res.header("Content-Type") ?: "image/jpeg"
                     val imageType = when {
-                        contentType.contains("json", ignoreCase = true) -> "json"
                         contentType.contains("png", ignoreCase = true) -> "png"
                         contentType.contains("gif", ignoreCase = true) -> "gif"
                         contentType.contains("webp", ignoreCase = true) -> "webp"
@@ -526,7 +501,7 @@ class ThemeConfigFragment : PreferenceFragment(),
                 val suffix = if (fileDoc.name.contains(".9.png", true)) {
                     ".9.png"
                 } else {
-                    "." + fileDoc.name.substringAfterLast(".").lowercase()
+                    "." + fileDoc.name.substringAfterLast(".")
                 }
                 val fileName = uri.inputStream(requireContext()).getOrThrow().use {
                     MD5Utils.md5Encode(it) + suffix
