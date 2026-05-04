@@ -243,7 +243,6 @@
     <string name="bookshelf_px_2">Título del libro</string>
     <string name="bookshelf_px_3">Ordenar manualmente</string>
     <string name="read_type">Estrategia de lectura</string>
-    <string name="compose_type">Tipografía</string>
     <string name="del_select">Quitar selecionados</string>
     <string name="del_msg">¿Desea quitarlos?</string>
     <string name="clear_font">Limpiar fuente</string>

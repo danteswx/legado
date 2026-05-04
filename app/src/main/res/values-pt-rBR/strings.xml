@@ -247,7 +247,6 @@
     <string name="bookshelf_px_2">Por título do livro</string>
     <string name="bookshelf_px_3">Ordenar manualmente</string>
     <string name="read_type">Estratégia de leitura</string>
-    <string name="compose_type">Tipografia</string>
     <string name="del_select">Excluir selecionados</string>
     <string name="del_msg">Você quer excluir?</string>
     <string name="clear_font">Fonte padrão</string>

@@ -241,7 +241,6 @@
     <string name="bookshelf_px_2">按書名</string>
     <string name="bookshelf_px_3">手動排序</string>
     <string name="read_type">閱讀方式</string>
-    <string name="compose_type">排版</string>
     <string name="del_select">刪除所選</string>
     <string name="del_msg">是否確認刪除？</string>
     <string name="clear_font">預設字體</string>

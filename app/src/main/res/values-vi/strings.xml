@@ -242,7 +242,6 @@
     <string name="bookshelf_px_2">Theo tên sách</string>
     <string name="bookshelf_px_3">Sắp xếp thủ công</string>
     <string name="read_type">Chiến lược đọc</string>
-    <string name="compose_type">Bố cục chữ</string>
     <string name="del_select">Xóa mục đã chọn</string>
     <string name="del_msg">Bạn có chắc chắn muốn xóa không?</string>
     <string name="clear_font">Phông chữ mặc định</string>

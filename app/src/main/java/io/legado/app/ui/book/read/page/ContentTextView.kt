@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
-import android.os.Looper
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
@@ -67,7 +66,6 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
     var longScreenshot = false
     var reverseStartCursor = false
     var reverseEndCursor = false
-    internal var externalInvalidateCallback: (() -> Unit)? = null
 
     //滚动参数
     private val pageFactory get() = callBack.pageFactory
@@ -135,48 +133,6 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
             canvas.clipRect(visibleRect)
         }
         drawPage(canvas)
-    }
-
-    internal fun drawForEpubCompose(canvas: Canvas) {
-        val saveCount = canvas.save()
-        try {
-            autoPager?.onDraw(canvas)
-            if (longScreenshot) {
-                canvas.translate(0f, scrollY.toFloat())
-            }
-            drawScrollFollowBackground(canvas)
-            check(!visibleRect.isEmpty) { "visibleRect 为空" }
-            if (!textPage.hasEpubBackground()) {
-                canvas.clipRect(visibleRect)
-            }
-            drawPage(canvas)
-        } finally {
-            canvas.restoreToCount(saveCount)
-        }
-    }
-
-    override fun invalidate() {
-        super.invalidate()
-        notifyExternalInvalidate()
-    }
-
-    override fun postInvalidate() {
-        super.postInvalidate()
-        notifyExternalInvalidate()
-    }
-
-    override fun postInvalidateOnAnimation() {
-        super.postInvalidateOnAnimation()
-        notifyExternalInvalidate()
-    }
-
-    private fun notifyExternalInvalidate() {
-        val callback = externalInvalidateCallback ?: return
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            callback()
-        } else {
-            post { callback() }
-        }
     }
 
     /**

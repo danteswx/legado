@@ -247,7 +247,6 @@
     <string name="bookshelf_px_2">By book title</string>
     <string name="bookshelf_px_3">By sort manually</string>
     <string name="read_type">Reading strategy</string>
-    <string name="compose_type">Typesetting</string>
     <string name="del_select">Delete selected</string>
     <string name="del_msg">Are you sure to delete?</string>
     <string name="clear_font">Default font</string>
