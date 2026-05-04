@@ -9,7 +9,6 @@ plugins {
     alias libs.plugins.android.application
     alias libs.plugins.kotlin.android
     alias libs.plugins.kotlin.parcelize
-    alias libs.plugins.kotlin.compose
     alias libs.plugins.room
     alias libs.plugins.ksp
     alias libs.plugins.google.services
@@ -83,7 +82,6 @@ android {
     buildFeatures {
         buildConfig = true
         viewBinding = true
-        compose = true
     }
     buildTypes {
         release {
@@ -211,9 +209,6 @@ dependencies {
     implementation(libs.core.ktx)
     implementation(libs.appcompat.appcompat)
     implementation(libs.activity.ktx)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.compose.foundation)
-    implementation(libs.androidx.compose.ui)
     implementation(libs.fragment.ktx)
     implementation(libs.preference.ktx)
     implementation(libs.androidx.constraintlayout)
