@@ -14,6 +14,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ThemeConfig
+import io.legado.app.help.config.ThemePackageManager
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.BookCover
 import io.legado.app.utils.FileUtils
@@ -233,6 +234,7 @@ object Backup {
         backgroundAssetDirNames.forEach { dirName ->
             paths.add(appCtx.externalFiles.getFile(dirName).absolutePath)
         }
+        paths.add(ThemePackageManager.rootDir.absolutePath)
         FileUtils.delete(zipFilePath)
         FileUtils.delete(zipFilePath.replace("tmp_", ""))
         val backupFileName = if (AppConfig.onlyLatestBackup) {

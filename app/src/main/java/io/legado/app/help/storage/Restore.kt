@@ -32,6 +32,7 @@ import io.legado.app.help.book.upType
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ThemeConfig
+import io.legado.app.help.config.ThemePackageManager
 import io.legado.app.model.VideoPlay.VIDEO_PREF_NAME
 import io.legado.app.model.BookCover
 import io.legado.app.model.localBook.LocalBook
@@ -253,6 +254,7 @@ object Restore {
             }
         }
         restoreBackgroundAssets(path)
+        restoreThemePackages(path)
         //AppWebDav.downBgs()
         appCtx.getSharedPreferences(path, "config")?.all?.let { map ->
             val edit = appCtx.defaultSharedPreferences.edit()
@@ -287,6 +289,12 @@ object Restore {
             edit.commit()
         }
         normalizeBackgroundPrefs()
+        kotlin.runCatching {
+            ThemePackageManager.ensureLocalAppliedTheme(appCtx, false)
+            ThemePackageManager.ensureLocalAppliedTheme(appCtx, true)
+        }.onFailure {
+            AppLog.put("恢复默认主题包出错\n${it.localizedMessage}", it)
+        }
         appCtx.getSharedPreferences(path, "videoConfig")?.all?.let { map ->
             appCtx.getSharedPreferences(VIDEO_PREF_NAME, Context.MODE_PRIVATE).edit().apply {
                 map.forEach { (key, value) ->
@@ -350,6 +358,18 @@ object Restore {
             }.onFailure {
                 AppLog.put("恢复背景图片出错 $dirName\n${it.localizedMessage}", it)
             }
+        }
+    }
+
+    private fun restoreThemePackages(path: String) {
+        val sourceDir = File(path, "themePackages")
+        if (!sourceDir.exists() || !sourceDir.isDirectory) return
+        val targetDir = ThemePackageManager.rootDir
+        kotlin.runCatching {
+            FileUtils.delete(targetDir, deleteRootDir = true)
+            copyDir(sourceDir, targetDir)
+        }.onFailure {
+            AppLog.put("恢复主题包出错\n${it.localizedMessage}", it)
         }
     }
 

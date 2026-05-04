@@ -332,6 +332,19 @@ object ThemeConfig {
         }
     }
 
+    fun getThemeConfig(context: Context, isNightTheme: Boolean): Config {
+        val name = if (isNightTheme) {
+            context.getPrefString(PreferKey.dNThemeName) ?: ""
+        } else {
+            context.getPrefString(PreferKey.dThemeName) ?: ""
+        }
+        return if (isNightTheme) {
+            getNightTheme(context, name)
+        } else {
+            getDayTheme(context, name)
+        }
+    }
+
     private fun getDayTheme(context: Context, name: String): Config {
         val primary =
             context.getPrefInt(PreferKey.cPrimary, context.getCompatColor(R.color.md_brown_500))

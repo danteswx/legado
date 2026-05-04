@@ -105,7 +105,13 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(), ColorPic
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         restorePendingRemoteSyncTasks()
         initView()
-        loadThemes()
+        lifecycleScope.launch {
+            kotlin.runCatching {
+                ThemePackageManager.ensureLocalAppliedTheme(this@ThemeManageActivity, false)
+                ThemePackageManager.ensureLocalAppliedTheme(this@ThemeManageActivity, true)
+            }
+            loadThemes()
+        }
         flushPendingRemoteSyncTasks()
     }
 
@@ -146,11 +152,7 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(), ColorPic
         binding.tvSummary.text = appendPendingRemoteSummary(getString(R.string.theme_package_summary_default))
         lifecycleScope.launch {
             kotlin.runCatching {
-                if (useCloud) {
-                    ThemePackageManager.load(isNightTheme)
-                } else {
-                    ThemePackageManager.loadLocalOnly(isNightTheme)
-                }
+                ThemePackageManager.loadLocalOnly(isNightTheme)
             }.onSuccess {
                 if (version != loadVersion) return@launch
                 adapter.items = it
@@ -164,6 +166,9 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(), ColorPic
                         getString(R.string.theme_package_summary_default)
                     }
                 )
+                if (useCloud) {
+                    loadThemesRemote(version)
+                }
             }.onFailure {
                 if (it.isJobCancellation()) return@onFailure
                 if (version != loadVersion) return@launch
@@ -172,6 +177,33 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(), ColorPic
                 } else {
                     getString(R.string.theme_package_load_failed, it.localizedMessage)
                 }
+            }
+        }
+    }
+
+    private fun loadThemesRemote(version: Int) {
+        lifecycleScope.launch {
+            kotlin.runCatching {
+                ThemePackageManager.load(isNightTheme)
+            }.onSuccess {
+                if (version != loadVersion) return@onSuccess
+                adapter.items = it
+                binding.tvSummary.text = appendPendingRemoteSummary(
+                    if (it.isEmpty()) {
+                        getString(
+                            R.string.theme_package_empty,
+                            getString(if (isNightTheme) R.string.theme_night_short else R.string.theme_day_short)
+                        )
+                    } else {
+                        getString(R.string.theme_package_summary_default)
+                    }
+                )
+            }.onFailure {
+                if (it.isJobCancellation()) return@onFailure
+                if (version != loadVersion) return@onFailure
+                binding.tvSummary.text = appendPendingRemoteSummary(
+                    getString(R.string.theme_package_cloud_load_failed, it.localizedMessage)
+                )
             }
         }
     }
@@ -391,7 +423,7 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(), ColorPic
         lifecycleScope.launch {
             kotlin.runCatching {
                 val wasApplied = oldEntry?.let { isApplied(it) } == true
-                val exists = ThemePackageManager.themeExists(
+                val exists = ThemePackageManager.localThemeExists(
                     config.isNightTheme,
                     config.themeName,
                     oldEntry?.dirName
@@ -433,7 +465,6 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(), ColorPic
                 dirName = entry.dirName
             )
         )
-        loadThemes()
     }
 
     private fun currentConfig(): ThemeConfig.Config {

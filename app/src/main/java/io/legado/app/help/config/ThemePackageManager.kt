@@ -54,6 +54,17 @@ object ThemePackageManager {
         loadLocal(isNightTheme)
     }
 
+    suspend fun localThemeExists(
+        isNightTheme: Boolean,
+        themeName: String,
+        excludeDirName: String? = null
+    ): Boolean = withContext(IO) {
+        val normalizedDirName = themeName.trim().normalizeFileName()
+        loadLocal(isNightTheme).any {
+            it.dirName == normalizedDirName && it.dirName != excludeDirName
+        }
+    }
+
     suspend fun addFromCurrent(context: Context, name: String, isNightTheme: Boolean): Entry =
         withContext(IO) {
             val normalizedName = name.trim().ifBlank { if (isNightTheme) "夜间主题" else "日间主题" }
@@ -138,6 +149,22 @@ object ThemePackageManager {
         val dir = entry.localDir ?: localDir(entry.packageInfo.isNightTheme, entry.dirName)
         return resolveConfigPaths(entry.packageInfo, dir)
     }
+
+    suspend fun ensureLocalAppliedTheme(context: Context, isNightTheme: Boolean): Entry =
+        withContext(IO) {
+            val currentConfig = ThemeConfig.getThemeConfig(context, isNightTheme)
+            val config = currentConfig.copy(
+                isNightTheme = isNightTheme,
+                themeName = currentConfig.themeName.trim()
+                    .ifBlank { if (isNightTheme) "夜间主题" else "日间主题" }
+            )
+            val dirName = config.themeName.normalizeFileName()
+            val dir = localDir(isNightTheme, dirName)
+            readPackage(dir)?.let { pkg ->
+                return@withContext Entry(pkg, Source.LOCAL, localDir = dir)
+            }
+            saveConfig(config.copy(isNightTheme = isNightTheme))
+        }
 
     private fun saveConfig(config: ThemeConfig.Config): Entry {
         val normalizedName = config.themeName.trim()
