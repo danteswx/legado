@@ -350,6 +350,7 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
         val actions = buildList {
             if (isMain) add(ThemeImageAction.BLUR)
             add(ThemeImageAction.SELECT)
+            add(ThemeImageAction.ONLINE)
             if (hasImage) add(ThemeImageAction.DELETE)
         }
         selector(
@@ -362,6 +363,7 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
                     requestCode = if (isMain) requestMainBackground else requestBookInfoBackground
                     mode = HandleFileContract.IMAGE
                 }
+                ThemeImageAction.ONLINE -> showOnlineImageDialog(isMain)
                 ThemeImageAction.DELETE -> {
                     if (isMain) {
                         pendingMainBackgroundPath = null
@@ -372,6 +374,39 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
                     }
                 }
             }
+        }
+    }
+
+    private fun showOnlineImageDialog(isMain: Boolean) {
+        alert(R.string.theme_image_online) {
+            val alertBinding = io.legado.app.databinding.DialogEditTextBinding.inflate(layoutInflater).apply {
+                editView.hint = "https://..."
+                editView.setText(
+                    if (isMain) {
+                        pendingMainBackgroundPath?.takeIf { it.startsWith("http", ignoreCase = true) }
+                    } else {
+                        pendingBookInfoBackgroundPath?.takeIf { it.startsWith("http", ignoreCase = true) }
+                    }.orEmpty()
+                )
+            }
+            customView { alertBinding.root }
+            okButton {
+                val url = alertBinding.editView.text?.toString()?.trim().orEmpty()
+                if (!url.startsWith("http://", ignoreCase = true) &&
+                    !url.startsWith("https://", ignoreCase = true)
+                ) {
+                    toastOnUi(R.string.theme_image_online_invalid)
+                    return@okButton
+                }
+                if (isMain) {
+                    pendingMainBackgroundPath = url
+                    editDialogBinding?.let { updateImageRow(it.rowMainBackground, true) }
+                } else {
+                    pendingBookInfoBackgroundPath = url
+                    editDialogBinding?.let { updateImageRow(it.rowBookInfoBackground, false) }
+                }
+            }
+            cancelButton()
         }
     }
 
@@ -955,6 +990,7 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
     private enum class ThemeImageAction(val titleRes: Int) {
         BLUR(R.string.theme_image_blur),
         SELECT(R.string.theme_image_select),
+        ONLINE(R.string.theme_image_online),
         DELETE(R.string.theme_image_delete)
     }
 
