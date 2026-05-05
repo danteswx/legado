@@ -4,7 +4,7 @@
         <layer-list>
             <item>
                 <shape android:shape="rectangle">
-                    <corners android:topLeftRadius="12dp" android:topRightRadius="12dp" />
+                    <corners android:topLeftRadius="@dimen/ui_panel_radius" android:topRightRadius="@dimen/ui_panel_radius" />
                     <solid android:color="@color/btn_bg_press" />
                 </shape>
             </item>
@@ -20,7 +20,7 @@
         <layer-list>
             <item>
                 <shape android:shape="rectangle">
-                    <corners android:topLeftRadius="12dp" android:topRightRadius="12dp" />
+                    <corners android:topLeftRadius="@dimen/ui_panel_radius" android:topRightRadius="@dimen/ui_panel_radius" />
                     <solid android:color="@color/background_card" />
                 </shape>
             </item>

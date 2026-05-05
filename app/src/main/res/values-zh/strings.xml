@@ -722,6 +722,13 @@
     <string name="liquid_glass_level_summary">当前程度：%s。数值越高，折射和流体质感越强。</string>
     <string name="frosted_glass_level">毛玻璃程度</string>
     <string name="frosted_glass_level_summary">当前强度：%s。数值越高，底部玻璃栏的磨砂和模糊质感越强。</string>
+    <string name="ui_corner_scale">圆角倍率</string>
+    <string name="ui_corner_scale_summary">当前圆角倍率：%s，范围 0-1</string>
+    <string name="ui_corner_scale_invalid">请输入 0 到 1 之间的数字</string>
+    <string name="ui_corner_search_follow">搜索栏跟随圆角</string>
+    <string name="ui_corner_search_follow_summary">允许搜索栏使用全局圆角倍率</string>
+    <string name="ui_corner_reply_follow">回复栏跟随圆角</string>
+    <string name="ui_corner_reply_follow_summary">允许回复/输入栏使用全局圆角倍率</string>
     <string name="btn_default_s">默认</string>
     <string name="main_menu">主菜单</string>
     <string name="request_permission">点击授予权限</string>

@@ -2,9 +2,11 @@ package io.legado.app.lib.prefs
 
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.preference.PreferenceGroup
 import androidx.preference.PreferenceViewHolder
 import io.legado.app.R
+import io.legado.app.lib.theme.UiCorner
 import kotlin.math.roundToInt
 import androidx.preference.Preference as AndroidPreference
 import androidx.preference.PreferenceCategory as AndroidPreferenceCategory
@@ -15,15 +17,17 @@ object PreferenceItemStyle {
         val parent = preference.parent ?: return
         val hasPrev = hasVisibleSibling(parent, preference, forward = false)
         val hasNext = hasVisibleSibling(parent, preference, forward = true)
-        val background = when {
-            !hasPrev && !hasNext -> R.drawable.bg_preference_group_single
-            !hasPrev -> R.drawable.bg_preference_group_top
-            !hasNext -> R.drawable.bg_preference_group_bottom
-            else -> R.drawable.bg_preference_group_middle
-        }
         holder.isDividerAllowedAbove = false
         holder.isDividerAllowedBelow = false
-        holder.itemView.setBackgroundResource(background)
+        holder.itemView.background = PreferenceGroupBackgroundDrawable(
+            normalColor = ContextCompat.getColor(preference.context, R.color.background_card),
+            pressedColor = ContextCompat.getColor(preference.context, R.color.btn_bg_press),
+            dividerColor = ContextCompat.getColor(preference.context, R.color.bg_divider_line),
+            radius = UiCorner.panelRadius(preference.context),
+            hasPrev = hasPrev,
+            hasNext = hasNext,
+            dividerInset = holder.itemView.dp(16).toFloat()
+        )
         holder.itemView.updateGroupMargins(!hasPrev, !hasNext, parent)
     }
 

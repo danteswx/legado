@@ -1097,6 +1097,21 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefInt(PreferKey.frostedGlassLevel, value.coerceIn(0, 100))
         }
 
+    var uiCornerScale: Float
+        get() = appCtx.getPrefString(PreferKey.uiCornerScale, "1")
+            ?.toFloatOrNull()
+            ?.coerceIn(0f, 1f)
+            ?: 1f
+        set(value) {
+            appCtx.putPrefString(PreferKey.uiCornerScale, value.coerceIn(0f, 1f).toPlainScale())
+        }
+
+    val uiCornerSearchFollow: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.uiCornerSearchFollow, false)
+
+    val uiCornerReplyFollow: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.uiCornerReplyFollow, false)
+
     var liquidGlassLevel: Int
         get() = appCtx.getPrefInt(PreferKey.liquidGlassLevel, 68).coerceIn(0, 100)
         set(value) {
@@ -1119,6 +1134,14 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         set(value) {
             appCtx.putPrefBoolean(PreferKey.readUrlOpenInBrowser, value)
         }
+
+    private fun Float.toPlainScale(): String {
+        return if (this % 1f == 0f) {
+            this.toInt().toString()
+        } else {
+            String.format(java.util.Locale.US, "%.2f", this).trimEnd('0').trimEnd('.')
+        }
+    }
 
     var exportCharset: String
         get() {

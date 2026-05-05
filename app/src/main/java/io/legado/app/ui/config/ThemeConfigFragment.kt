@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.text.InputType
 import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
@@ -29,6 +30,7 @@ import io.legado.app.help.http.okHttpClient
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.prefs.ColorPreference
+import io.legado.app.lib.prefs.EditTextPreference
 import io.legado.app.lib.prefs.fragment.PreferenceFragment
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.model.analyzeRule.AnalyzeUrl
@@ -102,7 +104,9 @@ class ThemeConfigFragment : PreferenceFragment(),
         upPreferenceSummary(PreferKey.bottomBarEffectMode, AppConfig.bottomBarEffectMode)
         upPreferenceSummary(PreferKey.liquidGlassLevel, AppConfig.liquidGlassLevel.toString())
         upPreferenceSummary(PreferKey.frostedGlassLevel, AppConfig.frostedGlassLevel.toString())
+        upPreferenceSummary(PreferKey.uiCornerScale, AppConfig.uiCornerScale.toScaleText())
         upPreferenceSummary(PreferKey.fontScale)
+        setupUiCornerPreference()
         updateBottomBarEffectPreferences()
         findPreference<ColorPreference>(PreferKey.cBackground)?.let {
             it.onSaveColor = { color ->
@@ -192,6 +196,13 @@ class ThemeConfigFragment : PreferenceFragment(),
             PreferKey.bottomBarEffectMode -> {
                 upPreferenceSummary(key, getPrefString(key))
                 updateBottomBarEffectPreferences()
+                recreateActivities()
+            }
+
+            PreferKey.uiCornerScale,
+            PreferKey.uiCornerSearchFollow,
+            PreferKey.uiCornerReplyFollow -> {
+                upPreferenceSummary(PreferKey.uiCornerScale, AppConfig.uiCornerScale.toScaleText())
                 recreateActivities()
             }
         }
@@ -428,6 +439,9 @@ class ThemeConfigFragment : PreferenceFragment(),
             PreferKey.frostedGlassLevel -> preference.summary =
                 getString(R.string.frosted_glass_level_summary, value ?: AppConfig.frostedGlassLevel.toString())
 
+            PreferKey.uiCornerScale -> preference.summary =
+                getString(R.string.ui_corner_scale_summary, value ?: AppConfig.uiCornerScale.toScaleText())
+
             PreferKey.fontScale -> {
                 val fontScale = AppContextWrapper.getFontScale(requireContext())
                 preference.summary = getString(R.string.font_scale_summary, fontScale)
@@ -450,6 +464,36 @@ class ThemeConfigFragment : PreferenceFragment(),
         val mode = AppConfig.bottomBarEffectMode
         findPreference<Preference>(PreferKey.liquidGlassLevel)?.isVisible = mode == "glass"
         findPreference<Preference>(PreferKey.frostedGlassLevel)?.isVisible = mode == "frosted"
+    }
+
+    private fun setupUiCornerPreference() {
+        findPreference<EditTextPreference>(PreferKey.uiCornerScale)?.let { preference ->
+            preference.text = AppConfig.uiCornerScale.toScaleText()
+            preference.setOnBindEditTextListener { editText ->
+                editText.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+                editText.setSingleLine(true)
+                editText.setSelection(editText.text?.length ?: 0)
+            }
+            preference.setOnPreferenceChangeListener { _, newValue ->
+                val value = newValue?.toString()?.trim()?.toFloatOrNull()
+                if (value == null || value !in 0f..1f) {
+                    toastOnUi(R.string.ui_corner_scale_invalid)
+                    false
+                } else {
+                    AppConfig.uiCornerScale = value
+                    upPreferenceSummary(PreferKey.uiCornerScale, AppConfig.uiCornerScale.toScaleText())
+                    true
+                }
+            }
+        }
+    }
+
+    private fun Float.toScaleText(): String {
+        return if (this % 1f == 0f) {
+            this.toInt().toString()
+        } else {
+            String.format(java.util.Locale.US, "%.2f", this).trimEnd('0').trimEnd('.')
+        }
     }
 
     private fun setBgFromUri(uri: Uri, preferenceKey: String, success: () -> Unit) {
