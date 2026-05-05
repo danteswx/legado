@@ -1,17 +1,22 @@
 package io.legado.app.ui.book.cache
 
+import androidx.core.app.NotificationCompat
 import io.legado.app.R
+import io.legado.app.constant.AppConst
+import io.legado.app.constant.NotificationId
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.help.globalExecutor
 import io.legado.app.help.exoplayer.ExoPlayerHelper
 import io.legado.app.utils.ConvertUtils
+import io.legado.app.utils.activityPendingIntent
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.runBlocking
 import splitties.init.appCtx
+import splitties.systemservices.notificationManager
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Future
@@ -23,6 +28,7 @@ object AudioCacheTaskManager {
     private val executor: ExecutorService = globalExecutor
     private val cancelFlags = ConcurrentHashMap<String, AtomicBoolean>()
     private val futures = ConcurrentHashMap<String, Future<*>>()
+    private val lastNotifyTimes = ConcurrentHashMap<String, Long>()
     private val _states = MutableStateFlow<Map<String, AudioCacheTaskState>>(emptyMap())
     val states: StateFlow<Map<String, AudioCacheTaskState>> = _states.asStateFlow()
 
@@ -174,6 +180,7 @@ object AudioCacheTaskManager {
                 cancelFlags.remove(book.bookUrl)
                 futures.remove(book.bookUrl)
                 onFinished?.invoke()
+                lastNotifyTimes.remove(book.bookUrl)
             }
         }
         futures[book.bookUrl] = future
@@ -218,6 +225,35 @@ object AudioCacheTaskManager {
         _states.value = _states.value.toMutableMap().apply {
             put(bookUrl, state)
         }
+        notifyState(state)
+    }
+
+    private fun notifyState(state: AudioCacheTaskState) {
+        val terminal = !state.active && state.status in setOf(
+            CacheTaskStatus.COMPLETED,
+            CacheTaskStatus.CANCELLED,
+            CacheTaskStatus.FAILED
+        )
+        val now = System.currentTimeMillis()
+        val last = lastNotifyTimes[state.bookUrl] ?: 0L
+        if (!terminal && now - last < 1000L) return
+        lastNotifyTimes[state.bookUrl] = now
+        val progressMax = state.totalChapters.coerceAtLeast(1)
+        val progress = state.completedChapters.coerceIn(0, progressMax)
+        val builder = NotificationCompat.Builder(appCtx, AppConst.channelIdDownload)
+            .setSmallIcon(R.drawable.ic_download)
+            .setContentTitle(appCtx.getString(R.string.offline_cache))
+            .setContentText("${state.bookName} · ${state.message}")
+            .setOngoing(state.active)
+            .setOnlyAlertOnce(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setContentIntent(appCtx.activityPendingIntent<CacheManageActivity>("audioCacheManage"))
+        if (state.active) {
+            builder.setProgress(progressMax, progress, state.status == CacheTaskStatus.RESOLVING)
+        } else {
+            builder.setProgress(0, 0, false)
+        }
+        notificationManager.notify(NotificationId.AudioCache, builder.build())
     }
 }
 
