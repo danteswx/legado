@@ -20,20 +20,22 @@ class CacheManageAdapter(
     override val diffItemCallback: DiffUtil.ItemCallback<CacheBookItem> =
         object : DiffUtil.ItemCallback<CacheBookItem>() {
             override fun areItemsTheSame(oldItem: CacheBookItem, newItem: CacheBookItem): Boolean {
-                return oldItem.book.bookUrl == newItem.book.bookUrl
+                return oldItem.groupKey == newItem.groupKey
             }
 
             override fun areContentsTheSame(oldItem: CacheBookItem, newItem: CacheBookItem): Boolean {
                 return oldItem.book.name == newItem.book.name &&
                     oldItem.book.author == newItem.book.author &&
-                    oldItem.book.durChapterTitle == newItem.book.durChapterTitle &&
                     oldItem.book.latestChapterTitle == newItem.book.latestChapterTitle &&
+                    oldItem.sourceKey == newItem.sourceKey &&
+                    oldItem.sourceName == newItem.sourceName &&
                     oldItem.cachedCount == newItem.cachedCount &&
                     oldItem.totalChapterCount == newItem.totalChapterCount &&
                     oldItem.mode == newItem.mode &&
                     oldItem.taskState == newItem.taskState &&
                     oldItem.inBookshelf == newItem.inBookshelf &&
-                    oldItem.sourceAvailable == newItem.sourceAvailable
+                    oldItem.sourceAvailable == newItem.sourceAvailable &&
+                    oldItem.sourceVariants == newItem.sourceVariants
             }
         }
 
@@ -50,20 +52,14 @@ class CacheManageAdapter(
         val book = item.book
         ivCover.load(book, false)
         tvName.text = book.name
-        tvType.setText(item.mode.titleRes)
-        val sourceName = book.originName.ifBlank { book.origin }
-        val sourceText = if (item.sourceAvailable) {
-            sourceName
+        tvType.text = if (item.sourceAvailable) {
+            item.sourceName
         } else {
-            context.getString(R.string.cache_manage_source_deleted, sourceName)
+            context.getString(R.string.cache_manage_source_deleted_chip, item.sourceName)
         }
-        tvAuthor.text = context.getString(
-            R.string.cache_manage_author_source,
-            book.getRealAuthor(),
-            sourceText
-        )
-        tvRead.text = book.durChapterTitle?.takeIf { it.isNotBlank() }
-            ?: context.getString(R.string.last_read)
+        tvType.alpha = if (item.sourceVariants.size > 1) 1f else 0.72f
+        tvAuthor.text = book.getRealAuthor()
+        tvRead.gone()
         tvLatest.text = book.latestChapterTitle?.takeIf { it.isNotBlank() }
             ?: context.getString(R.string.lasted_show, context.getString(R.string.unknown))
         tvCache.text = context.getString(
@@ -118,6 +114,9 @@ class CacheManageAdapter(
         binding.btnStop.setOnClickListener {
             getItem(holder.layoutPosition)?.let(callback::stopAudioCache)
         }
+        binding.tvType.setOnClickListener {
+            getItem(holder.layoutPosition)?.let(callback::selectSource)
+        }
     }
 
     fun updateTaskStates(states: Map<String, AudioCacheTaskState>) {
@@ -131,5 +130,6 @@ class CacheManageAdapter(
         fun restoreToBookshelf(item: CacheBookItem)
         fun deleteBookCache(item: CacheBookItem)
         fun stopAudioCache(item: CacheBookItem)
+        fun selectSource(item: CacheBookItem)
     }
 }

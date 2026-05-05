@@ -292,6 +292,7 @@ object Restore {
         kotlin.runCatching {
             ThemePackageManager.ensureLocalAppliedTheme(appCtx, false)
             ThemePackageManager.ensureLocalAppliedTheme(appCtx, true)
+            ThemePackageManager.reapplyRestoredAppliedThemes(appCtx)
         }.onFailure {
             AppLog.put("恢复默认主题包出错\n${it.localizedMessage}", it)
         }

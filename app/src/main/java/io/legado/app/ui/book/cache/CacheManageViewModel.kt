@@ -45,6 +45,7 @@ class CacheManageViewModel(application: Application) : BaseViewModel(application
     val loadingLiveData = MutableLiveData<Boolean>()
 
     private var loadJob: Job? = null
+    private val selectedSourceKeys = hashMapOf<String, String>()
     var mode: CacheManageMode = CacheManageMode.BOOK
         private set
 
@@ -67,10 +68,7 @@ class CacheManageViewModel(application: Application) : BaseViewModel(application
                     .filterNot { currentBookUrls.contains(it.bookUrl) }
                     .mapNotNull { manifest -> buildCacheBookItem(manifest, mode) }
                     .toList()
-                val items = (currentItems + manifestItems)
-                    .asSequence()
-                    .sortedWith(compareByDescending<CacheBookItem> { it.cachedCount }.thenBy { it.book.name })
-                    .toList()
+                val items = groupByBook(currentItems + manifestItems)
                 ensureActive()
                 itemsLiveData.postValue(items)
                 summaryLiveData.postValue(
@@ -90,6 +88,11 @@ class CacheManageViewModel(application: Application) : BaseViewModel(application
         }
         loadJob = job
         job.start()
+    }
+
+    fun selectSource(groupKey: String, sourceKey: String) {
+        selectedSourceKeys[groupKey] = sourceKey
+        load()
     }
 
     fun deleteBookCache(book: Book, onDone: () -> Unit) {
@@ -339,6 +342,36 @@ class CacheManageViewModel(application: Application) : BaseViewModel(application
         return zipFile
     }
 
+    private fun groupByBook(items: List<CacheBookItem>): List<CacheBookItem> {
+        return items
+            .groupBy { it.groupKey }
+            .values
+            .mapNotNull { group ->
+                val variants = group
+                    .sortedWith(
+                        compareByDescending<CacheBookItem> { if (it.taskState?.active == true) 1 else 0 }
+                            .thenByDescending { it.cachedCount }
+                            .thenBy { it.sourceName }
+                    )
+                    .map { it.toSourceVariant() }
+                val groupKey = group.firstOrNull()?.groupKey ?: return@mapNotNull null
+                val selectedKey = selectedSourceKeys[groupKey]
+                val selected = group.firstOrNull { it.sourceKey == selectedKey }
+                    ?: group.firstOrNull { it.taskState?.active == true }
+                    ?: group.maxWithOrNull(
+                        compareBy<CacheBookItem> { it.cachedCount }
+                            .thenBy { it.totalChapterCount }
+                    )
+                    ?: group.first()
+                selected.copy(sourceVariants = variants)
+            }
+            .sortedWith(
+                compareByDescending<CacheBookItem> { it.cachedCount }
+                    .thenBy { it.book.name }
+                    .thenBy { it.sourceName }
+            )
+    }
+
     private fun buildCacheBookItem(book: Book, mode: CacheManageMode): CacheBookItem? {
         val taskState = AudioCacheTaskManager.snapshot(book.bookUrl)
         val chapters = appDb.bookChapterDao.getChapterList(book.bookUrl)
@@ -370,6 +403,9 @@ class CacheManageViewModel(application: Application) : BaseViewModel(application
         return CacheBookItem(
             book = book,
             mode = mode,
+            groupKey = book.cacheGroupKey(mode),
+            sourceKey = book.cacheSourceKey(),
+            sourceName = book.cacheSourceName(),
             cachedCount = cachedCount,
             totalChapterCount = totalChapterCount,
             taskState = taskState,
@@ -400,6 +436,9 @@ class CacheManageViewModel(application: Application) : BaseViewModel(application
         return CacheBookItem(
             book = book,
             mode = mode,
+            groupKey = book.cacheGroupKey(mode),
+            sourceKey = book.cacheSourceKey(),
+            sourceName = book.cacheSourceName(),
             cachedCount = rawCachedCount.coerceAtMost(totalChapterCount),
             totalChapterCount = totalChapterCount,
             manifest = manifest,
@@ -511,6 +550,44 @@ class CacheManageViewModel(application: Application) : BaseViewModel(application
             lastError?.localizedMessage ?: context.getString(R.string.cache_manage_audio_url_empty)
         )
     }
+
+    private fun Book.cacheGroupKey(mode: CacheManageMode): String {
+        return listOf(
+            mode.name,
+            name.trim(),
+            getRealAuthor().trim()
+        ).joinToString(separator = "\u001F")
+    }
+
+    private fun Book.cacheSourceKey(): String {
+        return listOf(
+            origin.ifBlank { originName },
+            bookUrl
+        ).joinToString(separator = "\u001F")
+    }
+
+    private fun Book.cacheSourceName(): String {
+        return when {
+            isLocal -> context.getString(R.string.local)
+            originName.isNotBlank() -> originName
+            origin.isNotBlank() -> origin
+            else -> context.getString(R.string.unknown)
+        }
+    }
+
+    private fun CacheBookItem.toSourceVariant(): CacheBookSourceVariant {
+        return CacheBookSourceVariant(
+            sourceKey = sourceKey,
+            sourceName = sourceName,
+            book = book,
+            cachedCount = cachedCount,
+            totalChapterCount = totalChapterCount,
+            taskState = taskState,
+            manifest = manifest,
+            inBookshelf = inBookshelf,
+            sourceAvailable = sourceAvailable
+        )
+    }
 }
 
 enum class CacheManageMode(@StringRes val titleRes: Int, val bookType: Int) {
@@ -528,6 +605,22 @@ enum class CacheChapterFilter {
 data class CacheBookItem(
     val book: Book,
     val mode: CacheManageMode,
+    val groupKey: String,
+    val sourceKey: String,
+    val sourceName: String,
+    val cachedCount: Int,
+    val totalChapterCount: Int,
+    val taskState: AudioCacheTaskState? = null,
+    val manifest: CacheBookManifest? = null,
+    val inBookshelf: Boolean = true,
+    val sourceAvailable: Boolean = true,
+    val sourceVariants: List<CacheBookSourceVariant> = emptyList()
+)
+
+data class CacheBookSourceVariant(
+    val sourceKey: String,
+    val sourceName: String,
+    val book: Book,
     val cachedCount: Int,
     val totalChapterCount: Int,
     val taskState: AudioCacheTaskState? = null,

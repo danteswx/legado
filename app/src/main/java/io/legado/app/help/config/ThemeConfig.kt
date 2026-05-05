@@ -115,10 +115,7 @@ object ThemeConfig {
             val name = getUrlToFile(path)
             val fileRoot = context.externalFiles
             val filePath = FileUtils.getPath(fileRoot, preferenceKey, name)
-            if (!FileUtils.exist(filePath)) {
-                appCtx.toastOnUi("未缓存在线背景图\n请重新应用主题")
-                return null
-            }
+            if (!FileUtils.exist(filePath)) return null
             path = filePath
         }
         if (path.endsWith(".9.png")) {
@@ -227,7 +224,12 @@ object ThemeConfig {
         return null
     }
 
-    fun applyConfig(context: Context, config: Config, switchNightMode: Boolean = true) {
+    fun applyConfig(
+        context: Context,
+        config: Config,
+        switchNightMode: Boolean = true,
+        notify: Boolean = true
+    ) {
         try {
             if (needClearImg) {
                 needClearImg = false
@@ -257,7 +259,7 @@ object ThemeConfig {
                 }
                 val fileImg = File(fileFold, name)
                 if (!fileImg.exists()) {
-                    appCtx.toastOnUi("下载背景图片中...")
+                    appCtx.toastOnUi(R.string.theme_background_downloading)
                     Coroutine.async {
                         kotlin.runCatching {
                             val res = okHttpClient.newCallResponse(0) {
@@ -269,12 +271,14 @@ object ThemeConfig {
                                 }
                             }
                         }.onSuccess {
-                            appCtx.toastOnUi("背景图下载成功\n请重新应用主题")
+                            appCtx.toastOnUi(R.string.theme_background_downloaded)
+                            if (notify) {
+                                postEvent(EventBus.RECREATE, "")
+                            }
                         }.onFailure {
                             appCtx.toastOnUi(it.localizedMessage)
                         }
                     }
-                    return
                 }
             }
             val backgroundBlur = config.backgroundImgBlur
@@ -306,6 +310,9 @@ object ThemeConfig {
             primaryTextColor?.let { themeEditor.textColorPrimary(it) }
             secondaryTextColor?.let { themeEditor.textColorSecondary(it) }
             themeEditor.apply()
+            if (!notify) {
+                return
+            }
             if (switchNightMode) {
                 applyDayNight(context)
             } else {
@@ -483,12 +490,8 @@ object ThemeConfig {
                     getPrefInt(PreferKey.cNPrimary, getCompatColor(R.color.md_blue_grey_600))
                 val accent =
                     getPrefInt(PreferKey.cNAccent, getCompatColor(R.color.md_deep_orange_800))
-                var background =
+                val background =
                     getPrefInt(PreferKey.cNBackground, getCompatColor(R.color.md_grey_900))
-                if (ColorUtils.isColorLight(background)) {
-                    background = getCompatColor(R.color.md_grey_900)
-                    putPrefInt(PreferKey.cNBackground, background)
-                }
                 val bBackground =
                     getPrefInt(PreferKey.cNBBackground, getCompatColor(R.color.md_grey_850))
                 val transparentNavBar =
@@ -507,12 +510,8 @@ object ThemeConfig {
                     getPrefInt(PreferKey.cPrimary, getCompatColor(R.color.md_brown_500))
                 val accent =
                     getPrefInt(PreferKey.cAccent, getCompatColor(R.color.md_red_600))
-                var background =
+                val background =
                     getPrefInt(PreferKey.cBackground, getCompatColor(R.color.md_grey_100))
-                if (!ColorUtils.isColorLight(background)) {
-                    background = getCompatColor(R.color.md_grey_100)
-                    putPrefInt(PreferKey.cBackground, background)
-                }
                 val bBackground =
                     getPrefInt(PreferKey.cBBackground, getCompatColor(R.color.md_grey_200))
                 val transparentNavBar =

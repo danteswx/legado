@@ -167,21 +167,23 @@ abstract class BaseActivity<VB : ViewBinding>(
     }
 
     open fun upBackgroundImage() {
-        if (imageBg) {
-            try {
-                val drawable = ThemeConfig.getBgImage(this, windowManager.windowSize)
-                if (drawable != null) {
-                    window.decorView.background = drawable
-                } else {
-                    window.decorView.applyBackgroundTint(backgroundColor)
-                }
-            } catch (_: OutOfMemoryError) {
+        if (!imageBg) {
+            window.decorView.applyBackgroundTint(backgroundColor)
+            return
+        }
+        try {
+            val drawable = ThemeConfig.getBgImage(this, windowManager.windowSize)
+            if (drawable != null) {
+                window.decorView.background = drawable
+            } else {
                 window.decorView.applyBackgroundTint(backgroundColor)
-                toastOnUi("背景图片太大,内存溢出")
-            } catch (e: Exception) {
-                window.decorView.applyBackgroundTint(backgroundColor)
-                AppLog.put("加载背景出错\n${e.localizedMessage}", e)
             }
+        } catch (_: OutOfMemoryError) {
+            window.decorView.applyBackgroundTint(backgroundColor)
+            toastOnUi(R.string.background_image_too_large)
+        } catch (e: Exception) {
+            window.decorView.applyBackgroundTint(backgroundColor)
+            AppLog.put(getString(R.string.background_image_load_error, e.localizedMessage), e)
         }
     }
 

@@ -10,6 +10,7 @@ import io.legado.app.base.VMBaseActivity
 import io.legado.app.databinding.ActivityCacheManageBinding
 import io.legado.app.help.AppWebDav
 import io.legado.app.lib.dialogs.alert
+import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.utils.gone
@@ -80,7 +81,11 @@ class CacheManageActivity :
             AudioCacheTaskManager.states.collectLatest { states ->
                 adapter.updateTaskStates(states)
                 if (viewModel.mode == CacheManageMode.AUDIO) {
-                    val visibleBookUrls = adapter.getItems().map { it.book.bookUrl }.toSet()
+                    val visibleBookUrls = adapter.getItems()
+                        .flatMap { item ->
+                            item.sourceVariants.map { it.book.bookUrl }.ifEmpty { listOf(item.book.bookUrl) }
+                        }
+                        .toSet()
                     val taskBookUrls = states.values.filter { it.active }.map { it.bookUrl }.toSet()
                     if (!visibleBookUrls.containsAll(taskBookUrls)) {
                         viewModel.load()
@@ -160,6 +165,34 @@ class CacheManageActivity :
 
     override fun stopAudioCache(item: CacheBookItem) {
         AudioCacheTaskManager.cancel(item.book.bookUrl)
+    }
+
+    override fun selectSource(item: CacheBookItem) {
+        val variants = item.sourceVariants
+        if (variants.size <= 1) return
+        val labels: List<CharSequence> = variants.map { variant ->
+            buildString {
+                append(
+                    if (variant.sourceAvailable) {
+                        variant.sourceName
+                    } else {
+                        getString(R.string.cache_manage_source_deleted, variant.sourceName)
+                    }
+                )
+                append(" · ")
+                append(
+                    getString(
+                        R.string.cache_manage_cached_count,
+                        variant.cachedCount,
+                        variant.totalChapterCount
+                    )
+                )
+            }
+        }
+        selector(getString(R.string.cache_manage_select_source), labels) { _, index ->
+            val variant = variants.getOrNull(index) ?: return@selector
+            viewModel.selectSource(item.groupKey, variant.sourceKey)
+        }
     }
 
     private fun uploadAll() {

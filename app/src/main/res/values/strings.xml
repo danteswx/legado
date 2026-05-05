@@ -35,6 +35,7 @@
     <string name="dynamic_loading">Loading</string>
     <string name="draw">Warning</string>
     <string name="edit">Edit</string>
+    <string name="more">More</string>
     <string name="delete">Delete</string>
     <string name="delete_select_group">Delete Select Group</string>
     <string name="delete_all">Delete all</string>
@@ -1662,6 +1663,8 @@
     <string name="theme_apply">Apply</string>
     <string name="theme_applied_state">Applied</string>
     <string name="theme_zip_exported">Theme ZIP exported</string>
+    <string name="theme_background_downloading">Downloading background image...</string>
+    <string name="theme_background_downloaded">Background image downloaded</string>
     <string name="cache_manage_title">Cache Manager</string>
     <string name="cache_manage_summary">Manage book, audio, and manga caches in one place.</string>
     <string name="cache_manage_cached_only">Only cached chapters</string>
@@ -1714,6 +1717,10 @@
     <string name="cache_manage_use_cache_success">Cache chapters synced</string>
     <string name="cache_manage_author_source">%1$s · %2$s</string>
     <string name="cache_manage_source_deleted">Source removed: %1$s</string>
+    <string name="cache_manage_source_deleted_chip">Removed · %1$s</string>
+    <string name="cache_manage_select_source">Select source</string>
+    <string name="background_image_too_large">Background image is too large</string>
+    <string name="background_image_load_error">Failed to load background\n%1$s</string>
     <string name="preview">Preview</string>
     <string name="advanced_title_dialog_title">Advanced Title</string>
     <string name="advanced_title_scope_label">Apply to</string>

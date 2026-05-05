@@ -34,6 +34,7 @@
     <string name="dynamic_loading">正在加载</string>
     <string name="draw">提醒</string>
     <string name="edit">编辑</string>
+    <string name="more">更多</string>
     <string name="delete">删除</string>
     <string name="delete_select_group">删除当前分组</string>
     <string name="delete_all">删除所有</string>
@@ -1554,6 +1555,8 @@
     <string name="theme_apply">应用</string>
     <string name="theme_applied_state">已应用</string>
     <string name="theme_zip_exported">主题 ZIP 已导出</string>
+    <string name="theme_background_downloading">正在下载背景图片...</string>
+    <string name="theme_background_downloaded">背景图片已下载</string>
     <string name="cache_manage_title">缓存管理</string>
     <string name="cache_manage_summary">统一管理书籍、音频和漫画缓存。</string>
     <string name="cache_manage_cached_only">仅展示已缓存章节</string>
@@ -1606,6 +1609,10 @@
     <string name="cache_manage_use_cache_success">已同步缓存目录</string>
     <string name="cache_manage_author_source">%1$s · %2$s</string>
     <string name="cache_manage_source_deleted">书源已删除：%1$s</string>
+    <string name="cache_manage_source_deleted_chip">已删 · %1$s</string>
+    <string name="cache_manage_select_source">选择书源</string>
+    <string name="background_image_too_large">背景图片过大，已使用背景色</string>
+    <string name="background_image_load_error">加载背景出错\n%1$s</string>
     <string name="preview">预览</string>
     <string name="advanced_title_dialog_title">高级标题设置</string>
     <string name="advanced_title_scope_label">作用范围</string>
