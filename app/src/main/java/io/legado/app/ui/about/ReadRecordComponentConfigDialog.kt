@@ -2,6 +2,7 @@ package io.legado.app.ui.about
 
 import android.content.Context
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
@@ -14,6 +15,7 @@ import io.legado.app.databinding.ItemReadRecordComponentBinding
 import io.legado.app.lib.theme.UiCorner
 import io.legado.app.ui.widget.recycler.ItemTouchCallback
 import io.legado.app.utils.applyTint
+import io.legado.app.utils.dpToPx
 
 object ReadRecordComponentConfigDialog {
 
@@ -91,6 +93,7 @@ object ReadRecordComponentConfigDialog {
                     UiCorner.panelRadius(context)
                 )
                 tvTitle.text = context.getString(item.type.titleRes)
+                tvSubtitle.text = context.getString(item.type.hintRes)
                 cbEnabled.setOnCheckedChangeListener(null)
                 cbEnabled.isChecked = item.enabled
                 cbEnabled.setOnCheckedChangeListener { _, checked ->
@@ -100,6 +103,56 @@ object ReadRecordComponentConfigDialog {
                     cbEnabled.isChecked = !cbEnabled.isChecked
                 }
                 ivDrag.setColorFilter(ContextCompat.getColor(context, R.color.secondaryText))
+                applyPreview(item)
+            }
+
+            private fun applyPreview(item: ReadRecordComponentItem) = with(binding) {
+                val backgrounds = listOf(previewA, previewB, previewC)
+                backgrounds.forEachIndexed { index, view ->
+                    view.background = buildReadRecordPreviewBackground(
+                        context,
+                        0.9f + index * 0.08f
+                    )
+                }
+                previewA.layoutParams.width = 0
+                previewA.layoutParams.height = 28.dpToPx()
+                previewB.layoutParams.width = 0
+                previewB.layoutParams.height = 28.dpToPx()
+                previewC.layoutParams.width = 0
+                previewC.layoutParams.height = 28.dpToPx()
+                previewA.visibility = View.VISIBLE
+                previewB.visibility = View.VISIBLE
+                previewC.visibility = View.VISIBLE
+                when (item.type) {
+                    ReadRecordComponentType.OVERVIEW -> {
+                        previewA.layoutParams.width = 0
+                    }
+                    ReadRecordComponentType.HEATMAP -> {
+                        previewA.layoutParams.height = 34.dpToPx()
+                    }
+                    ReadRecordComponentType.RECENT_BOOKS,
+                    ReadRecordComponentType.DAILY_RECORDS,
+                    ReadRecordComponentType.READ_RANK -> {
+                        previewA.layoutParams.height = 22.dpToPx()
+                        previewB.layoutParams.height = 22.dpToPx()
+                        previewC.layoutParams.height = 22.dpToPx()
+                        previewB.visibility = View.VISIBLE
+                        previewC.visibility = View.VISIBLE
+                    }
+                    ReadRecordComponentType.RECENT_COVERS -> {
+                        previewA.layoutParams.height = 44.dpToPx()
+                        previewB.layoutParams.height = 44.dpToPx()
+                        previewC.layoutParams.height = 44.dpToPx()
+                        previewB.visibility = View.VISIBLE
+                        previewC.visibility = View.VISIBLE
+                    }
+                    ReadRecordComponentType.GOAL_CARD -> {
+                        previewA.layoutParams.height = 40.dpToPx()
+                        previewB.layoutParams.height = 16.dpToPx()
+                        previewC.visibility = View.GONE
+                    }
+                }
+                backgrounds.forEach { it.requestLayout() }
             }
         }
     }

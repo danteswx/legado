@@ -186,6 +186,8 @@ object PreferKey {
     const val tocCountWords = "tocCountWords"
     const val enableReadRecord = "enableReadRecord"
     const val readRecordComponents = "readRecordComponents"
+    const val readRecordRecentSnapshots = "readRecordRecentSnapshots"
+    const val readRecordGoalConfig = "readRecordGoalConfig"
     const val localBookImportSort = "localBookImportSort"
     const val customWelcome = "customWelcome"
     const val welcomeShowTime = "welcomeShowTime"

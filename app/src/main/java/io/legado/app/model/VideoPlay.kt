@@ -37,6 +37,7 @@ import io.legado.app.help.gsyVideo.VideoPlayer
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.rss.Rss
 import io.legado.app.model.webBook.WebBook
+import io.legado.app.ui.about.ReadRecordWidgetStore
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.NetworkUtils
@@ -603,6 +604,7 @@ object VideoPlay : CoroutineScope by MainScope(){
                 SourceCallBack.callBackBook(SourceCallBack.SAVE_READ, source as BookSource?, book, chapter, durTime.toString())
                 book.update()
                 appDb.readRecentBookDao.insert(ReadRecentBook(book.bookUrl, durTime))
+                ReadRecordWidgetStore.updateRecentSnapshot(book, durTime)
             }
             rssStar?.let {
                 it.durPos = durPos

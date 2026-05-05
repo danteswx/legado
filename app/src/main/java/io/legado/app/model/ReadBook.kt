@@ -30,6 +30,7 @@ import io.legado.app.model.localBook.TextFile
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.service.CacheBookService
+import io.legado.app.ui.about.ReadRecordWidgetStore
 import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.ui.book.read.page.provider.LayoutProgressListener
@@ -935,6 +936,7 @@ object ReadBook : CoroutineScope by MainScope() {
                 }
                 book.update()
                 appDb.readRecentBookDao.insert(ReadRecentBook(book.bookUrl, durTime))
+                ReadRecordWidgetStore.updateRecentSnapshot(book, durTime)
             }.onFailure {
                 AppLog.put("保存书籍阅读进度信息出错\n$it", it)
             }

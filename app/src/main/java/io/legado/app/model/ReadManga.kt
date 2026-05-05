@@ -22,6 +22,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.globalExecutor
 import io.legado.app.model.webBook.WebBook
+import io.legado.app.ui.about.ReadRecordWidgetStore
 import io.legado.app.ui.book.manga.entities.BaseMangaPage
 import io.legado.app.ui.book.manga.entities.MangaChapter
 import io.legado.app.ui.book.manga.entities.MangaContent
@@ -350,6 +351,7 @@ object ReadManga : CoroutineScope by MainScope() {
                 }
                 appDb.bookDao.update(book)
                 appDb.readRecentBookDao.insert(ReadRecentBook(book.bookUrl, book.durChapterTime))
+                ReadRecordWidgetStore.updateRecentSnapshot(book, book.durChapterTime)
             }.onFailure {
                 AppLog.put("保存漫画阅读进度信息出错\n$it", it)
             }

@@ -11,6 +11,7 @@ import android.widget.LinearLayout
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
 import io.legado.app.R
 import io.legado.app.base.BaseFragment
 import io.legado.app.data.appDb
@@ -28,6 +29,15 @@ import io.legado.app.ui.about.ReadHeatmapCell
 import io.legado.app.ui.about.ReadRecordComponentConfigDialog
 import io.legado.app.ui.about.ReadRecordComponentType
 import io.legado.app.ui.about.ReadRecordComponents
+import io.legado.app.ui.about.ReadRecordCoverAdapter
+import io.legado.app.ui.about.ReadRecordGoalConfig
+import io.legado.app.ui.about.ReadRecordRankDialog
+import io.legado.app.ui.about.ReadRecordRankItem
+import io.legado.app.ui.about.ReadRecordWidgetStore
+import io.legado.app.ui.about.ReadRecentVisualItem
+import io.legado.app.ui.about.loadReadRecordCover
+import io.legado.app.ui.about.openReadRecordBook
+import io.legado.app.ui.about.showReadRecordGoalDialog
 import io.legado.app.ui.main.MainFragmentInterface
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.applyMainBottomBarPadding
@@ -77,6 +87,11 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
     private var loadedDate: LocalDate? = null
     private var lastLoadTime = 0L
     private var componentItems = ReadRecordComponents.load()
+    private var currentRankItems: List<ReadRecordRankItem> = emptyList()
+    private var currentGoalConfig: ReadRecordGoalConfig = ReadRecordWidgetStore.loadGoalConfig()
+    private var currentTodayTime: Long = 0L
+    private var currentTotalTime: Long = 0L
+    private var currentReadBookCount: Int = 0
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         setSupportToolbar(binding.titleBar.toolbar)
@@ -89,6 +104,18 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
         binding.ivComponentMenu.setOnClickListener {
             showComponentConfigDialog()
         }
+        binding.ivRankMore.setOnClickListener {
+            ReadRecordRankDialog.show(requireContext(), currentRankItems, ::formatDuring)
+        }
+        binding.ivGoalEdit.setOnClickListener {
+            requireContext().showReadRecordGoalDialog(currentGoalConfig) { config ->
+                currentGoalConfig = config
+                ReadRecordWidgetStore.saveGoalConfig(config)
+                renderGoalCard(currentTodayTime, currentTotalTime, currentReadBookCount)
+            }
+        }
+        binding.rvRecentCovers.layoutManager =
+            LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
         applyComponentLayout()
         preloadData()
     }
@@ -190,7 +217,11 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
             heatmapCells = heatmapCells,
             recentBooks = recentBooks,
             dailyTimeline = dailyStats.take(14),
-            hasDailyStats = dailyStats.isNotEmpty()
+            hasDailyStats = dailyStats.isNotEmpty(),
+            recentCoverItems = ReadRecordWidgetStore.loadRecentVisualItems(5),
+            rankItems = ReadRecordWidgetStore.buildRankItems(),
+            goalConfig = ReadRecordWidgetStore.loadGoalConfig(),
+            readBookCount = appDb.readRecordDao.allShow.size
         )
     }
 
@@ -231,9 +262,16 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
         binding.tvHeatmapMonthCenter.text = centerDate.format(monthFormatter)
         binding.tvHeatmapMonthEnd.text = endDate.format(monthFormatter)
         binding.tvHeatmapEmpty.isVisible = !dashboard.hasDailyStats
+        currentTodayTime = dashboard.todayTime
+        currentTotalTime = dashboard.totalTime
+        currentReadBookCount = dashboard.readBookCount
 
         renderRecentBooks(dashboard.recentBooks)
         renderDailyTimeline(dashboard.dailyTimeline, dashboard.hasDailyStats)
+        renderRecentCovers(dashboard.recentCoverItems)
+        renderReadRank(dashboard.rankItems.take(5), dashboard.rankItems)
+        currentGoalConfig = dashboard.goalConfig
+        renderGoalCard(dashboard.todayTime, dashboard.totalTime, dashboard.readBookCount)
         applyPageChrome()
     }
 
@@ -256,7 +294,10 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
             ReadRecordComponentType.OVERVIEW to binding.panelOverview,
             ReadRecordComponentType.HEATMAP to binding.panelHeatmap,
             ReadRecordComponentType.RECENT_BOOKS to binding.panelRecentBooks,
-            ReadRecordComponentType.DAILY_RECORDS to binding.panelDailyRecords
+            ReadRecordComponentType.DAILY_RECORDS to binding.panelDailyRecords,
+            ReadRecordComponentType.RECENT_COVERS to binding.panelRecentCovers,
+            ReadRecordComponentType.READ_RANK to binding.panelReadRank,
+            ReadRecordComponentType.GOAL_CARD to binding.panelGoalCard
         )
         componentViews.values.forEach { view ->
             (view.parent as? ViewGroup)?.removeView(view)
@@ -332,6 +373,61 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
         }
     }
 
+    private fun renderRecentCovers(items: List<ReadRecentVisualItem>) {
+        binding.tvRecentCoversEmpty.isVisible = items.isEmpty()
+        binding.rvRecentCovers.isVisible = items.isNotEmpty()
+        binding.rvRecentCovers.adapter = ReadRecordCoverAdapter(requireContext(), items) {
+            requireContext().openReadRecordBook(it.book)
+        }
+    }
+
+    private fun renderReadRank(items: List<ReadRecordRankItem>, allItems: List<ReadRecordRankItem>) {
+        currentRankItems = allItems
+        binding.llReadRank.removeAllViews()
+        binding.tvReadRankEmpty.isVisible = items.isEmpty()
+        binding.ivRankMore.isVisible = allItems.isNotEmpty()
+        if (items.isEmpty()) return
+        items.forEachIndexed { index, item ->
+            val rowBinding =
+                io.legado.app.databinding.ItemReadRecordRankBinding.inflate(layoutInflater, binding.llReadRank, false)
+            rowBinding.ivCover.loadReadRecordCover(item.book?.getDisplayCover() ?: item.snapshot?.displayCover())
+            rowBinding.tvName.text = item.book?.name ?: item.snapshot?.name.orEmpty()
+            val author = item.book?.author ?: item.snapshot?.author.orEmpty()
+            rowBinding.tvMeta.text = if (author.isBlank()) {
+                getString(R.string.read_record_rank_number, index + 1)
+            } else {
+                "${index + 1}. $author"
+            }
+            rowBinding.tvTime.text = formatDuring(item.readTime)
+            rowBinding.root.alpha = if (item.book == null) 0.72f else 1f
+            rowBinding.root.setOnClickListener {
+                requireContext().openReadRecordBook(item.book)
+            }
+            binding.llReadRank.addView(rowBinding.root)
+            if (index < items.lastIndex) {
+                binding.llReadRank.addView(createDivider())
+            }
+        }
+    }
+
+    private fun renderGoalCard(todayTime: Long, totalTime: Long, readBookCount: Int) {
+        val todayText = formatDuring(todayTime)
+        val totalText = formatDuring(totalTime)
+        binding.ivGoalAvatar.loadReadRecordCover(currentGoalConfig.avatar)
+        binding.tvGoalToday.text = getString(R.string.read_record_goal_today, todayText)
+        binding.tvGoalTotal.text = getString(R.string.read_record_goal_total, totalText)
+        binding.tvGoalBooks.text = getString(R.string.read_record_goal_books, readBookCount)
+        val goalMs = currentGoalConfig.dailyGoalMinutes * 60L * 1000L
+        val percent = if (goalMs <= 0L) 0 else ((todayTime * 100) / goalMs).toInt().coerceIn(0, 100)
+        binding.tvGoalProgress.text = getString(
+            R.string.read_record_goal_progress,
+            todayText,
+            formatDuring(goalMs),
+            percent
+        )
+        binding.progressGoal.progress = percent
+    }
+
     private fun buildRecentBookMeta(book: Book): String {
         val parts = mutableListOf<String>()
         book.durChapterTitle?.trim()?.takeIf { it.isNotEmpty() }?.let {
@@ -400,12 +496,18 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
         binding.tvHeatmapMonthStart.setTextColor(secondaryTextColor)
         binding.tvHeatmapMonthCenter.setTextColor(secondaryTextColor)
         binding.tvHeatmapMonthEnd.setTextColor(secondaryTextColor)
-        binding.ivComponentMenu.background = UiCorner.actionSelector(
-            ColorUtils.adjustAlpha(panelSurfaceColor, 0.92f),
-            ContextCompat.getColor(requireContext(), R.color.background_menu),
-            UiCorner.actionRadius(requireContext())
-        )
+        binding.panelRecentCovers.background =
+            createSurfaceDrawable(panelSurfaceColor, strokeColor, 14f)
+        binding.panelReadRank.background =
+            createSurfaceDrawable(panelSurfaceColor, strokeColor, 14f)
+        binding.panelGoalCard.background =
+            createSurfaceDrawable(panelSurfaceColor, strokeColor, 14f)
+        binding.ivComponentMenu.background = null
         binding.ivComponentMenu.setColorFilter(primaryTextColor)
+        binding.ivRankMore.background = null
+        binding.ivGoalEdit.background = null
+        binding.ivRankMore.setColorFilter(secondaryTextColor)
+        binding.ivGoalEdit.setColorFilter(secondaryTextColor)
         binding.heatmapView.submit(currentHeatmapCells, accentColor, panelSurfaceColor)
     }
 
@@ -468,7 +570,11 @@ private data class ReadRecordDashboard(
     val heatmapCells: List<ReadHeatmapCell>,
     val recentBooks: List<RecentReadBook>,
     val dailyTimeline: List<DailyReadSummary>,
-    val hasDailyStats: Boolean
+    val hasDailyStats: Boolean,
+    val recentCoverItems: List<ReadRecentVisualItem>,
+    val rankItems: List<ReadRecordRankItem>,
+    val goalConfig: ReadRecordGoalConfig,
+    val readBookCount: Int
 )
 
 private data class RecentReadBook(
