@@ -19,6 +19,7 @@ import io.legado.app.databinding.ItemReadRecordDaySummaryBinding
 import io.legado.app.databinding.ItemReadRecordRecentBookBinding
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
+import io.legado.app.lib.theme.UiCorner
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.lib.theme.secondaryTextColor
@@ -370,7 +371,7 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
     ): GradientDrawable {
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
-            cornerRadius = radiusDp.dpToPx()
+            cornerRadius = UiCorner.scaledDp(radiusDp)
             setColor(fillColor)
             setStroke(1.dpToPx(), strokeColor)
         }
@@ -379,7 +380,7 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
     private fun createFillDrawable(fillColor: Int, radiusDp: Float): GradientDrawable {
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
-            cornerRadius = radiusDp.dpToPx()
+            cornerRadius = UiCorner.scaledDp(radiusDp)
             setColor(fillColor)
         }
     }

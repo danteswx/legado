@@ -5,11 +5,13 @@ import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.widget.FrameLayout
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.R
 import io.legado.app.lib.theme.Selector
 import io.legado.app.lib.theme.ThemeStore
+import io.legado.app.lib.theme.UiCorner
 
 class RoundedTagBarView @JvmOverloads constructor(
     context: Context,
@@ -45,7 +47,10 @@ class RoundedTagBarView @JvmOverloads constructor(
 
     init {
         clipToOutline = true
-        setBackgroundResource(R.drawable.bg_bookshelf_tag_track)
+        background = UiCorner.rounded(
+            ContextCompat.getColor(context, R.color.background_menu),
+            UiCorner.panelRadius(context)
+        )
         val horizontalPadding = resources.getDimensionPixelSize(R.dimen.bookshelf_tag_bar_padding_horizontal)
         val verticalPadding = resources.getDimensionPixelSize(R.dimen.bookshelf_tag_bar_padding_vertical)
         setPadding(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding)
@@ -140,6 +145,11 @@ class RoundedTagBarView @JvmOverloads constructor(
             val textView = LayoutInflater.from(parent.context)
                 .inflate(R.layout.item_bookshelf_group_tag, parent, false) as TextView
             textView.setTextColor(tagTextColors)
+            textView.background = UiCorner.actionSelector(
+                android.graphics.Color.TRANSPARENT,
+                ContextCompat.getColor(parent.context, R.color.background_card),
+                UiCorner.actionRadius(parent.context)
+            )
             return TagViewHolder(textView)
         }
 

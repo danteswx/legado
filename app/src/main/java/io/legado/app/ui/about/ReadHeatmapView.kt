@@ -6,6 +6,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
+import io.legado.app.lib.theme.UiCorner
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.dpToPx
 import java.time.LocalDate
@@ -26,7 +27,8 @@ class ReadHeatmapView @JvmOverloads constructor(
     private val cellRect = RectF()
     private val cellGap = 4f.dpToPx()
     private val minCellSize = 8f.dpToPx()
-    private val cornerRadius = 4f.dpToPx()
+    private val cornerRadius: Float
+        get() = UiCorner.scaledDp(4f)
 
     private var cells: List<ReadHeatmapCell> = emptyList()
     private var accentColor: Int = 0

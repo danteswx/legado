@@ -36,6 +36,7 @@ import io.legado.app.databinding.ActivityBookSearchBinding
 import io.legado.app.help.book.isVideo
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.Selector
+import io.legado.app.lib.theme.UiCorner
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.primaryTextColor
@@ -144,7 +145,7 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
         binding.root.applyStatusBarPadding()
         binding.btnMenu.setColorFilter(secondaryTextColor)
         binding.searchView.background = GradientDrawable().apply {
-            cornerRadius = 18.dpToPx().toFloat()
+            cornerRadius = UiCorner.searchRadius(18f)
             setColor(
                 ColorUtils.adjustAlpha(
                     ColorUtils.blendColors(primaryTextColor, Color.GRAY, 0.72f),

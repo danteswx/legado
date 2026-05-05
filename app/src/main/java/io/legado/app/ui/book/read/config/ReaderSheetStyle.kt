@@ -7,6 +7,7 @@ import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.lib.theme.primaryColor
+import io.legado.app.lib.theme.UiCorner
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getCompatColor
@@ -63,7 +64,7 @@ object ReaderSheetStyle {
     }
 
     fun topSheetDrawable(palette: Palette, radiusDp: Float = 28f): GradientDrawable {
-        val radius = radiusDp.dpToPx()
+        val radius = UiCorner.scaledDp(radiusDp)
         return GradientDrawable().apply {
             cornerRadii = floatArrayOf(
                 radius, radius,
@@ -78,7 +79,7 @@ object ReaderSheetStyle {
 
     fun blockDrawable(fillColor: Int, strokeColor: Int, radiusDp: Float = 20f): GradientDrawable {
         return GradientDrawable().apply {
-            cornerRadius = radiusDp.dpToPx().toFloat()
+            cornerRadius = UiCorner.scaledDp(radiusDp)
             setColor(fillColor)
             setStroke(1.dpToPx(), strokeColor)
         }

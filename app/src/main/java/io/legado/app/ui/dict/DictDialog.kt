@@ -19,6 +19,7 @@ import io.legado.app.data.entities.DictRule
 import io.legado.app.databinding.DialogDictBinding
 import io.legado.app.help.GlideImageGetter
 import io.legado.app.help.TextViewTagHandler
+import io.legado.app.lib.theme.UiCorner
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.secondaryTextColor
@@ -177,7 +178,11 @@ class DictDialog() : BaseDialogFragment(R.layout.dialog_dict) {
             setTextColor(if (selected) accentColor else secondaryTextColor)
             textSize = 14f
             setPadding(14.dpToPx(), 8.dpToPx(), 14.dpToPx(), 8.dpToPx())
-            background = requireContext().getDrawable(R.drawable.bg_bookshelf_tag_item)
+            background = UiCorner.actionSelector(
+                android.graphics.Color.TRANSPARENT,
+                backgroundColor,
+                UiCorner.actionRadius(requireContext())
+            )
         }
     }
 

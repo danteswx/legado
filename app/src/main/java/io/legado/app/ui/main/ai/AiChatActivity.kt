@@ -23,6 +23,7 @@ import io.legado.app.databinding.ActivityAiChatBinding
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
+import io.legado.app.lib.theme.UiCorner
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.primaryTextColor
@@ -456,7 +457,7 @@ class AiChatActivity : BaseActivity<ActivityAiChatBinding>(
     ): GradientDrawable {
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
-            cornerRadius = radiusDp.dpToPx()
+            cornerRadius = UiCorner.scaledDp(radiusDp)
             setColor(fillColor)
             setStroke(1.dpToPx(), strokeColor)
         }

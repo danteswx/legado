@@ -13,6 +13,7 @@ import androidx.core.view.isVisible
 import io.legado.app.R
 import io.legado.app.databinding.ViewSearchMenuBinding
 import io.legado.app.lib.theme.Selector
+import io.legado.app.lib.theme.UiCorner
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.getPrimaryTextColor
@@ -97,12 +98,12 @@ class SearchMenu @JvmOverloads constructor(
             if (isBgLight) 1f else 0.14f
         )
         llBottomMenu.background = GradientDrawable().apply {
-            cornerRadius = 18F.dpToPx()
+            cornerRadius = UiCorner.scaledDp(18F)
             setColor(panelBaseColor)
             setStroke(1.dpToPx(), panelStrokeColor)
         }
         llSearchBaseInfo.background = GradientDrawable().apply {
-            cornerRadius = 14F.dpToPx()
+            cornerRadius = UiCorner.searchRadius(14F)
             setColor(panelInnerColor)
             setStroke(
                 1.dpToPx(),

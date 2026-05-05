@@ -18,6 +18,7 @@ import android.widget.TextView
 import androidx.annotation.MenuRes
 import androidx.core.content.ContextCompat
 import io.legado.app.R
+import io.legado.app.lib.theme.UiCorner
 import io.legado.app.utils.dpToPx
 
 object ModernActionPopup {
@@ -84,7 +85,10 @@ object ModernActionPopup {
         val textColor = ContextCompat.getColor(context, R.color.primaryText)
         val list = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundResource(R.drawable.bg_popup_action_modern)
+            background = UiCorner.rounded(
+                ContextCompat.getColor(context, R.color.background_card),
+                UiCorner.panelRadius(context)
+            )
             setPadding(6.dpToPx(), 6.dpToPx(), 6.dpToPx(), 6.dpToPx())
             actions.forEach { action ->
                 addView(createItem(context, action, textColor, dismiss))
@@ -94,7 +98,10 @@ object ModernActionPopup {
             isFillViewport = false
             isVerticalScrollBarEnabled = true
             overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
-            setBackgroundResource(R.drawable.bg_popup_action_modern)
+            background = UiCorner.rounded(
+                ContextCompat.getColor(context, R.color.background_card),
+                UiCorner.panelRadius(context)
+            )
             addView(
                 list,
                 ViewGroup.LayoutParams(
@@ -120,7 +127,11 @@ object ModernActionPopup {
             textSize = 14f
             includeFontPadding = false
             setPadding(16.dpToPx(), 0, 16.dpToPx(), 0)
-            setBackgroundResource(R.drawable.bg_popup_action_item)
+            background = UiCorner.actionSelector(
+                Color.TRANSPARENT,
+                ContextCompat.getColor(context, R.color.background_menu),
+                UiCorner.actionRadius(context)
+            )
             setOnClickListener {
                 dismiss()
                 action.invoke()

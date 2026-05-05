@@ -24,6 +24,7 @@ import io.legado.app.constant.Theme
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ThemeConfig
 import io.legado.app.lib.theme.ThemeStore
+import io.legado.app.lib.theme.UiCorner
 import io.legado.app.ui.widget.TitleBar
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.applyOpenTint
@@ -70,7 +71,10 @@ abstract class BaseActivity<VB : ViewBinding>(
         attrs: AttributeSet
     ): View? {
         if (AppConst.menuViewNames.contains(name) && parent?.parent is FrameLayout) {
-            (parent.parent as View).setBackgroundResource(R.drawable.bg_popup_action_modern)
+            (parent.parent as View).background = UiCorner.rounded(
+                androidx.core.content.ContextCompat.getColor(context, R.color.background_card),
+                UiCorner.panelRadius(context)
+            )
         }
         return super.onCreateView(parent, name, context, attrs)
     }

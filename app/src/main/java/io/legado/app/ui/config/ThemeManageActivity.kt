@@ -32,6 +32,7 @@ import io.legado.app.help.glide.ImageLoader
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.ThemeStore
+import io.legado.app.lib.theme.UiCorner
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.lib.theme.secondaryTextColor
@@ -320,7 +321,7 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
     private fun updateSwatch(row: ItemThemePackageOptionBinding, color: Int) {
         row.viewSwatch.background = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
-            cornerRadius = 11f * resources.displayMetrics.density
+            cornerRadius = UiCorner.scaledDp(11f)
             setColor(color)
             setStroke((1f * resources.displayMetrics.density).toInt().coerceAtLeast(1), ColorUtils.adjustAlpha(primaryTextColor, 0.16f))
         }

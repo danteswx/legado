@@ -5,5 +5,5 @@
     <stroke
         android:width="0.8dp"
         android:color="@color/card_border_water" />
-    <corners android:radius="16dp" />
+    <corners android:radius="@dimen/ui_panel_radius" />
 </shape>

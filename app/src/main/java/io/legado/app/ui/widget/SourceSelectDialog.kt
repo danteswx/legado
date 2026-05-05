@@ -10,9 +10,11 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SearchView
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.R
+import io.legado.app.lib.theme.UiCorner
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.utils.dpToPx
 
@@ -83,7 +85,10 @@ object SourceSelectDialog {
         }
         val container = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundResource(R.drawable.bg_source_picker_panel)
+            background = UiCorner.rounded(
+                ContextCompat.getColor(context, R.color.background_card),
+                UiCorner.panelRadius(context)
+            )
             setPadding(14.dpToPx(), 14.dpToPx(), 14.dpToPx(), 12.dpToPx())
             addView(
                 TextView(context).apply {
@@ -129,7 +134,11 @@ object SourceSelectDialog {
             setTextColor(context.primaryTextColor)
             textSize = 15f
             setPadding(18.dpToPx(), 0, 18.dpToPx(), 0)
-            setBackgroundResource(R.drawable.bg_popup_action_item)
+            background = UiCorner.actionSelector(
+                Color.TRANSPARENT,
+                ContextCompat.getColor(context, R.color.background_menu),
+                UiCorner.actionRadius(context)
+            )
             isClickable = true
             isFocusable = true
         }

@@ -30,6 +30,7 @@ import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.buttonDisabledColor
 import io.legado.app.lib.theme.getPrimaryTextColor
+import io.legado.app.lib.theme.UiCorner
 import io.legado.app.model.ReadBook
 import io.legado.app.model.SourceCallBack
 import io.legado.app.ui.book.read.config.ReaderSheetStyle
@@ -159,7 +160,7 @@ class ReadMenu @JvmOverloads constructor(
         strokeColor: Int,
         topOnly: Boolean = false
     ) = GradientDrawable().apply {
-        val radius = radiusDp.dpToPx()
+        val radius = UiCorner.scaledDp(radiusDp)
         if (topOnly) {
             cornerRadii = floatArrayOf(
                 radius, radius,

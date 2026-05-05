@@ -7,6 +7,7 @@ import androidx.appcompat.widget.AppCompatRadioButton
 import androidx.appcompat.widget.TooltipCompat
 import io.legado.app.R
 import io.legado.app.lib.theme.Selector
+import io.legado.app.lib.theme.UiCorner
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.getPrimaryTextColor
@@ -41,7 +42,7 @@ class ThemeRadioNoButton(context: Context, attrs: AttributeSet) :
                     Color.WHITE
                 }
                 background = Selector.shapeBuild()
-                    .setCornerRadius(2.dpToPx())
+                    .setCornerRadius(UiCorner.scaledDp(2f).toInt())
                     .setStrokeWidth(2.dpToPx())
                     .setCheckedBgColor(accentColor)
                     .setCheckedStrokeColor(accentColor)
@@ -63,7 +64,7 @@ class ThemeRadioNoButton(context: Context, attrs: AttributeSet) :
                     Color.WHITE
                 }
                 background = Selector.shapeBuild()
-                    .setCornerRadius(2.dpToPx())
+                    .setCornerRadius(UiCorner.scaledDp(2f).toInt())
                     .setStrokeWidth(2.dpToPx())
                     .setCheckedBgColor(accentColor)
                     .setCheckedStrokeColor(accentColor)

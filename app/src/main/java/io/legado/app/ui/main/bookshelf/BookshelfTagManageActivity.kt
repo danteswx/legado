@@ -21,6 +21,7 @@ import io.legado.app.databinding.ActivityBookshelfTagManageBinding
 import io.legado.app.help.book.BookTagHelper
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
+import io.legado.app.lib.theme.UiCorner
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.lib.theme.secondaryTextColor
@@ -283,7 +284,7 @@ class BookshelfTagManageActivity : BaseActivity<ActivityBookshelfTagManageBindin
             if (ColorUtils.isColorLight(backgroundColor)) 0.58f else 0.08f
         )
         return GradientDrawable().apply {
-            cornerRadius = 12f.dpToPx()
+            cornerRadius = UiCorner.scaledDp(12f)
             setColor(fill)
             setStroke(1.dpToPx(), ColorUtils.adjustAlpha(primaryTextColor, 0.08f))
         }

@@ -24,6 +24,7 @@ import io.legado.app.data.entities.SearchBook
 import io.legado.app.help.config.AppConfig
 import io.legado.app.databinding.ItemAiMessageAssistantBinding
 import io.legado.app.databinding.ItemAiMessageUserBinding
+import io.legado.app.lib.theme.UiCorner
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryTextColor
@@ -226,7 +227,7 @@ class AiChatAdapter(
         val row = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             background = GradientDrawable().apply {
-                cornerRadius = 16.dpToPx().toFloat()
+                cornerRadius = UiCorner.scaledDp(16f)
                 setColor(ColorUtils.blendColors(context.backgroundColor, context.accentColor, 0.05f))
                 setStroke(
                     1.dpToPx(),
@@ -310,7 +311,7 @@ class AiChatAdapter(
             orientation = LinearLayout.VERTICAL
             setPadding(cardPaddingH, cardPaddingV, cardPaddingH, cardPaddingV)
             background = GradientDrawable().apply {
-                cornerRadius = 12.dpToPx().toFloat()
+                cornerRadius = UiCorner.scaledDp(12f)
                 setColor(ColorUtils.blendColors(context.backgroundColor, context.accentColor, 0.08f))
                 setStroke(1.dpToPx(), ColorUtils.adjustAlpha(context.accentColor, 0.18f))
             }

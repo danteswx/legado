@@ -2,19 +2,19 @@
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_pressed="true">
         <shape android:shape="rectangle">
-            <corners android:radius="9dp" />
+            <corners android:radius="@dimen/ui_action_radius" />
             <solid android:color="@color/background_menu" />
         </shape>
     </item>
     <item android:state_selected="true">
         <shape android:shape="rectangle">
-            <corners android:radius="9dp" />
+            <corners android:radius="@dimen/ui_action_radius" />
             <solid android:color="@color/background_menu" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
-            <corners android:radius="9dp" />
+            <corners android:radius="@dimen/ui_action_radius" />
             <solid android:color="@android:color/transparent" />
         </shape>
     </item>
