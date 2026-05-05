@@ -149,6 +149,20 @@ object ThemeConfig {
         return File(path).exists()
     }
 
+    fun getFallbackBackgroundColor(context: Context): Int {
+        return when {
+            AppConfig.isEInkMode -> Color.WHITE
+            AppConfig.isNightTheme -> context.getPrefInt(
+                PreferKey.cNBackground,
+                context.getCompatColor(R.color.md_grey_900)
+            )
+            else -> context.getPrefInt(
+                PreferKey.cBackground,
+                context.getCompatColor(R.color.md_grey_100)
+            )
+        }
+    }
+
     fun upConfig() {
         addConfigs(getConfigs())
     }
@@ -510,10 +524,12 @@ object ThemeConfig {
                     getPrefInt(PreferKey.cNBBackground, getCompatColor(R.color.md_grey_850))
                 val transparentNavBar =
                     getPrefBoolean(PreferKey.tNavBarN, false)
+                val appBackground =
+                    if (hasUsableBgImage(this)) Color.TRANSPARENT else ColorUtils.withAlpha(background, 1f)
                 ThemeStore.editTheme(this)
                     .primaryColor(ColorUtils.withAlpha(primary, 1f))
                     .accentColor(ColorUtils.withAlpha(accent, 1f))
-                    .backgroundColor(ColorUtils.withAlpha(background, 1f))
+                    .backgroundColor(appBackground)
                     .bottomBackground(ColorUtils.withAlpha(bBackground, 1f))
                     .transparentNavBar(transparentNavBar)
                     .apply()
@@ -530,10 +546,12 @@ object ThemeConfig {
                     getPrefInt(PreferKey.cBBackground, getCompatColor(R.color.md_grey_200))
                 val transparentNavBar =
                     getPrefBoolean(PreferKey.tNavBar, false)
+                val appBackground =
+                    if (hasUsableBgImage(this)) Color.TRANSPARENT else ColorUtils.withAlpha(background, 1f)
                 ThemeStore.editTheme(this)
                     .primaryColor(ColorUtils.withAlpha(primary, 1f))
                     .accentColor(ColorUtils.withAlpha(accent, 1f))
-                    .backgroundColor(ColorUtils.withAlpha(background, 1f))
+                    .backgroundColor(appBackground)
                     .bottomBackground(ColorUtils.withAlpha(bBackground, 1f))
                     .transparentNavBar(transparentNavBar)
                     .apply()

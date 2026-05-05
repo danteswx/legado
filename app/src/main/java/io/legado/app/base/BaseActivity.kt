@@ -24,7 +24,6 @@ import io.legado.app.constant.Theme
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ThemeConfig
 import io.legado.app.lib.theme.ThemeStore
-import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.ui.widget.TitleBar
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.applyOpenTint
@@ -179,7 +178,7 @@ abstract class BaseActivity<VB : ViewBinding>(
 
     private fun applyWindowBackgroundColor() {
         ViewCompat.setBackgroundTintList(window.decorView, null)
-        window.decorView.setBackgroundColor(backgroundColor)
+        window.decorView.setBackgroundColor(ThemeConfig.getFallbackBackgroundColor(this))
     }
 
     private fun applyInitialWindowBackground() {

@@ -319,6 +319,9 @@ object ThemePackageManager {
         if (!source.exists()) return path
         val suffix = source.name.substringAfterLast('.', "").takeIf { it.isNotBlank() }?.let { ".$it" }.orEmpty()
         val target = File(dir, "$prefix$suffix")
+        if (source.canonicalFile == target.canonicalFile) {
+            return target.name
+        }
         source.copyTo(target, overwrite = true)
         return target.name
     }
