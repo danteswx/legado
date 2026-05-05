@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import androidx.core.content.ContextCompat
 import androidx.core.view.doOnLayout
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
@@ -50,6 +51,7 @@ class AiChatFragment() : BaseFragment(R.layout.fragment_ai_chat), MainFragmentIn
     }
 
     private fun initView() {
+        applyPageBackground()
         binding.topRow.applyStatusBarPadding(withInitialPadding = true)
         binding.composerContainer.applyNavigationBarMargin(withInitialMargin = true)
         binding.rvAiMessages.layoutManager = LinearLayoutManager(requireContext())
@@ -90,6 +92,15 @@ class AiChatFragment() : BaseFragment(R.layout.fragment_ai_chat), MainFragmentIn
         binding.composerContainer.elevation = 8.dpToPx().toFloat()
         binding.etAiInput.setTextColor(primaryTextColor)
         binding.etAiInput.setHintTextColor(secondaryTextColor)
+    }
+
+    private fun applyPageBackground() {
+        binding.root.setBackgroundColor(
+            ContextCompat.getColor(
+                requireContext(),
+                if (AppConfig.isNightTheme) R.color.md_grey_900 else R.color.white
+            )
+        )
     }
 
     private fun observeMessages() {

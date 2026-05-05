@@ -24,7 +24,6 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.accentColor
-import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.lib.theme.secondaryTextColor
@@ -412,7 +411,8 @@ class AiChatActivity : BaseActivity<ActivityAiChatBinding>(
     }
 
     private fun applyPageChrome() {
-        val baseColor = backgroundColor
+        val baseColor = fixedAiBackgroundColor()
+        binding.root.setBackgroundColor(baseColor)
         val baseIsLight = ColorUtils.isColorLight(baseColor)
         val surfaceColor = if (baseIsLight) {
             ColorUtils.blendColors(
@@ -460,5 +460,12 @@ class AiChatActivity : BaseActivity<ActivityAiChatBinding>(
             setColor(fillColor)
             setStroke(1.dpToPx(), strokeColor)
         }
+    }
+
+    private fun fixedAiBackgroundColor(): Int {
+        return ContextCompat.getColor(
+            this,
+            if (AppConfig.isNightTheme) R.color.md_grey_900 else R.color.white
+        )
     }
 }
