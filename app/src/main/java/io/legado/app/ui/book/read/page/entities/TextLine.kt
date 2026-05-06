@@ -214,7 +214,16 @@ data class TextLine(
             paint.wordSpacing = wordSpacing
         }
         val offsetX = if (atLeastApi35) letterSpacingHalf else extraLetterSpacingOffsetX
-        canvas.drawText(text, indentSize, text.length, startX + offsetX, lineBase - lineTop, paint)
+        view.drawTextWithPaperInk(
+            canvas = canvas,
+            text = text,
+            start = indentSize,
+            end = text.length,
+            x = startX + offsetX,
+            y = lineBase - lineTop,
+            paint = paint,
+            enableBlend = !isReadAloud
+        )
         PaintPool.recycle(paint)
         for (i in columns.indices) {
             val column = columns[i] as TextColumn

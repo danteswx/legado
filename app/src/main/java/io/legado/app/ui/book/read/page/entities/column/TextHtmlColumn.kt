@@ -88,6 +88,7 @@ data class TextHtmlColumn(
     }
 
     private fun drawText(view: ContentTextView, canvas: Canvas, y: Float, textPaint: TextPaint) {
+        val enablePaperInk = linkUrl == null && !textLine.isReadAloud && !isSearchResult
         backgroundColor?.takeIf { it != Color.TRANSPARENT }?.let { color ->
             val oldColor = textPaint.color
             textPaint.color = color
@@ -108,9 +109,9 @@ data class TextHtmlColumn(
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
             val letterSpacing = textPaint.letterSpacing * textPaint.textSize
             val letterSpacingHalf = letterSpacing * 0.5f
-            canvas.drawText(charData, start + letterSpacingHalf, y, textPaint)
+            view.drawTextWithPaperInk(canvas, charData, start + letterSpacingHalf, y, textPaint, enablePaperInk)
         } else {
-            canvas.drawText(charData, start, y, textPaint)
+            view.drawTextWithPaperInk(canvas, charData, start, y, textPaint, enablePaperInk)
         }
         if (selected) {
             canvas.drawRect(start, 0f, end, textLine.height, view.selectedPaint)

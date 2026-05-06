@@ -297,15 +297,69 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         canvas.save()
         canvas.clipRect(0, 0, width, height)
         paperTintPaint.color = if (AppConfig.isNightTheme) {
-            Color.argb(10, 255, 245, 220)
+            Color.argb(14, 255, 245, 220)
         } else {
-            Color.argb(18, 255, 246, 220)
+            Color.argb(28, 255, 246, 220)
         }
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paperTintPaint)
         paperPaint.shader = paperShader ?: createPaperShader().also { paperShader = it }
-        paperPaint.alpha = if (AppConfig.isNightTheme) 26 else 38
+        paperPaint.alpha = if (AppConfig.isNightTheme) 36 else 60
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paperPaint)
         canvas.restore()
+    }
+
+    fun drawTextWithPaperInk(
+        canvas: Canvas,
+        text: String,
+        start: Int,
+        end: Int,
+        x: Float,
+        y: Float,
+        paint: Paint,
+        enableBlend: Boolean = true
+    ) {
+        if (!ReadBookConfig.paperEffect || !enableBlend) {
+            canvas.drawText(text, start, end, x, y, paint)
+            return
+        }
+        val oldColor = paint.color
+        val oldAlpha = paint.alpha
+        paint.color = blendInkColor(oldColor)
+        paint.alpha = (oldAlpha * if (AppConfig.isNightTheme) 0.9f else 0.86f).toInt()
+            .coerceIn(0, oldAlpha)
+        paint.setShadowLayer(0.55f, 0.18f, 0.18f, blendInkShadowColor(oldColor))
+        canvas.drawText(text, start, end, x, y, paint)
+        paint.clearShadowLayer()
+        paint.alpha = oldAlpha
+        paint.color = oldColor
+    }
+
+    fun drawTextWithPaperInk(
+        canvas: Canvas,
+        text: String,
+        x: Float,
+        y: Float,
+        paint: Paint,
+        enableBlend: Boolean = true
+    ) {
+        drawTextWithPaperInk(canvas, text, 0, text.length, x, y, paint, enableBlend)
+    }
+
+    private fun blendInkColor(color: Int): Int {
+        val bg = ReadBookConfig.bgMeanColor
+        val ratio = if (AppConfig.isNightTheme) 0.18f else 0.26f
+        val inv = 1f - ratio
+        return Color.argb(
+            Color.alpha(color),
+            (Color.red(color) * inv + Color.red(bg) * ratio).toInt().coerceIn(0, 255),
+            (Color.green(color) * inv + Color.green(bg) * ratio).toInt().coerceIn(0, 255),
+            (Color.blue(color) * inv + Color.blue(bg) * ratio).toInt().coerceIn(0, 255)
+        )
+    }
+
+    private fun blendInkShadowColor(color: Int): Int {
+        val alpha = if (AppConfig.isNightTheme) 28 else 38
+        return Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color))
     }
 
     private fun createPaperShader(): BitmapShader {
