@@ -239,9 +239,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
 
     override fun onResume() {
         super.onResume()
-        NavigationBarIconConfig.applyCurrentBottomConfig(AppConfig.isNightTheme)
-        applyBottomNavigationIcons()
-        scheduleLiquidGlassSetup()
+        refreshBottomNavigationConfig()
     }
 
     override fun onNavigationItemSelected(item: MenuItem): Boolean = binding.run {
@@ -338,6 +336,15 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             binding.bottomControls.postDelayed(delayMillis, action)
         } else {
             binding.bottomControls.post(action)
+        }
+    }
+
+    private fun refreshBottomNavigationConfig() {
+        NavigationBarIconConfig.applyCurrentBottomConfig(AppConfig.isNightTheme)
+        applyBottomNavigationIcons()
+        scheduleLiquidGlassSetup()
+        binding.bottomNavigationView.doOnLayout {
+            updateBottomNavigationIndicator(animate = false)
         }
     }
 
@@ -911,6 +918,11 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         }
         observeEvent<String>(EventBus.RECREATE) {
             recreate()
+        }
+        observeEvent<Boolean>(EventBus.NAVIGATION_BAR_CHANGED) {
+            if (it == AppConfig.isNightTheme) {
+                refreshBottomNavigationConfig()
+            }
         }
         observeEvent<Boolean>(EventBus.NOTIFY_MAIN) {
             binding.apply {

@@ -31,8 +31,10 @@ import io.legado.app.utils.compress.ZipUtils
 import io.legado.app.utils.externalFiles
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.getFile
+import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.normalizeFileName
+import io.legado.app.utils.putPrefBoolean
 import io.legado.app.utils.putPrefString
 import splitties.init.appCtx
 import java.io.File
@@ -50,6 +52,8 @@ object NavigationBarIconConfig {
     private const val packageFileName = "navigation.json"
     private const val activeDayKey = "navigationBarPackageDay"
     private const val activeNightKey = "navigationBarPackageNight"
+    private const val legacyMigratedDayKey = "navigationBarLegacyMigratedDay"
+    private const val legacyMigratedNightKey = "navigationBarLegacyMigratedNight"
 
     val rootDir: File
         get() = appCtx.externalFiles.getFile("navigationBarPackages")
@@ -179,6 +183,13 @@ object NavigationBarIconConfig {
         if (oldEntry != null &&
             oldEntry.dirName.isNotBlank() &&
             oldEntry.dirName != dirName &&
+            activeDirName(oldEntry.config.isNightMode) == oldEntry.dirName
+        ) {
+            appCtx.putPrefString(if (oldEntry.config.isNightMode) activeNightKey else activeDayKey, dirName)
+        }
+        if (oldEntry != null &&
+            oldEntry.dirName.isNotBlank() &&
+            oldEntry.dirName != dirName &&
             oldEntry.source != Source.REMOTE &&
             oldEntry.dirName != DEFAULT_DIR_NAME
         ) {
@@ -190,9 +201,21 @@ object NavigationBarIconConfig {
     fun deleteLocal(entry: Entry) {
         if (entry.dirName == DEFAULT_DIR_NAME) return
         FileUtils.delete(entry.localDir ?: localDir(entry.config.isNightMode, entry.dirName), deleteRootDir = true)
-        if (activeDirName(entry.config.isNightMode) == entry.dirName) {
-            appCtx.putPrefString(if (entry.config.isNightMode) activeNightKey else activeDayKey, DEFAULT_DIR_NAME)
+        resetActiveIfNeeded(entry)
+    }
+
+    suspend fun delete(entry: Entry) {
+        if (entry.dirName == DEFAULT_DIR_NAME) return
+        when (entry.source) {
+            Source.REMOTE -> deleteRemote(entry)
+            Source.BOTH -> {
+                deleteRemote(entry)
+                deleteLocal(entry)
+            }
+            Source.LOCAL -> deleteLocal(entry)
+            Source.BUILTIN -> return
         }
+        resetActiveIfNeeded(entry)
     }
 
     suspend fun exportZip(entry: Entry): File {
@@ -479,15 +502,37 @@ object NavigationBarIconConfig {
         return appCtx.getString(if (isNight) R.string.navigation_bar_night_default_name else R.string.navigation_bar_day_default_name)
     }
 
+    private fun resetActiveIfNeeded(entry: Entry) {
+        if (activeDirName(entry.config.isNightMode) == entry.dirName) {
+            appCtx.putPrefString(if (entry.config.isNightMode) activeNightKey else activeDayKey, DEFAULT_DIR_NAME)
+        }
+    }
+
+    private fun legacyMigratedKey(isNight: Boolean): String {
+        return if (isNight) legacyMigratedNightKey else legacyMigratedDayKey
+    }
+
     private fun migrateLegacyIconsIfNeeded(isNight: Boolean) {
-        if (!legacyRootDir.exists()) return
+        val migratedKey = legacyMigratedKey(isNight)
+        if (appCtx.getPrefBoolean(migratedKey, false)) return
+        if (!legacyRootDir.exists()) {
+            appCtx.putPrefBoolean(migratedKey, true)
+            return
+        }
         val mode = if (isNight) MODE_NIGHT else MODE_DAY
         val hasLegacy = items.any { item ->
             File(legacyRootDir, "${mode}_${item.key}_$STATE_NORMAL.png").exists() ||
                 File(legacyRootDir, "${mode}_${item.key}_$STATE_SELECTED.png").exists()
         }
+        if (!hasLegacy) {
+            appCtx.putPrefBoolean(migratedKey, true)
+            return
+        }
         val customName = appCtx.getString(R.string.navigation_bar_custom_name)
-        if (!hasLegacy || readEntry(localDir(isNight, customName.normalizeFileName())) != null) return
+        if (readEntry(localDir(isNight, customName.normalizeFileName())) != null) {
+            appCtx.putPrefBoolean(migratedKey, true)
+            return
+        }
         val dir = localDir(isNight, customName.normalizeFileName()).apply { mkdirs() }
         val icons = linkedMapOf<String, String>()
         items.forEach { item ->
@@ -509,5 +554,6 @@ object NavigationBarIconConfig {
                 icons = icons
             )
         )
+        appCtx.putPrefBoolean(migratedKey, true)
     }
 }

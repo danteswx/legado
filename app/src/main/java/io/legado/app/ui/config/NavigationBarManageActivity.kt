@@ -77,6 +77,7 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
             }.onSuccess {
                 editingEntry = it
                 pendingConfig = it.config.copy(icons = it.config.icons.toMutableMap())
+                notifyAppliedIfNeeded(it)
                 refreshEditDialog()
                 loadPackages()
                 toastOnUi(R.string.success)
@@ -184,7 +185,7 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
                     NavigationBarIconConfig.loadEntries(isNightMode, includeRemote = AppConfig.syncThemePackages)
                 }
             }.onSuccess {
-                adapter.items = it
+                adapter.submit(it, NavigationBarIconConfig.activeDirName(isNightMode))
                 binding.tvSummary.text = if (it.size <= 1) {
                     getString(R.string.navigation_bar_package_empty)
                 } else {
@@ -376,6 +377,7 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
                     } else {
                         editingEntry = NavigationBarIconConfig.clearIcon(entry, item.key, selected)
                         pendingConfig = editingEntry!!.config.copy(icons = editingEntry!!.config.icons.toMutableMap())
+                        notifyAppliedIfNeeded(editingEntry!!)
                         refreshEditDialog()
                         loadPackages()
                     }
@@ -393,6 +395,7 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
                     NavigationBarIconConfig.addOrUpdate(config.copy(name = name), editingEntry)
                 }
             }.onSuccess {
+                notifyAppliedIfNeeded(it)
                 toastOnUi(R.string.theme_saved_local)
                 loadPackages()
             }.onFailure {
@@ -419,7 +422,10 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
                 NavAction.EXPORT -> exportPackage(entry)
                 NavAction.UPLOAD -> runAction { NavigationBarIconConfig.upload(entry) }
                 NavAction.DOWNLOAD -> runAction { NavigationBarIconConfig.download(entry) }
-                NavAction.DELETE -> runAction { NavigationBarIconConfig.deleteLocal(entry) }
+                NavAction.DELETE -> runAction {
+                    NavigationBarIconConfig.delete(entry)
+                    postEvent(EventBus.NAVIGATION_BAR_CHANGED, entry.config.isNightMode)
+                }
             }
         }
     }
@@ -430,7 +436,7 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
                 withContext(Dispatchers.IO) { if (entry.source == NavigationBarIconConfig.Source.REMOTE) NavigationBarIconConfig.download(entry) else entry }
             }.onSuccess {
                 NavigationBarIconConfig.apply(it)
-                postEvent(EventBus.RECREATE, "")
+                postEvent(EventBus.NAVIGATION_BAR_CHANGED, it.config.isNightMode)
                 loadPackages()
             }.onFailure {
                 toastOnUi(it.localizedMessage)
@@ -482,6 +488,13 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
         }
     }
 
+    private fun notifyAppliedIfNeeded(entry: NavigationBarIconConfig.Entry) {
+        if (entry.dirName == NavigationBarIconConfig.activeDirName(entry.config.isNightMode)) {
+            NavigationBarIconConfig.apply(entry)
+            postEvent(EventBus.NAVIGATION_BAR_CHANGED, entry.config.isNightMode)
+        }
+    }
+
     private fun effectModeLabel(value: String): String {
         return when (value) {
             "solid" -> getString(R.string.bottom_bar_effect_solid)
@@ -520,21 +533,31 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
     private inner class Adapter : RecyclerView.Adapter<Adapter.Holder>() {
 
         var items: List<NavigationBarIconConfig.Entry> = emptyList()
-            set(value) {
-                val old = field
-                field = value
-                DiffUtil.calculateDiff(object : DiffUtil.Callback() {
-                    override fun getOldListSize(): Int = old.size
-                    override fun getNewListSize(): Int = value.size
-                    override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
-                        return old[oldItemPosition].dirName == value[newItemPosition].dirName
-                    }
+            private set
+        private var activeDirName = NavigationBarIconConfig.DEFAULT_DIR_NAME
 
-                    override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
-                        return old[oldItemPosition] == value[newItemPosition]
-                    }
-                }).dispatchUpdatesTo(this)
-            }
+        fun submit(value: List<NavigationBarIconConfig.Entry>, activeDirName: String) {
+            val old = items
+            val oldActive = this.activeDirName
+            items = value
+            this.activeDirName = activeDirName
+            DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+                override fun getOldListSize(): Int = old.size
+                override fun getNewListSize(): Int = value.size
+                override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+                    return old[oldItemPosition].dirName == value[newItemPosition].dirName &&
+                        old[oldItemPosition].config.isNightMode == value[newItemPosition].config.isNightMode
+                }
+
+                override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+                    val oldItem = old[oldItemPosition]
+                    val newItem = value[newItemPosition]
+                    val oldApplied = oldItem.dirName == oldActive
+                    val newApplied = newItem.dirName == activeDirName
+                    return oldItem == newItem && oldApplied == newApplied
+                }
+            }).dispatchUpdatesTo(this)
+        }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
             return Holder(ItemThemePackageBinding.inflate(LayoutInflater.from(parent.context), parent, false))
@@ -567,7 +590,7 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
                     }
                 }
                 tvSource.text = when {
-                    entry.dirName == NavigationBarIconConfig.activeDirName(isNightMode) -> getString(R.string.theme_source_using)
+                    entry.dirName == activeDirName -> getString(R.string.theme_source_using)
                     entry.source == NavigationBarIconConfig.Source.BUILTIN -> getString(R.string.theme_source_local)
                     entry.source == NavigationBarIconConfig.Source.REMOTE -> getString(R.string.theme_source_remote)
                     entry.source == NavigationBarIconConfig.Source.BOTH -> getString(R.string.theme_source_both)
@@ -584,7 +607,7 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
                     )
                 }
                 cardPreview.visibility = View.GONE
-                btnApply.text = getString(if (entry.dirName == NavigationBarIconConfig.activeDirName(isNightMode)) R.string.theme_applied_state else R.string.theme_apply)
+                btnApply.text = getString(if (entry.dirName == activeDirName) R.string.theme_applied_state else R.string.theme_apply)
                 btnEdit.text = getString(R.string.edit)
                 btnApply.setOnClickListener { applyPackage(entry) }
                 btnEdit.setOnClickListener { showEditDialog(entry) }
