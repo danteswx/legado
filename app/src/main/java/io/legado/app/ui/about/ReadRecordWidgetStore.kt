@@ -47,7 +47,7 @@ object ReadRecordWidgetStore {
 
     fun updateRecentSnapshot(book: Book, lastRead: Long) {
         val current = loadRecentSnapshots().toMutableList()
-        current.removeAll { it.bookUrl == book.bookUrl }
+        current.removeAll { it.sameBook(book.name, book.author) || it.bookUrl == book.bookUrl }
         current.add(
             0,
             ReadRecentVisualSnapshot(
@@ -78,6 +78,12 @@ object ReadRecordWidgetStore {
         saveRecentSnapshots(current)
     }
 
+    fun removeRecentSnapshot(book: Book) {
+        val current = loadRecentSnapshots()
+            .filterNot { it.sameBook(book.name, book.author) || it.bookUrl == book.bookUrl }
+        saveRecentSnapshots(current)
+    }
+
     fun clearRecentSnapshots() {
         saveRecentSnapshots(emptyList())
     }
@@ -86,6 +92,7 @@ object ReadRecordWidgetStore {
         val booksByUrl = appDb.bookDao.all.associateBy { it.bookUrl }
         return loadRecentSnapshots()
             .sortedByDescending { it.lastRead }
+            .distinctBy { it.identityKey() }
             .take(limit)
             .map { ReadRecentVisualItem(it, booksByUrl[it.bookUrl]) }
     }
@@ -120,5 +127,22 @@ object ReadRecordWidgetStore {
             )
         }
         return if (limit != null) result.take(limit) else result
+    }
+
+    private fun ReadRecentVisualSnapshot.identityKey(): String {
+        val normalizedName = name.trim()
+        val normalizedAuthor = author.trim()
+        return if (normalizedName.isNotEmpty()) {
+            "$normalizedName\n$normalizedAuthor"
+        } else {
+            bookUrl
+        }
+    }
+
+    private fun ReadRecentVisualSnapshot.sameBook(name: String, author: String?): Boolean {
+        val normalizedName = name.trim()
+        if (normalizedName.isEmpty()) return false
+        return this.name.trim() == normalizedName &&
+            this.author.trim() == author.orEmpty().trim()
     }
 }

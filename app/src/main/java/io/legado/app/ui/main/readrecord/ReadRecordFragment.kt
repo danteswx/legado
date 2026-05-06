@@ -89,6 +89,7 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
     private var loadJob: Job? = null
     private var loadedDate: LocalDate? = null
     private var lastLoadTime = 0L
+    private var lastRecentReadTime = 0L
     private var componentItems = ReadRecordComponents.load()
     private var currentRankItems: List<ReadRecordRankItem> = emptyList()
     private var currentGoalConfig: ReadRecordGoalConfig = ReadRecordWidgetStore.loadGoalConfig()
@@ -148,7 +149,17 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
 
     override fun onResume() {
         super.onResume()
-        loadData(force = loadedDate == null || loadedDate != selectedDate || isDataStale())
+        viewLifecycleOwner.lifecycleScope.launch {
+            val latestRecentReadTime = withContext(IO) {
+                appDb.readRecentBookDao.latestReadTime() ?: 0L
+            }
+            loadData(
+                force = loadedDate == null ||
+                    loadedDate != selectedDate ||
+                    isDataStale() ||
+                    latestRecentReadTime != lastRecentReadTime
+            )
+        }
     }
 
     override fun onCompatCreateOptionsMenu(menu: Menu) {
@@ -248,7 +259,8 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
             recentCoverItems = ReadRecordWidgetStore.loadRecentVisualItems(5),
             rankItems = ReadRecordWidgetStore.buildRankItems(),
             goalConfig = ReadRecordWidgetStore.loadGoalConfig(),
-            readBookCount = appDb.readRecordDao.allShow.size
+            readBookCount = appDb.readRecordDao.allShow.size,
+            latestRecentReadTime = appDb.readRecentBookDao.latestReadTime() ?: 0L
         )
     }
 
@@ -292,6 +304,7 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
         currentTodayTime = dashboard.todayTime
         currentTotalTime = dashboard.totalTime
         currentReadBookCount = dashboard.readBookCount
+        lastRecentReadTime = dashboard.latestRecentReadTime
 
         renderRecentBooks(dashboard.recentBooks)
         renderDailyTimeline(dashboard.dailyTimeline, dashboard.hasDailyStats)
@@ -379,8 +392,8 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
                 requireContext().showReadRecordBookActionDialog(item.book.name, item.book, item.book.name) {
                     viewLifecycleOwner.lifecycleScope.launch {
                         withContext(IO) {
-                            appDb.readRecentBookDao.delete(item.book.bookUrl)
-                            ReadRecordWidgetStore.removeRecentSnapshot(item.book.bookUrl)
+                            appDb.readRecentBookDao.deleteSameBook(item.book.name, item.book.author)
+                            ReadRecordWidgetStore.removeRecentSnapshot(item.book)
                         }
                         loadData(force = true)
                     }
@@ -443,8 +456,13 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
                 ) {
                     viewLifecycleOwner.lifecycleScope.launch {
                         withContext(IO) {
-                            appDb.readRecentBookDao.delete(item.snapshot.bookUrl)
-                            ReadRecordWidgetStore.removeRecentSnapshot(item.snapshot.bookUrl)
+                            item.book?.let { book ->
+                                appDb.readRecentBookDao.deleteSameBook(book.name, book.author)
+                                ReadRecordWidgetStore.removeRecentSnapshot(book)
+                            } ?: run {
+                                appDb.readRecentBookDao.delete(item.snapshot.bookUrl)
+                                ReadRecordWidgetStore.removeRecentSnapshot(item.snapshot.bookUrl)
+                            }
                         }
                         loadData(force = true)
                     }
@@ -662,7 +680,8 @@ private data class ReadRecordDashboard(
     val recentCoverItems: List<ReadRecentVisualItem>,
     val rankItems: List<ReadRecordRankItem>,
     val goalConfig: ReadRecordGoalConfig,
-    val readBookCount: Int
+    val readBookCount: Int,
+    val latestRecentReadTime: Long
 )
 
 private data class RecentReadBook(

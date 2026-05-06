@@ -99,6 +99,19 @@ object ReadBook : CoroutineScope by MainScope() {
     val preDownloadSemaphore = Semaphore(2)
     val executor = globalExecutor
 
+    fun markRecentRead(book: Book, readTime: Long = System.currentTimeMillis()) {
+        executor.execute {
+            kotlin.runCatching {
+                book.durChapterTime = readTime
+                book.update()
+                appDb.readRecentBookDao.insert(ReadRecentBook(book.bookUrl, readTime))
+                ReadRecordWidgetStore.updateRecentSnapshot(book, readTime)
+            }.onFailure {
+                AppLog.put("更新最近在读出错\n$it", it)
+            }
+        }
+    }
+
     fun resetData(book: Book) {
         releaseAndCancel()
         ReadBook.book = book

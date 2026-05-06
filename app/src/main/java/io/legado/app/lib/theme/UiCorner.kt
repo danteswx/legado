@@ -62,4 +62,24 @@ object UiCorner {
             addState(intArrayOf(), rounded(defaultColor, radius))
         }
     }
+
+    fun actionStrokeSelector(
+        defaultColor: Int,
+        pressedColor: Int,
+        radius: Float,
+        strokeWidth: Int,
+        strokeColor: Int
+    ): StateListDrawable {
+        return StateListDrawable().apply {
+            addState(
+                intArrayOf(android.R.attr.state_pressed),
+                roundedStroke(pressedColor, radius, strokeWidth, strokeColor)
+            )
+            addState(
+                intArrayOf(android.R.attr.state_selected),
+                roundedStroke(pressedColor, radius, strokeWidth, strokeColor)
+            )
+            addState(intArrayOf(), roundedStroke(defaultColor, radius, strokeWidth, strokeColor))
+        }
+    }
 }

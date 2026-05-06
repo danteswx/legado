@@ -213,7 +213,8 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
             recentCoverItems = ReadRecordWidgetStore.loadRecentVisualItems(5),
             rankItems = ReadRecordWidgetStore.buildRankItems(),
             goalConfig = ReadRecordWidgetStore.loadGoalConfig(),
-            readBookCount = appDb.readRecordDao.allShow.size
+            readBookCount = appDb.readRecordDao.allShow.size,
+            latestRecentReadTime = appDb.readRecentBookDao.latestReadTime() ?: 0L
         )
     }
 
@@ -344,8 +345,8 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
                 showReadRecordBookActionDialog(item.book.name, item.book, item.book.name) {
                     lifecycleScope.launch {
                         withContext(IO) {
-                            appDb.readRecentBookDao.delete(item.book.bookUrl)
-                            ReadRecordWidgetStore.removeRecentSnapshot(item.book.bookUrl)
+                            appDb.readRecentBookDao.deleteSameBook(item.book.name, item.book.author)
+                            ReadRecordWidgetStore.removeRecentSnapshot(item.book)
                         }
                         loadData()
                     }
@@ -408,8 +409,13 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
                 ) {
                     lifecycleScope.launch {
                         withContext(IO) {
-                            appDb.readRecentBookDao.delete(item.snapshot.bookUrl)
-                            ReadRecordWidgetStore.removeRecentSnapshot(item.snapshot.bookUrl)
+                            item.book?.let { book ->
+                                appDb.readRecentBookDao.deleteSameBook(book.name, book.author)
+                                ReadRecordWidgetStore.removeRecentSnapshot(book)
+                            } ?: run {
+                                appDb.readRecentBookDao.delete(item.snapshot.bookUrl)
+                                ReadRecordWidgetStore.removeRecentSnapshot(item.snapshot.bookUrl)
+                            }
                         }
                         loadData()
                     }
@@ -629,7 +635,8 @@ private data class ReadRecordDashboard(
     val recentCoverItems: List<ReadRecentVisualItem>,
     val rankItems: List<ReadRecordRankItem>,
     val goalConfig: ReadRecordGoalConfig,
-    val readBookCount: Int
+    val readBookCount: Int,
+    val latestRecentReadTime: Long
 )
 
 private data class RecentReadBook(

@@ -92,7 +92,10 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
                 else -> appDb.bookDao.getBook(bookUrl)
             } ?: ReadBook.book
             when {
-                book != null -> initBook(book)
+                book != null -> {
+                    ReadBook.markRecentRead(book)
+                    initBook(book)
+                }
                 else -> {
                     ReadBook.upMsg(context.getString(R.string.no_book))
                     AppLog.put("未找到书籍\nbookUrl:$bookUrl")

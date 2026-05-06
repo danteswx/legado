@@ -292,18 +292,27 @@ class BookInfoActivity :
     private fun applyUiCorners() = binding.run {
         val panelColor = ContextCompat.getColor(this@BookInfoActivity, R.color.background_card)
         val menuColor = ContextCompat.getColor(this@BookInfoActivity, R.color.background_menu)
+        val actionColor = ContextCompat.getColor(this@BookInfoActivity, R.color.book_info_frost)
+        val strokeColor = ContextCompat.getColor(this@BookInfoActivity, R.color.glass_stroke)
         val transparent = Color.TRANSPARENT
         ivCoverC.radius = UiCorner.panelRadius(this@BookInfoActivity)
         listOfNotNull(llDetailPanel, llInfoPage, llDetailContentPanel).forEach {
             it.background = UiCorner.rounded(panelColor, UiCorner.panelRadius(this@BookInfoActivity))
         }
-        listOfNotNull(tvTabIntro, tvTabToc, tvTabInfo, tvIntroToggle, tvShelf).forEach {
+        listOfNotNull(tvTabIntro, tvTabToc, tvTabInfo, tvIntroToggle).forEach {
             it.background = UiCorner.actionSelector(
                 transparent,
                 menuColor,
                 UiCorner.actionRadius(this@BookInfoActivity)
             )
         }
+        tvShelf.background = UiCorner.actionStrokeSelector(
+            actionColor,
+            menuColor,
+            UiCorner.actionRadius(this@BookInfoActivity),
+            1.dpToPx(),
+            strokeColor
+        )
     }
 
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
