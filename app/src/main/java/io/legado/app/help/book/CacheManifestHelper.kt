@@ -24,7 +24,9 @@ object CacheManifestHelper {
 
     fun read(file: File): CacheBookManifest? {
         if (!file.isFile) return null
-        return GSON.fromJsonObject<CacheBookManifest>(file.readText()).getOrNull()
+        return runCatching {
+            GSON.fromJsonObject<CacheBookManifest>(file.readText()).getOrNull()
+        }.getOrNull()
     }
 
     fun listManifests(): List<CacheBookManifest> {

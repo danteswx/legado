@@ -1034,6 +1034,8 @@
     <string name="read_record_rank_empty">No reading time rank yet</string>
     <string name="read_record_rank_number">No.%1$d</string>
     <string name="read_record_goal_target_progress">Today\'s target %1$s / %2$s</string>
+    <string name="read_record_open_book_info">Open book details</string>
+    <string name="read_record_delete_entry">Delete this record</string>
     <string name="local_tts">Local TTS</string>
     <string name="thread_count">Thread count</string>
     <string name="all_read_time">Total read time</string>

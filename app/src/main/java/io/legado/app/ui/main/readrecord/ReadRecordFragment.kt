@@ -37,6 +37,7 @@ import io.legado.app.ui.about.ReadRecordWidgetStore
 import io.legado.app.ui.about.ReadRecentVisualItem
 import io.legado.app.ui.about.loadReadRecordCover
 import io.legado.app.ui.about.openReadRecordBook
+import io.legado.app.ui.about.showReadRecordBookActionDialog
 import io.legado.app.ui.about.showReadRecordGoalDialog
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.main.MainFragmentInterface
@@ -114,7 +115,14 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
             showComponentConfigDialog()
         }
         binding.ivRankMore.setOnClickListener {
-            ReadRecordRankDialog.show(requireContext(), currentRankItems, ::formatDuring)
+            ReadRecordRankDialog.show(requireContext(), currentRankItems, ::formatDuring) { item ->
+                viewLifecycleOwner.lifecycleScope.launch {
+                    withContext(IO) {
+                        appDb.readRecordDao.deleteByName(item.displayName)
+                    }
+                    loadData(force = true)
+                }
+            }
         }
         binding.ivGoalEdit.setOnClickListener {
             requireContext().showReadRecordGoalDialog(
@@ -368,17 +376,14 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
                 startActivityForBook(item.book)
             }
             itemBinding.root.setOnLongClickListener {
-                alert(getString(R.string.delete), item.book.name) {
-                    yesButton {
-                        lifecycleScope.launch {
-                            withContext(IO) {
-                                appDb.readRecentBookDao.delete(item.book.bookUrl)
-                                ReadRecordWidgetStore.removeRecentSnapshot(item.book.bookUrl)
-                            }
-                            loadData(force = true)
+                requireContext().showReadRecordBookActionDialog(item.book.name, item.book, item.book.name) {
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        withContext(IO) {
+                            appDb.readRecentBookDao.delete(item.book.bookUrl)
+                            ReadRecordWidgetStore.removeRecentSnapshot(item.book.bookUrl)
                         }
+                        loadData(force = true)
                     }
-                    noButton()
                 }
                 true
             }
@@ -424,9 +429,28 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
     private fun renderRecentCovers(items: List<ReadRecentVisualItem>) {
         binding.tvRecentCoversEmpty.isVisible = items.isEmpty()
         binding.rvRecentCovers.isVisible = items.isNotEmpty()
-        binding.rvRecentCovers.adapter = ReadRecordCoverAdapter(requireContext(), items) {
-            requireContext().openReadRecordBook(it.book, it.snapshot.name)
-        }
+        binding.rvRecentCovers.adapter = ReadRecordCoverAdapter(
+            context = requireContext(),
+            items = items,
+            onClick = {
+                requireContext().openReadRecordBook(it.book, it.snapshot.name)
+            },
+            onLongClick = { item ->
+                requireContext().showReadRecordBookActionDialog(
+                    title = item.book?.name ?: item.snapshot.name,
+                    book = item.book,
+                    fallbackName = item.snapshot.name
+                ) {
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        withContext(IO) {
+                            appDb.readRecentBookDao.delete(item.snapshot.bookUrl)
+                            ReadRecordWidgetStore.removeRecentSnapshot(item.snapshot.bookUrl)
+                        }
+                        loadData(force = true)
+                    }
+                }
+            }
+        )
     }
 
     private fun renderReadRank(items: List<ReadRecordRankItem>, allItems: List<ReadRecordRankItem>) {
@@ -450,6 +474,21 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
             rowBinding.root.alpha = if (item.book == null) 0.72f else 1f
             rowBinding.root.setOnClickListener {
                 requireContext().openReadRecordBook(item.book, item.displayName)
+            }
+            rowBinding.root.setOnLongClickListener {
+                requireContext().showReadRecordBookActionDialog(
+                    title = item.book?.name ?: item.snapshot?.name ?: item.displayName,
+                    book = item.book,
+                    fallbackName = item.displayName
+                ) {
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        withContext(IO) {
+                            appDb.readRecordDao.deleteByName(item.displayName)
+                        }
+                        loadData(force = true)
+                    }
+                }
+                true
             }
             binding.llReadRank.addView(rowBinding.root)
             if (index < items.lastIndex) {

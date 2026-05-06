@@ -1,6 +1,7 @@
 package io.legado.app.ui.about
 
 import android.content.Context
+import android.content.Intent
 import android.graphics.drawable.GradientDrawable
 import android.text.InputType
 import android.view.LayoutInflater
@@ -14,11 +15,14 @@ import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.R
+import io.legado.app.data.entities.Book
 import io.legado.app.databinding.ItemReadRecordCoverBinding
 import io.legado.app.databinding.ItemReadRecordRankBinding
+import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.UiCorner
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.model.BookCover
+import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.applyTint
@@ -41,6 +45,50 @@ fun Context.openReadRecordBook(
     startActivityForBook(book)
 }
 
+fun Context.openReadRecordBookInfo(
+    book: Book?,
+    fallbackName: String? = null
+) {
+    if (book == null) {
+        fallbackName?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            SearchActivity.start(this, it)
+            return
+        }
+        toastOnUi(getString(R.string.read_record_goal_open_missing))
+        return
+    }
+    startActivity(
+        Intent(this, BookInfoActivity::class.java).apply {
+            putExtra("name", book.name)
+            putExtra("author", book.author)
+            putExtra("bookUrl", book.bookUrl)
+            putExtra("origin", book.origin)
+            putExtra("originName", book.originName)
+        }
+    )
+}
+
+fun Context.showReadRecordBookActionDialog(
+    title: String,
+    book: Book?,
+    fallbackName: String? = null,
+    onDeleteRecord: () -> Unit
+) {
+    alert(title) {
+        items(
+            listOf(
+                getString(R.string.read_record_open_book_info),
+                getString(R.string.read_record_delete_entry)
+            )
+        ) { _, _, index ->
+            when (index) {
+                0 -> openReadRecordBookInfo(book, fallbackName)
+                1 -> onDeleteRecord()
+            }
+        }
+    }
+}
+
 fun ImageView.loadReadRecordCover(path: String?) {
     BookCover.load(context, path).into(this)
 }
@@ -48,7 +96,8 @@ fun ImageView.loadReadRecordCover(path: String?) {
 class ReadRecordCoverAdapter(
     private val context: Context,
     private val items: List<ReadRecentVisualItem>,
-    private val onClick: (ReadRecentVisualItem) -> Unit
+    private val onClick: (ReadRecentVisualItem) -> Unit,
+    private val onLongClick: ((ReadRecentVisualItem) -> Unit)? = null
 ) : RecyclerView.Adapter<ReadRecordCoverAdapter.CoverHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CoverHolder {
@@ -68,6 +117,10 @@ class ReadRecordCoverAdapter(
         fun bind(item: ReadRecentVisualItem) {
             binding.ivCover.loadReadRecordCover(item.snapshot.displayCover())
             binding.root.setOnClickListener { onClick(item) }
+            binding.root.setOnLongClickListener {
+                onLongClick?.invoke(item)
+                onLongClick != null
+            }
             binding.root.alpha = if (item.book == null) 0.72f else 1f
         }
     }
@@ -77,7 +130,8 @@ class ReadRecordRankAdapter(
     private val context: Context,
     private val items: List<ReadRecordRankItem>,
     private val formatDuring: (Long) -> String,
-    private val onClick: (ReadRecordRankItem) -> Unit
+    private val onClick: (ReadRecordRankItem) -> Unit,
+    private val onLongClick: ((ReadRecordRankItem) -> Unit)? = null
 ) : RecyclerView.Adapter<ReadRecordRankAdapter.RankHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RankHolder {
@@ -109,6 +163,10 @@ class ReadRecordRankAdapter(
             )
             binding.root.alpha = if (item.book == null) 0.72f else 1f
             binding.root.setOnClickListener { onClick(item) }
+            binding.root.setOnLongClickListener {
+                onLongClick?.invoke(item)
+                onLongClick != null
+            }
         }
     }
 }
@@ -117,13 +175,36 @@ object ReadRecordRankDialog {
     fun show(
         context: Context,
         items: List<ReadRecordRankItem>,
-        formatDuring: (Long) -> String
+        formatDuring: (Long) -> String,
+        onDeleteRecord: ((ReadRecordRankItem) -> Unit)? = null
     ) {
+        val rankItems = items.toMutableList()
+        lateinit var rankAdapter: ReadRecordRankAdapter
         val recyclerView = androidx.recyclerview.widget.RecyclerView(context).apply {
             layoutManager = androidx.recyclerview.widget.LinearLayoutManager(context)
-            adapter = ReadRecordRankAdapter(context, items, formatDuring) {
-                context.openReadRecordBook(it.book, it.displayName)
-            }
+            rankAdapter = ReadRecordRankAdapter(
+                context = context,
+                items = rankItems,
+                formatDuring = formatDuring,
+                onClick = {
+                    context.openReadRecordBook(it.book, it.displayName)
+                },
+                onLongClick = { item ->
+                    context.showReadRecordBookActionDialog(
+                        title = item.book?.name ?: item.snapshot?.name ?: item.displayName,
+                        book = item.book,
+                        fallbackName = item.displayName
+                    ) {
+                        onDeleteRecord?.invoke(item)
+                        val index = rankItems.indexOf(item)
+                        if (index >= 0) {
+                            rankItems.removeAt(index)
+                            rankAdapter.notifyItemRemoved(index)
+                        }
+                    }
+                }
+            )
+            adapter = rankAdapter
             overScrollMode = View.OVER_SCROLL_NEVER
         }
         val container = LinearLayout(context).apply {

@@ -135,7 +135,14 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
             showComponentConfigDialog()
         }
         binding.ivRankMore.setOnClickListener {
-            ReadRecordRankDialog.show(this, currentRankItems, ::formatDuring)
+            ReadRecordRankDialog.show(this, currentRankItems, ::formatDuring) { item ->
+                lifecycleScope.launch {
+                    withContext(IO) {
+                        appDb.readRecordDao.deleteByName(item.displayName)
+                    }
+                    loadData()
+                }
+            }
         }
         binding.ivGoalEdit.setOnClickListener {
             showReadRecordGoalDialog(
@@ -334,17 +341,14 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
                 startActivityForBook(item.book)
             }
             itemBinding.root.setOnLongClickListener {
-                alert(getString(R.string.delete), item.book.name) {
-                    yesButton {
-                        lifecycleScope.launch {
-                            withContext(IO) {
-                                appDb.readRecentBookDao.delete(item.book.bookUrl)
-                                ReadRecordWidgetStore.removeRecentSnapshot(item.book.bookUrl)
-                            }
-                            loadData()
+                showReadRecordBookActionDialog(item.book.name, item.book, item.book.name) {
+                    lifecycleScope.launch {
+                        withContext(IO) {
+                            appDb.readRecentBookDao.delete(item.book.bookUrl)
+                            ReadRecordWidgetStore.removeRecentSnapshot(item.book.bookUrl)
                         }
+                        loadData()
                     }
-                    noButton()
                 }
                 true
             }
@@ -390,9 +394,28 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
     private fun renderRecentCovers(items: List<ReadRecentVisualItem>) {
         binding.tvRecentCoversEmpty.isVisible = items.isEmpty()
         binding.rvRecentCovers.isVisible = items.isNotEmpty()
-        binding.rvRecentCovers.adapter = ReadRecordCoverAdapter(this, items) {
-            openReadRecordBook(it.book, it.snapshot.name)
-        }
+        binding.rvRecentCovers.adapter = ReadRecordCoverAdapter(
+            context = this,
+            items = items,
+            onClick = {
+                openReadRecordBook(it.book, it.snapshot.name)
+            },
+            onLongClick = { item ->
+                showReadRecordBookActionDialog(
+                    title = item.book?.name ?: item.snapshot.name,
+                    book = item.book,
+                    fallbackName = item.snapshot.name
+                ) {
+                    lifecycleScope.launch {
+                        withContext(IO) {
+                            appDb.readRecentBookDao.delete(item.snapshot.bookUrl)
+                            ReadRecordWidgetStore.removeRecentSnapshot(item.snapshot.bookUrl)
+                        }
+                        loadData()
+                    }
+                }
+            }
+        )
     }
 
     private fun renderReadRank(items: List<ReadRecordRankItem>, allItems: List<ReadRecordRankItem>) {
@@ -416,6 +439,21 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
             rowBinding.root.alpha = if (item.book == null) 0.72f else 1f
             rowBinding.root.setOnClickListener {
                 openReadRecordBook(item.book, item.displayName)
+            }
+            rowBinding.root.setOnLongClickListener {
+                showReadRecordBookActionDialog(
+                    title = item.book?.name ?: item.snapshot?.name ?: item.displayName,
+                    book = item.book,
+                    fallbackName = item.displayName
+                ) {
+                    lifecycleScope.launch {
+                        withContext(IO) {
+                            appDb.readRecordDao.deleteByName(item.displayName)
+                        }
+                        loadData()
+                    }
+                }
+                true
             }
             binding.llReadRank.addView(rowBinding.root)
             if (index < items.lastIndex) {
