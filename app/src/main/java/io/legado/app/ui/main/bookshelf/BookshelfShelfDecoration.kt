@@ -12,8 +12,8 @@ import androidx.core.graphics.ColorUtils
 import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.R
 import io.legado.app.help.config.AppConfig
-import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.utils.dpToPx
+import io.legado.app.utils.getCompatColor
 
 class BookshelfShelfDecoration(
     context: Context,
@@ -45,22 +45,22 @@ class BookshelfShelfDecoration(
     private val frontBottomEndColor: Int
 
     init {
-        val background = context.backgroundColor
-        val darkBase = if (ColorUtils.calculateLuminance(background) > 0.5) {
+        val surface = context.getCompatColor(R.color.background_card)
+        val darkBase = if (ColorUtils.calculateLuminance(surface) > 0.5) {
             0xFF000000.toInt()
         } else {
             0xFFFFFFFF.toInt()
         }
-        topStartColor = ColorUtils.blendARGB(background, darkBase, 0.08f)
-        topEndColor = ColorUtils.blendARGB(background, darkBase, 0.18f)
-        frontStartColor = ColorUtils.blendARGB(background, darkBase, 0.16f)
-        frontMiddleColor = ColorUtils.blendARGB(background, darkBase, 0.28f)
-        frontEndColor = ColorUtils.blendARGB(background, darkBase, 0.40f)
-        frontBottomStartColor = ColorUtils.blendARGB(background, darkBase, 0.30f)
-        frontBottomEndColor = ColorUtils.blendARGB(background, darkBase, 0.52f)
-        shadowPaint.color = ColorUtils.setAlphaComponent(darkBase, 42)
-        highlightPaint.color = ColorUtils.setAlphaComponent(background, 72)
-        contactShadowPaint.color = ColorUtils.setAlphaComponent(darkBase, 64)
+        topStartColor = ColorUtils.blendARGB(surface, darkBase, 0.03f)
+        topEndColor = ColorUtils.blendARGB(surface, darkBase, 0.08f)
+        frontStartColor = ColorUtils.blendARGB(surface, darkBase, 0.08f)
+        frontMiddleColor = ColorUtils.blendARGB(surface, darkBase, 0.15f)
+        frontEndColor = ColorUtils.blendARGB(surface, darkBase, 0.22f)
+        frontBottomStartColor = ColorUtils.blendARGB(surface, darkBase, 0.18f)
+        frontBottomEndColor = ColorUtils.blendARGB(surface, darkBase, 0.32f)
+        shadowPaint.color = ColorUtils.setAlphaComponent(darkBase, 34)
+        highlightPaint.color = ColorUtils.setAlphaComponent(surface, 88)
+        contactShadowPaint.color = ColorUtils.setAlphaComponent(darkBase, 84)
     }
 
     override fun onDraw(canvas: Canvas, parent: RecyclerView, state: RecyclerView.State) {
@@ -163,7 +163,7 @@ class BookshelfShelfDecoration(
         plankFrontPaint.shader = null
 
         plankRect.set(visualLeft + 8.dpToPx(), frontBottom, visualRight - 8.dpToPx(), frontBottom + shadowHeight)
-        canvas.drawRoundRect(plankRect, shadowHeight, shadowHeight, shadowPaint)
+        canvas.drawRect(plankRect, shadowPaint)
     }
 
     private data class RowBounds(
