@@ -334,7 +334,7 @@ object ThemePackageManager {
             accentColor = "#E53935",
             backgroundColor = if (pkg.isNightTheme) "#212121" else "#F5F5F5",
             bottomBackground = if (pkg.isNightTheme) "#303030" else "#EEEEEE",
-            transparentNavBar = false,
+            transparentNavBar = true,
             backgroundImgPath = null,
             backgroundImgBlur = 0
         )

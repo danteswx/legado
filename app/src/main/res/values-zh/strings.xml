@@ -727,12 +727,8 @@
     <string name="ui_corner_scale">圆角倍率</string>
     <string name="ui_corner_scale_summary">当前圆角倍率：%s，范围 0-3</string>
     <string name="ui_corner_scale_invalid">请输入 0 到 3 之间的数字</string>
-    <string name="ui_corner_effect_mode">圆角布局样式</string>
-    <string name="ui_corner_effect_mode_summary">当前样式：%s</string>
-    <string name="ui_corner_effect_level">圆角布局强度</string>
-    <string name="ui_corner_effect_level_summary">%s</string>
-    <string name="ui_corner_effect_level_solid">常规透明度：%d%%</string>
-    <string name="ui_corner_effect_level_glass">玻璃模糊程度：%d%%</string>
+    <string name="ui_layout_alpha">界面布局透明度</string>
+    <string name="ui_layout_alpha_value">%d%%</string>
     <string name="ui_corner_search_follow">搜索栏跟随圆角</string>
     <string name="ui_corner_search_follow_summary">允许搜索栏使用全局圆角倍率</string>
     <string name="ui_corner_reply_follow">回复栏跟随圆角</string>

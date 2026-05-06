@@ -71,7 +71,7 @@ abstract class BaseActivity<VB : ViewBinding>(
         attrs: AttributeSet
     ): View? {
         if (AppConst.menuViewNames.contains(name) && parent?.parent is FrameLayout) {
-            (parent.parent as View).background = UiCorner.rounded(
+            (parent.parent as View).background = UiCorner.opaqueRounded(
                 androidx.core.content.ContextCompat.getColor(context, R.color.background_card),
                 UiCorner.panelRadius(context)
             )

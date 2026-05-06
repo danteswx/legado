@@ -95,7 +95,7 @@ object ModernActionPopup {
             isFillViewport = false
             isVerticalScrollBarEnabled = false
             overScrollMode = View.OVER_SCROLL_NEVER
-            background = UiCorner.rounded(
+            background = UiCorner.opaqueRounded(
                 ContextCompat.getColor(context, R.color.background_card),
                 UiCorner.panelRadius(context)
             )

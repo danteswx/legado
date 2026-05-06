@@ -38,6 +38,7 @@ import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.lib.theme.secondaryTextColor
 import io.legado.app.ui.file.HandleFileContract
+import io.legado.app.ui.widget.number.NumberPickerDialog
 import io.legado.app.ui.widget.seekbar.SeekBarChangeListener
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.GSON
@@ -78,6 +79,10 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
     private var pendingBlur = 0
     private var pendingMainBackgroundPath: String? = null
     private var pendingBookInfoBackgroundPath: String? = null
+    private var pendingUiCornerScale = 1f
+    private var pendingUiLayoutAlpha = 100
+    private var pendingUiCornerSearchFollow = false
+    private var pendingUiCornerReplyFollow = false
     private var loadVersion = 0
     private val pendingRemoteSyncTasks = linkedMapOf<String, RemoteSyncTask>()
     @Volatile
@@ -136,7 +141,7 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
     }
 
     private fun initView() = binding.run {
-        tabBar.background = UiCorner.rounded(
+        tabBar.background = UiCorner.opaqueRounded(
             ContextCompat.getColor(this@ThemeManageActivity, R.color.background_menu),
             UiCorner.panelRadius(this@ThemeManageActivity)
         )
@@ -309,6 +314,10 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
         pendingMainBackgroundPath = current.backgroundImgPath
         pendingBookInfoBackgroundPath = current.bookInfoBackgroundImgPath
         pendingBlur = current.backgroundImgBlur
+        pendingUiCornerScale = current.uiCornerScale ?: AppConfig.uiCornerScale
+        pendingUiLayoutAlpha = current.uiLayoutAlpha ?: AppConfig.uiLayoutAlpha
+        pendingUiCornerSearchFollow = current.uiCornerSearchFollow ?: AppConfig.uiCornerSearchFollow
+        pendingUiCornerReplyFollow = current.uiCornerReplyFollow ?: AppConfig.uiCornerReplyFollow
         return DialogThemePackageEditBinding.inflate(layoutInflater).apply {
             etName.setText(current.themeName)
             setupColorRow(rowPrimary, R.string.theme_color_primary, current.primaryColor, colorPrimary)
@@ -319,8 +328,76 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
             setupColorRow(rowSecondaryText, R.string.theme_color_secondary_text, current.secondaryTextColor ?: "#${secondaryTextColor.hexString}", colorSecondaryText)
             setupImageRow(rowMainBackground, R.string.theme_image_main_background, true)
             setupImageRow(rowBookInfoBackground, R.string.theme_image_book_info_background, false)
+            setupInterfaceRows(this)
             etName.isEnabled = entry?.source != ThemePackageManager.Source.REMOTE
         }
+    }
+
+    private fun setupInterfaceRows(binding: DialogThemePackageEditBinding) = binding.run {
+        setupCornerScaleRow(rowCornerScale)
+        setupLayoutAlphaRow(rowLayoutAlpha)
+        setupSwitchRow(rowSearchFollow, R.string.ui_corner_search_follow) {
+            pendingUiCornerSearchFollow = !pendingUiCornerSearchFollow
+            updateSwitchRow(rowSearchFollow, pendingUiCornerSearchFollow)
+        }
+        setupSwitchRow(rowReplyFollow, R.string.ui_corner_reply_follow) {
+            pendingUiCornerReplyFollow = !pendingUiCornerReplyFollow
+            updateSwitchRow(rowReplyFollow, pendingUiCornerReplyFollow)
+        }
+        updateSwitchRow(rowSearchFollow, pendingUiCornerSearchFollow)
+        updateSwitchRow(rowReplyFollow, pendingUiCornerReplyFollow)
+    }
+
+    private fun setupCornerScaleRow(row: ItemThemePackageOptionBinding) {
+        row.tvTitle.text = getString(R.string.ui_corner_scale)
+        row.viewSwatch.visibility = View.INVISIBLE
+        row.tvValue.text = pendingUiCornerScale.toScaleText()
+        row.root.setOnClickListener {
+            NumberPickerDialog(this, isDecimalMode = true)
+                .setTitle(getString(R.string.ui_corner_scale))
+                .setMaxValue(30)
+                .setMinValue(0)
+                .setValue((pendingUiCornerScale * 10).toInt())
+                .setCustomButton(R.string.btn_default_s) {
+                    pendingUiCornerScale = 1f
+                    row.tvValue.text = pendingUiCornerScale.toScaleText()
+                }
+                .show {
+                    pendingUiCornerScale = (it / 10f).coerceIn(0f, 3f)
+                    row.tvValue.text = pendingUiCornerScale.toScaleText()
+                }
+        }
+    }
+
+    private fun setupLayoutAlphaRow(row: ItemThemePackageOptionBinding) {
+        row.tvTitle.text = getString(R.string.ui_layout_alpha)
+        row.viewSwatch.visibility = View.INVISIBLE
+        row.tvValue.text = getString(R.string.ui_layout_alpha_value, pendingUiLayoutAlpha)
+        row.root.setOnClickListener {
+            NumberPickerDialog(this)
+                .setTitle(getString(R.string.ui_layout_alpha))
+                .setMaxValue(100)
+                .setMinValue(0)
+                .setValue(pendingUiLayoutAlpha)
+                .setCustomButton(R.string.btn_default_s) {
+                    pendingUiLayoutAlpha = 100
+                    row.tvValue.text = getString(R.string.ui_layout_alpha_value, pendingUiLayoutAlpha)
+                }
+                .show {
+                    pendingUiLayoutAlpha = it.coerceIn(0, 100)
+                    row.tvValue.text = getString(R.string.ui_layout_alpha_value, pendingUiLayoutAlpha)
+                }
+        }
+    }
+
+    private fun setupSwitchRow(row: ItemThemePackageOptionBinding, titleRes: Int, onClick: () -> Unit) {
+        row.tvTitle.text = getString(titleRes)
+        row.viewSwatch.visibility = View.INVISIBLE
+        row.root.setOnClickListener { onClick() }
+    }
+
+    private fun updateSwitchRow(row: ItemThemePackageOptionBinding, checked: Boolean) {
+        row.tvValue.text = getString(if (checked) R.string.enable else R.string.disable)
     }
 
     private fun setupColorRow(
@@ -471,12 +548,16 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
                 accentColor = normalizeColor(dialogBinding.rowAccent.tvValue.text?.toString()),
                 backgroundColor = normalizeColor(dialogBinding.rowBackground.tvValue.text?.toString()),
                 bottomBackground = normalizeColor(dialogBinding.rowBottomBackground.tvValue.text?.toString()),
-                transparentNavBar = false,
+                transparentNavBar = true,
                 backgroundImgPath = pendingMainBackgroundPath,
                 backgroundImgBlur = pendingBlur,
                 bookInfoBackgroundImgPath = pendingBookInfoBackgroundPath,
                 primaryTextColor = normalizeOptionalColor(dialogBinding.rowPrimaryText.tvValue.text?.toString()),
-                secondaryTextColor = normalizeOptionalColor(dialogBinding.rowSecondaryText.tvValue.text?.toString())
+                secondaryTextColor = normalizeOptionalColor(dialogBinding.rowSecondaryText.tvValue.text?.toString()),
+                uiCornerScale = pendingUiCornerScale,
+                uiLayoutAlpha = pendingUiLayoutAlpha,
+                uiCornerSearchFollow = pendingUiCornerSearchFollow,
+                uiCornerReplyFollow = pendingUiCornerReplyFollow
             )
         }.onFailure {
             toastOnUi("颜色格式不正确")
@@ -558,13 +639,25 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
             accentColor = "#${accent.hexString}",
             backgroundColor = "#${background.hexString}",
             bottomBackground = "#${bottom.hexString}",
-            transparentNavBar = getPrefBoolean(if (isNightTheme) PreferKey.tNavBarN else PreferKey.tNavBar),
+            transparentNavBar = true,
             backgroundImgPath = getPrefString(if (isNightTheme) PreferKey.bgImageN else PreferKey.bgImage),
             backgroundImgBlur = getPrefInt(if (isNightTheme) PreferKey.bgImageNBlurring else PreferKey.bgImageBlurring, 0),
             bookInfoBackgroundImgPath = getPrefString(if (isNightTheme) PreferKey.bookInfoBgImageN else PreferKey.bookInfoBgImage),
             primaryTextColor = "#${ThemeStore.textColorPrimary(this).hexString}",
-            secondaryTextColor = "#${ThemeStore.textColorSecondary(this).hexString}"
+            secondaryTextColor = "#${ThemeStore.textColorSecondary(this).hexString}",
+            uiCornerScale = AppConfig.uiCornerScale,
+            uiLayoutAlpha = AppConfig.uiLayoutAlpha,
+            uiCornerSearchFollow = AppConfig.uiCornerSearchFollow,
+            uiCornerReplyFollow = AppConfig.uiCornerReplyFollow
         )
+    }
+
+    private fun Float.toScaleText(): String {
+        return if (this % 1f == 0f) {
+            this.toInt().toString()
+        } else {
+            String.format(Locale.US, "%.2f", this).trimEnd('0').trimEnd('.')
+        }
     }
 
     private fun normalizeColor(value: String?): String {

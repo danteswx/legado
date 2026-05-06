@@ -12,33 +12,6 @@
         app:iconSpaceReserved="false"
         app:icons="@array/icons" />
 
-    <io.legado.app.lib.prefs.SwitchPreference
-        android:defaultValue="false"
-        android:key="mainTransparentStatusBar"
-        android:summary="@string/main_status_bar_immersion"
-        android:title="@string/main_immersion_status_bar"
-        app:iconSpaceReserved="false" />
-
-    <io.legado.app.lib.prefs.SwitchPreference
-        android:defaultValue="false"
-        android:key="transparentNavBar"
-        android:summary="@string/day_nav_bar_immersion"
-        android:title="@string/immersion_nav_bar"
-        app:iconSpaceReserved="false" />
-
-    <io.legado.app.lib.prefs.SwitchPreference
-        android:defaultValue="false"
-        android:key="transparentNavBarNight"
-        android:summary="@string/night_nav_bar_immersion"
-        android:title="@string/immersion_nav_bar"
-        app:iconSpaceReserved="false" />
-
-    <io.legado.app.lib.prefs.Preference
-        android:key="barElevation"
-        android:summary="@string/bar_elevation_s"
-        android:title="@string/bar_elevation"
-        app:iconSpaceReserved="false" />
-
     <io.legado.app.lib.prefs.NameListPreference
         android:defaultValue="glass"
         android:key="bottomBarEffectMode"
@@ -57,41 +30,6 @@
         android:key="frostedGlassLevel"
         android:summary="@string/frosted_glass_level_summary"
         android:title="@string/frosted_glass_level"
-        app:iconSpaceReserved="false" />
-
-    <io.legado.app.lib.prefs.EditTextPreference
-        android:defaultValue="1"
-        android:key="uiCornerScale"
-        android:summary="@string/ui_corner_scale_summary"
-        android:title="@string/ui_corner_scale"
-        app:iconSpaceReserved="false" />
-
-    <io.legado.app.lib.prefs.NameListPreference
-        android:defaultValue="solid"
-        android:key="uiCornerEffectMode"
-        android:title="@string/ui_corner_effect_mode"
-        app:entries="@array/ui_corner_effect_mode_entries"
-        app:entryValues="@array/ui_corner_effect_mode_values"
-        app:iconSpaceReserved="false" />
-
-    <io.legado.app.lib.prefs.Preference
-        android:key="uiCornerEffectLevel"
-        android:summary="@string/ui_corner_effect_level_summary"
-        android:title="@string/ui_corner_effect_level"
-        app:iconSpaceReserved="false" />
-
-    <io.legado.app.lib.prefs.SwitchPreference
-        android:defaultValue="false"
-        android:key="uiCornerSearchFollow"
-        android:summary="@string/ui_corner_search_follow_summary"
-        android:title="@string/ui_corner_search_follow"
-        app:iconSpaceReserved="false" />
-
-    <io.legado.app.lib.prefs.SwitchPreference
-        android:defaultValue="false"
-        android:key="uiCornerReplyFollow"
-        android:summary="@string/ui_corner_reply_follow_summary"
-        android:title="@string/ui_corner_reply_follow"
         app:iconSpaceReserved="false" />
 
     <io.legado.app.lib.prefs.Preference

@@ -5,7 +5,6 @@ import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.text.InputType
 import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
@@ -16,7 +15,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import io.legado.app.R
 import io.legado.app.base.AppContextWrapper
-import io.legado.app.constant.AppConst
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
 import io.legado.app.databinding.DialogEditTextBinding
@@ -30,9 +28,7 @@ import io.legado.app.help.http.okHttpClient
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.prefs.ColorPreference
-import io.legado.app.lib.prefs.EditTextPreference
 import io.legado.app.lib.prefs.fragment.PreferenceFragment
-import io.legado.app.lib.theme.UiCorner
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.ui.file.HandleFileContract
@@ -101,15 +97,10 @@ class ThemeConfigFragment : PreferenceFragment(),
         upPreferenceSummary(PreferKey.bgImageN, getPrefString(PreferKey.bgImageN))
         upPreferenceSummary(PreferKey.bookInfoBgImage, getPrefString(PreferKey.bookInfoBgImage))
         upPreferenceSummary(PreferKey.bookInfoBgImageN, getPrefString(PreferKey.bookInfoBgImageN))
-        upPreferenceSummary(PreferKey.barElevation, AppConfig.elevation.toString())
         upPreferenceSummary(PreferKey.bottomBarEffectMode, AppConfig.bottomBarEffectMode)
         upPreferenceSummary(PreferKey.liquidGlassLevel, AppConfig.liquidGlassLevel.toString())
         upPreferenceSummary(PreferKey.frostedGlassLevel, AppConfig.frostedGlassLevel.toString())
-        upPreferenceSummary(PreferKey.uiCornerScale, AppConfig.uiCornerScale.toScaleText())
-        upPreferenceSummary(PreferKey.uiCornerEffectMode, AppConfig.uiCornerEffectMode)
-        upPreferenceSummary(PreferKey.uiCornerEffectLevel, AppConfig.uiCornerEffectLevel.toString())
         upPreferenceSummary(PreferKey.fontScale)
-        setupUiCornerPreference()
         updateBottomBarEffectPreferences()
         findPreference<ColorPreference>(PreferKey.cBackground)?.let {
             it.onSaveColor = { color ->
@@ -171,7 +162,6 @@ class ThemeConfigFragment : PreferenceFragment(),
         when (key) {
             PreferKey.launcherIcon -> LauncherIconHelp.changeIcon(getPrefString(key))
             PreferKey.transparentStatusBar -> recreateActivities()
-            PreferKey.mainTransparentStatusBar -> recreateActivities()
             PreferKey.immNavigationBar -> recreateActivities()
             PreferKey.cPrimary,
             PreferKey.cAccent,
@@ -202,21 +192,6 @@ class ThemeConfigFragment : PreferenceFragment(),
                 recreateActivities()
             }
 
-            PreferKey.uiCornerEffectMode -> {
-                AppConfig.uiCornerEffectMode = getPrefString(key).orEmpty()
-                upPreferenceSummary(key, AppConfig.uiCornerEffectMode)
-                upPreferenceSummary(PreferKey.uiCornerEffectLevel, AppConfig.uiCornerEffectLevel.toString())
-                recreateActivities()
-            }
-
-            PreferKey.uiCornerScale,
-            PreferKey.uiCornerEffectLevel,
-            PreferKey.uiCornerSearchFollow,
-            PreferKey.uiCornerReplyFollow -> {
-                upPreferenceSummary(PreferKey.uiCornerScale, AppConfig.uiCornerScale.toScaleText())
-                upPreferenceSummary(PreferKey.uiCornerEffectLevel, AppConfig.uiCornerEffectLevel.toString())
-                recreateActivities()
-            }
         }
 
     }
@@ -224,20 +199,6 @@ class ThemeConfigFragment : PreferenceFragment(),
     @SuppressLint("PrivateResource")
     override fun onPreferenceTreeClick(preference: Preference): Boolean {
         when (val key = preference.key) {
-            PreferKey.barElevation -> NumberPickerDialog(requireContext())
-                .setTitle(getString(R.string.bar_elevation))
-                .setMaxValue(32)
-                .setMinValue(0)
-                .setValue(AppConfig.elevation)
-                .setCustomButton((R.string.btn_default_s)) {
-                    AppConfig.elevation = AppConst.sysElevation
-                    recreateActivities()
-                }
-                .show {
-                    AppConfig.elevation = it
-                    recreateActivities()
-                }
-
             PreferKey.liquidGlassLevel -> NumberPickerDialog(requireContext())
                 .setTitle(getString(R.string.liquid_glass_level))
                 .setMaxValue(100)
@@ -269,8 +230,6 @@ class ThemeConfigFragment : PreferenceFragment(),
                     upPreferenceSummary(PreferKey.frostedGlassLevel, it.toString())
                     recreateActivities()
                 }
-
-            PreferKey.uiCornerEffectLevel -> showUiCornerEffectLevelDialog()
 
             PreferKey.fontScale -> NumberPickerDialog(requireContext())
                 .setTitle(getString(R.string.font_scale))
@@ -430,9 +389,6 @@ class ThemeConfigFragment : PreferenceFragment(),
     private fun upPreferenceSummary(preferenceKey: String, value: String? = null) {
         val preference = findPreference<Preference>(preferenceKey) ?: return
         when (preferenceKey) {
-            PreferKey.barElevation -> preference.summary =
-                getString(R.string.bar_elevation_s, value)
-
             PreferKey.bottomBarEffectMode -> {
                 val modeValue = value ?: AppConfig.bottomBarEffectMode
                 val labels = resources.getStringArray(R.array.bottom_bar_effect_mode_entries)
@@ -452,23 +408,6 @@ class ThemeConfigFragment : PreferenceFragment(),
 
             PreferKey.frostedGlassLevel -> preference.summary =
                 getString(R.string.frosted_glass_level_summary, value ?: AppConfig.frostedGlassLevel.toString())
-
-            PreferKey.uiCornerScale -> preference.summary =
-                getString(R.string.ui_corner_scale_summary, value ?: AppConfig.uiCornerScale.toScaleText())
-
-            PreferKey.uiCornerEffectMode -> {
-                val modeValue = value ?: AppConfig.uiCornerEffectMode
-                val labels = resources.getStringArray(R.array.ui_corner_effect_mode_entries)
-                val values = resources.getStringArray(R.array.ui_corner_effect_mode_values)
-                val selectedLabel = values.indexOf(modeValue)
-                    .takeIf { it >= 0 }
-                    ?.let { labels.getOrNull(it) }
-                    ?: modeValue
-                preference.summary = getString(R.string.ui_corner_effect_mode_summary, selectedLabel)
-            }
-
-            PreferKey.uiCornerEffectLevel -> preference.summary =
-                getString(R.string.ui_corner_effect_level_summary, UiCorner.effectValueText(requireContext()))
 
             PreferKey.fontScale -> {
                 val fontScale = AppContextWrapper.getFontScale(requireContext())
@@ -492,54 +431,6 @@ class ThemeConfigFragment : PreferenceFragment(),
         val mode = AppConfig.bottomBarEffectMode
         findPreference<Preference>(PreferKey.liquidGlassLevel)?.isVisible = mode == "glass"
         findPreference<Preference>(PreferKey.frostedGlassLevel)?.isVisible = mode == "frosted"
-    }
-
-    private fun showUiCornerEffectLevelDialog() {
-        NumberPickerDialog(requireContext())
-            .setTitle(getString(R.string.ui_corner_effect_level))
-            .setMaxValue(100)
-            .setMinValue(0)
-            .setValue(AppConfig.uiCornerEffectLevel)
-            .setCustomButton(R.string.btn_default_s) {
-                AppConfig.uiCornerEffectLevel = 100
-                upPreferenceSummary(PreferKey.uiCornerEffectLevel, AppConfig.uiCornerEffectLevel.toString())
-                recreateActivities()
-            }
-            .show {
-                AppConfig.uiCornerEffectLevel = it
-                upPreferenceSummary(PreferKey.uiCornerEffectLevel, it.toString())
-                recreateActivities()
-            }
-    }
-
-    private fun setupUiCornerPreference() {
-        findPreference<EditTextPreference>(PreferKey.uiCornerScale)?.let { preference ->
-            preference.text = AppConfig.uiCornerScale.toScaleText()
-            preference.setOnBindEditTextListener { editText ->
-                editText.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
-                editText.setSingleLine(true)
-                editText.setSelection(editText.text?.length ?: 0)
-            }
-            preference.setOnPreferenceChangeListener { _, newValue ->
-                val value = newValue?.toString()?.trim()?.toFloatOrNull()
-                if (value == null || value !in 0f..3f) {
-                    toastOnUi(R.string.ui_corner_scale_invalid)
-                    false
-                } else {
-                    AppConfig.uiCornerScale = value
-                    upPreferenceSummary(PreferKey.uiCornerScale, AppConfig.uiCornerScale.toScaleText())
-                    true
-                }
-            }
-        }
-    }
-
-    private fun Float.toScaleText(): String {
-        return if (this % 1f == 0f) {
-            this.toInt().toString()
-        } else {
-            String.format(java.util.Locale.US, "%.2f", this).trimEnd('0').trimEnd('.')
-        }
     }
 
     private fun setBgFromUri(uri: Uri, preferenceKey: String, success: () -> Unit) {

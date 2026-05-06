@@ -223,12 +223,6 @@
 		<item>磨砂玻璃</item>
 	</string-array>
 
-	<string-array name="ui_corner_effect_mode_entries">
-		<item>Regular</item>
-		<item>Liquid glass</item>
-		<item>Frosted glass</item>
-	</string-array>
-
 	<string-array name="tip_color">
 		<item>Same color as content</item>
 		<item>Customize</item>

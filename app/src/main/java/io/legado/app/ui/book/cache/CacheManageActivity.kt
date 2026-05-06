@@ -53,7 +53,7 @@ class CacheManageActivity :
     }
 
     private fun initView() = binding.run {
-        tabBar.background = UiCorner.rounded(
+        tabBar.background = UiCorner.opaqueRounded(
             ContextCompat.getColor(this@CacheManageActivity, R.color.background_menu),
             UiCorner.panelRadius(this@CacheManageActivity)
         )

@@ -89,7 +89,7 @@ object SourceSelectDialog {
         }
         val container = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            background = UiCorner.rounded(
+            background = UiCorner.opaqueRounded(
                 ContextCompat.getColor(context, R.color.background_card),
                 UiCorner.panelRadius(context)
             )

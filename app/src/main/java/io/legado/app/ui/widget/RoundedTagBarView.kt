@@ -47,7 +47,7 @@ class RoundedTagBarView @JvmOverloads constructor(
 
     init {
         clipToOutline = true
-        background = UiCorner.rounded(
+        background = UiCorner.opaqueRounded(
             ContextCompat.getColor(context, R.color.background_menu),
             UiCorner.panelRadius(context)
         )

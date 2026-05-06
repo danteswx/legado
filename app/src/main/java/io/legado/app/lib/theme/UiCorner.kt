@@ -43,83 +43,56 @@ object UiCorner {
         }
     }
 
-    fun effectMode(): String {
-        return AppConfig.uiCornerEffectMode
-    }
+    fun effectMode(): String = "solid"
 
-    fun effectLevel(): Float {
-        return AppConfig.uiCornerEffectLevel.coerceIn(0, 100) / 100f
-    }
-
-    fun effectValueText(context: Context): String {
-        return when (effectMode()) {
-            "solid" -> context.getString(R.string.ui_corner_effect_level_solid, AppConfig.uiCornerEffectLevel)
-            else -> context.getString(R.string.ui_corner_effect_level_glass, AppConfig.uiCornerEffectLevel)
-        }
+    fun layoutAlpha(): Float {
+        return AppConfig.uiLayoutAlpha.coerceIn(0, 100) / 100f
     }
 
     fun surfaceColor(color: Int, pressed: Boolean = false): Int {
-        val level = effectLevel()
-        return when (effectMode()) {
-            "glass" -> {
-                val base = if (ColorUtils.calculateLuminance(color) > 0.5) {
-                    ColorUtils.blendARGB(color, Color.WHITE, 0.35f + level * 0.20f)
-                } else {
-                    ColorUtils.blendARGB(color, Color.WHITE, 0.10f + level * 0.12f)
-                }
-                val alpha = (0.28f + level * 0.34f + if (pressed) 0.12f else 0f).coerceIn(0f, 0.82f)
-                ColorUtils.setAlphaComponent(base, (alpha * 255).toInt())
-            }
-            "frosted" -> {
-                val base = if (ColorUtils.calculateLuminance(color) > 0.5) {
-                    ColorUtils.blendARGB(color, Color.WHITE, 0.16f + level * 0.14f)
-                } else {
-                    ColorUtils.blendARGB(color, Color.WHITE, 0.08f + level * 0.08f)
-                }
-                val alpha = (0.48f + level * 0.38f + if (pressed) 0.08f else 0f).coerceIn(0f, 0.96f)
-                ColorUtils.setAlphaComponent(base, (alpha * 255).toInt())
-            }
-            else -> {
-                val alpha = (level + if (pressed) 0.08f else 0f).coerceIn(0f, 1f)
-                ColorUtils.setAlphaComponent(color, (alpha * 255).toInt())
-            }
-        }
+        val alpha = (layoutAlpha() + if (pressed) 0.08f else 0f).coerceIn(0f, 1f)
+        return ColorUtils.setAlphaComponent(color, (alpha * 255).toInt())
     }
 
     fun effectStrokeColor(color: Int): Int {
-        val level = effectLevel()
         val base = if (ColorUtils.calculateLuminance(color) > 0.5) Color.BLACK else Color.WHITE
-        val alpha = when (effectMode()) {
-            "glass" -> 0.20f + level * 0.22f
-            "frosted" -> 0.12f + level * 0.16f
-            else -> 0.10f
-        }
+        val alpha = 0.10f
         return ColorUtils.setAlphaComponent(base, (alpha.coerceIn(0f, 0.5f) * 255).toInt())
     }
 
-    private fun roundedColor(color: Int, radius: Float, pressed: Boolean): GradientDrawable {
+    private fun roundedColor(color: Int, radius: Float, pressed: Boolean, transparent: Boolean): GradientDrawable {
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             cornerRadius = radius
-            setColor(surfaceColor(color, pressed))
+            setColor(if (transparent) surfaceColor(color, pressed) else color)
         }
     }
 
     fun rounded(color: Int, radius: Float): GradientDrawable {
-        return roundedColor(color, radius, false)
+        return roundedColor(color, radius, false, true)
+    }
+
+    fun opaqueRounded(color: Int, radius: Float): GradientDrawable {
+        return roundedColor(color, radius, false, false)
     }
 
     fun roundedStroke(color: Int, radius: Float, strokeWidth: Int, strokeColor: Int): GradientDrawable {
         return rounded(color, radius).apply {
-            setStroke(strokeWidth, if (effectMode() == "solid") strokeColor else effectStrokeColor(color))
+            setStroke(strokeWidth, strokeColor)
+        }
+    }
+
+    fun opaqueRoundedStroke(color: Int, radius: Float, strokeWidth: Int, strokeColor: Int): GradientDrawable {
+        return opaqueRounded(color, radius).apply {
+            setStroke(strokeWidth, strokeColor)
         }
     }
 
     fun actionSelector(defaultColor: Int, pressedColor: Int, radius: Float): StateListDrawable {
         return StateListDrawable().apply {
-            addState(intArrayOf(android.R.attr.state_pressed), roundedColor(pressedColor, radius, true))
-            addState(intArrayOf(android.R.attr.state_selected), roundedColor(pressedColor, radius, true))
-            addState(intArrayOf(), rounded(defaultColor, radius))
+            addState(intArrayOf(android.R.attr.state_pressed), roundedColor(pressedColor, radius, true, false))
+            addState(intArrayOf(android.R.attr.state_selected), roundedColor(pressedColor, radius, true, false))
+            addState(intArrayOf(), opaqueRounded(defaultColor, radius))
         }
     }
 
@@ -133,17 +106,17 @@ object UiCorner {
         return StateListDrawable().apply {
             addState(
                 intArrayOf(android.R.attr.state_pressed),
-                roundedColor(pressedColor, radius, true).apply {
-                    setStroke(strokeWidth, if (effectMode() == "solid") strokeColor else effectStrokeColor(pressedColor))
+                roundedColor(pressedColor, radius, true, false).apply {
+                    setStroke(strokeWidth, strokeColor)
                 }
             )
             addState(
                 intArrayOf(android.R.attr.state_selected),
-                roundedColor(pressedColor, radius, true).apply {
-                    setStroke(strokeWidth, if (effectMode() == "solid") strokeColor else effectStrokeColor(pressedColor))
+                roundedColor(pressedColor, radius, true, false).apply {
+                    setStroke(strokeWidth, strokeColor)
                 }
             )
-            addState(intArrayOf(), roundedStroke(defaultColor, radius, strokeWidth, strokeColor))
+            addState(intArrayOf(), opaqueRoundedStroke(defaultColor, radius, strokeWidth, strokeColor))
         }
     }
 }

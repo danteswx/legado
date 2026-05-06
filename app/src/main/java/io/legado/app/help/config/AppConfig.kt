@@ -248,7 +248,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = true
 
     val isMainTransparentStatusBar: Boolean
-        get() = appCtx.getPrefBoolean(PreferKey.mainTransparentStatusBar, false)
+        get() = true
 
     val immNavigationBar: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.immNavigationBar, true)
@@ -1106,21 +1106,27 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefString(PreferKey.uiCornerScale, value.coerceIn(0f, 3f).toPlainScale())
         }
 
-    var uiCornerEffectMode: String
-        get() = appCtx.getPrefString(PreferKey.uiCornerEffectMode, "solid")
-            ?.takeIf { it in setOf("solid", "glass", "frosted") }
-            ?: "solid"
+    var uiLayoutAlpha: Int
+        get() = appCtx.getPrefInt(
+            PreferKey.uiLayoutAlpha,
+            appCtx.getPrefInt(PreferKey.uiCornerEffectLevel, 100)
+        ).coerceIn(0, 100)
         set(value) {
-            appCtx.putPrefString(
-                PreferKey.uiCornerEffectMode,
-                value.takeIf { it in setOf("solid", "glass", "frosted") } ?: "solid"
-            )
+            appCtx.putPrefInt(PreferKey.uiLayoutAlpha, value.coerceIn(0, 100))
         }
 
-    var uiCornerEffectLevel: Int
-        get() = appCtx.getPrefInt(PreferKey.uiCornerEffectLevel, 100).coerceIn(0, 100)
+    @Deprecated("Use uiLayoutAlpha")
+    var uiCornerEffectMode: String
+        get() = "solid"
         set(value) {
-            appCtx.putPrefInt(PreferKey.uiCornerEffectLevel, value.coerceIn(0, 100))
+            appCtx.putPrefString(PreferKey.uiCornerEffectMode, value)
+        }
+
+    @Deprecated("Use uiLayoutAlpha")
+    var uiCornerEffectLevel: Int
+        get() = uiLayoutAlpha
+        set(value) {
+            uiLayoutAlpha = value
         }
 
     val uiCornerSearchFollow: Boolean

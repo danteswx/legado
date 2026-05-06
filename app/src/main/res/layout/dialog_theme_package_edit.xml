@@ -76,6 +76,32 @@
 
         </LinearLayout>
 
+        <LinearLayout
+            android:id="@+id/ll_interface_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="vertical"
+            android:padding="0dp">
+
+            <include
+                android:id="@+id/row_corner_scale"
+                layout="@layout/item_theme_package_option" />
+
+            <include
+                android:id="@+id/row_layout_alpha"
+                layout="@layout/item_theme_package_option" />
+
+            <include
+                android:id="@+id/row_search_follow"
+                layout="@layout/item_theme_package_option" />
+
+            <include
+                android:id="@+id/row_reply_follow"
+                layout="@layout/item_theme_package_option" />
+
+        </LinearLayout>
+
     </LinearLayout>
 
 </ScrollView>

@@ -20,8 +20,13 @@ object PreferenceItemStyle {
         holder.isDividerAllowedAbove = false
         holder.isDividerAllowedBelow = false
         holder.itemView.background = PreferenceGroupBackgroundDrawable(
-            normalColor = ContextCompat.getColor(preference.context, R.color.background_card),
-            pressedColor = ContextCompat.getColor(preference.context, R.color.btn_bg_press),
+            normalColor = UiCorner.surfaceColor(
+                ContextCompat.getColor(preference.context, R.color.background_card)
+            ),
+            pressedColor = UiCorner.surfaceColor(
+                ContextCompat.getColor(preference.context, R.color.btn_bg_press),
+                pressed = true
+            ),
             dividerColor = ContextCompat.getColor(preference.context, R.color.bg_divider_line),
             radius = UiCorner.panelRadius(preference.context),
             hasPrev = hasPrev,

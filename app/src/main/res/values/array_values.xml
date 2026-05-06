@@ -69,10 +69,4 @@
         <item>frosted</item>
     </string-array>
 
-    <string-array name="ui_corner_effect_mode_values">
-        <item>solid</item>
-        <item>glass</item>
-        <item>frosted</item>
-    </string-array>
-
 </resources>

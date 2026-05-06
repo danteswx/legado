@@ -43,6 +43,7 @@ import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.putPrefBoolean
 import io.legado.app.utils.toastOnUi
 import java.io.FileOutputStream
+import java.util.Locale
 
 @Keep
 object ThemeConfig {
@@ -268,11 +269,22 @@ object ThemeConfig {
             val background = config.backgroundColor.toColorInt()
             val bBackground = config.bottomBackground.toColorInt()
             val isNightTheme = config.isNightTheme
-            val transparentNavBar = config.transparentNavBar
             val backgroundPath = config.backgroundImgPath
             val bookInfoBackgroundPath = config.bookInfoBackgroundImgPath
             val primaryTextColor = config.primaryTextColor?.toColorInt()
             val secondaryTextColor = config.secondaryTextColor?.toColorInt()
+            config.uiCornerScale?.let {
+                context.putPrefString(PreferKey.uiCornerScale, it.coerceIn(0f, 3f).toPlainScale())
+            }
+            config.uiLayoutAlpha?.let {
+                context.putPrefInt(PreferKey.uiLayoutAlpha, it.coerceIn(0, 100))
+            }
+            config.uiCornerSearchFollow?.let {
+                context.putPrefBoolean(PreferKey.uiCornerSearchFollow, it)
+            }
+            config.uiCornerReplyFollow?.let {
+                context.putPrefBoolean(PreferKey.uiCornerReplyFollow, it)
+            }
             if (backgroundPath != null && backgroundPath.startsWith("http")) {
                 val fileRoot = context.externalFiles
                 val preferenceKey = if (isNightTheme) {
@@ -316,7 +328,7 @@ object ThemeConfig {
                 context.putPrefInt(PreferKey.cNAccent, accent)
                 context.putPrefInt(PreferKey.cNBackground, background)
                 context.putPrefInt(PreferKey.cNBBackground, bBackground)
-                context.putPrefBoolean(PreferKey.tNavBarN, false)
+                context.putPrefBoolean(PreferKey.tNavBarN, true)
                 context.putPrefString(PreferKey.bgImageN, backgroundPath)
                 context.putPrefInt(PreferKey.bgImageNBlurring, backgroundBlur)
                 context.putPrefString(PreferKey.bookInfoBgImageN, bookInfoBackgroundPath)
@@ -326,7 +338,7 @@ object ThemeConfig {
                 context.putPrefInt(PreferKey.cAccent, accent)
                 context.putPrefInt(PreferKey.cBackground, background)
                 context.putPrefInt(PreferKey.cBBackground, bBackground)
-                context.putPrefBoolean(PreferKey.tNavBar, false)
+                context.putPrefBoolean(PreferKey.tNavBar, true)
                 context.putPrefString(PreferKey.bgImage, backgroundPath)
                 context.putPrefInt(PreferKey.bgImageBlurring, backgroundBlur)
                 context.putPrefString(PreferKey.bookInfoBgImage, bookInfoBackgroundPath)
@@ -389,14 +401,15 @@ object ThemeConfig {
             context.getPrefInt(PreferKey.cBackground, context.getCompatColor(R.color.md_grey_100))
         val bBackground =
             context.getPrefInt(PreferKey.cBBackground, context.getCompatColor(R.color.md_grey_200))
-        val transparentNavBar =
-            context.getPrefBoolean(PreferKey.tNavBar, false)
         val bgImgPath =
             context.getPrefString(PreferKey.bgImage)
         val bgImgBlur =
             context.getPrefInt(PreferKey.bgImageBlurring, 0)
         val bookInfoBgImgPath =
             context.getPrefString(PreferKey.bookInfoBgImage)
+        val stored = configList.firstOrNull {
+            it.themeName == name && !it.isNightTheme
+        }
 
         return mergeStoredThemeAssets(
             Config(
@@ -406,12 +419,16 @@ object ThemeConfig {
             accentColor = "#${accent.hexString}",
             backgroundColor = "#${background.hexString}",
             bottomBackground = "#${bBackground.hexString}",
-            transparentNavBar = transparentNavBar,
+            transparentNavBar = true,
             backgroundImgPath = bgImgPath,
             backgroundImgBlur = bgImgBlur,
             bookInfoBackgroundImgPath = bookInfoBgImgPath,
             primaryTextColor = "#${ThemeStore.textColorPrimary(context).hexString}",
-            secondaryTextColor = "#${ThemeStore.textColorSecondary(context).hexString}"
+            secondaryTextColor = "#${ThemeStore.textColorSecondary(context).hexString}",
+            uiCornerScale = stored?.uiCornerScale ?: AppConfig.uiCornerScale,
+            uiLayoutAlpha = stored?.uiLayoutAlpha ?: AppConfig.uiLayoutAlpha,
+            uiCornerSearchFollow = stored?.uiCornerSearchFollow ?: AppConfig.uiCornerSearchFollow,
+            uiCornerReplyFollow = stored?.uiCornerReplyFollow ?: AppConfig.uiCornerReplyFollow
             )
         )
     }
@@ -436,14 +453,15 @@ object ThemeConfig {
             context.getPrefInt(PreferKey.cNBackground, context.getCompatColor(R.color.md_grey_900))
         val bBackground =
             context.getPrefInt(PreferKey.cNBBackground, context.getCompatColor(R.color.md_grey_850))
-        val transparentNavBar =
-            context.getPrefBoolean(PreferKey.tNavBarN, false)
         val bgImgPath =
             context.getPrefString(PreferKey.bgImageN)
         val bgImgBlur =
             context.getPrefInt(PreferKey.bgImageNBlurring, 0)
         val bookInfoBgImgPath =
             context.getPrefString(PreferKey.bookInfoBgImageN)
+        val stored = configList.firstOrNull {
+            it.themeName == name && it.isNightTheme
+        }
         return mergeStoredThemeAssets(
             Config(
             themeName = name,
@@ -452,12 +470,16 @@ object ThemeConfig {
             accentColor = "#${accent.hexString}",
             backgroundColor = "#${background.hexString}",
             bottomBackground = "#${bBackground.hexString}",
-            transparentNavBar = transparentNavBar,
+            transparentNavBar = true,
             backgroundImgPath = bgImgPath,
             backgroundImgBlur = bgImgBlur,
             bookInfoBackgroundImgPath = bookInfoBgImgPath,
             primaryTextColor = "#${ThemeStore.textColorPrimary(context).hexString}",
-            secondaryTextColor = "#${ThemeStore.textColorSecondary(context).hexString}"
+            secondaryTextColor = "#${ThemeStore.textColorSecondary(context).hexString}",
+            uiCornerScale = stored?.uiCornerScale ?: AppConfig.uiCornerScale,
+            uiLayoutAlpha = stored?.uiLayoutAlpha ?: AppConfig.uiLayoutAlpha,
+            uiCornerSearchFollow = stored?.uiCornerSearchFollow ?: AppConfig.uiCornerSearchFollow,
+            uiCornerReplyFollow = stored?.uiCornerReplyFollow ?: AppConfig.uiCornerReplyFollow
             )
         )
     }
@@ -479,7 +501,11 @@ object ThemeConfig {
                 config.backgroundImgBlur
             },
             primaryTextColor = config.primaryTextColor ?: stored.primaryTextColor,
-            secondaryTextColor = config.secondaryTextColor ?: stored.secondaryTextColor
+            secondaryTextColor = config.secondaryTextColor ?: stored.secondaryTextColor,
+            uiCornerScale = config.uiCornerScale ?: stored.uiCornerScale,
+            uiLayoutAlpha = config.uiLayoutAlpha ?: stored.uiLayoutAlpha,
+            uiCornerSearchFollow = config.uiCornerSearchFollow ?: stored.uiCornerSearchFollow,
+            uiCornerReplyFollow = config.uiCornerReplyFollow ?: stored.uiCornerReplyFollow
         )
     }
 
@@ -491,6 +517,14 @@ object ThemeConfig {
         return fallback?.takeIf {
             it.startsWith("http", ignoreCase = true) || File(it).exists()
         } ?: current
+    }
+
+    private fun Float.toPlainScale(): String {
+        return if (this % 1f == 0f) {
+            this.toInt().toString()
+        } else {
+            String.format(Locale.US, "%.2f", this).trimEnd('0').trimEnd('.')
+        }
     }
 
     fun saveNightTheme(context: Context, name: String) {
@@ -509,7 +543,7 @@ object ThemeConfig {
                     .accentColor(Color.BLACK)
                     .backgroundColor(Color.WHITE)
                     .bottomBackground(Color.WHITE)
-                    .transparentNavBar(false)
+                    .transparentNavBar(true)
                     .apply()
             }
 
@@ -522,8 +556,6 @@ object ThemeConfig {
                     getPrefInt(PreferKey.cNBackground, getCompatColor(R.color.md_grey_900))
                 val bBackground =
                     getPrefInt(PreferKey.cNBBackground, getCompatColor(R.color.md_grey_850))
-                val transparentNavBar =
-                    getPrefBoolean(PreferKey.tNavBarN, false)
                 val appBackground =
                     if (hasUsableBgImage(this)) Color.TRANSPARENT else ColorUtils.withAlpha(background, 1f)
                 ThemeStore.editTheme(this)
@@ -531,7 +563,7 @@ object ThemeConfig {
                     .accentColor(ColorUtils.withAlpha(accent, 1f))
                     .backgroundColor(appBackground)
                     .bottomBackground(ColorUtils.withAlpha(bBackground, 1f))
-                    .transparentNavBar(transparentNavBar)
+                    .transparentNavBar(true)
                     .apply()
             }
 
@@ -544,8 +576,6 @@ object ThemeConfig {
                     getPrefInt(PreferKey.cBackground, getCompatColor(R.color.md_grey_100))
                 val bBackground =
                     getPrefInt(PreferKey.cBBackground, getCompatColor(R.color.md_grey_200))
-                val transparentNavBar =
-                    getPrefBoolean(PreferKey.tNavBar, false)
                 val appBackground =
                     if (hasUsableBgImage(this)) Color.TRANSPARENT else ColorUtils.withAlpha(background, 1f)
                 ThemeStore.editTheme(this)
@@ -553,7 +583,7 @@ object ThemeConfig {
                     .accentColor(ColorUtils.withAlpha(accent, 1f))
                     .backgroundColor(appBackground)
                     .bottomBackground(ColorUtils.withAlpha(bBackground, 1f))
-                    .transparentNavBar(transparentNavBar)
+                    .transparentNavBar(true)
                     .apply()
             }
         }
@@ -605,7 +635,11 @@ object ThemeConfig {
         var backgroundImgBlur: Int,
         var bookInfoBackgroundImgPath: String? = null,
         var primaryTextColor: String? = null,
-        var secondaryTextColor: String? = null
+        var secondaryTextColor: String? = null,
+        var uiCornerScale: Float? = null,
+        var uiLayoutAlpha: Int? = null,
+        var uiCornerSearchFollow: Boolean? = null,
+        var uiCornerReplyFollow: Boolean? = null
     ) {
 
         override fun hashCode(): Int {
@@ -627,6 +661,10 @@ object ThemeConfig {
                         && other.bookInfoBackgroundImgPath == bookInfoBackgroundImgPath
                         && other.primaryTextColor == primaryTextColor
                         && other.secondaryTextColor == secondaryTextColor
+                        && other.uiCornerScale == uiCornerScale
+                        && other.uiLayoutAlpha == uiLayoutAlpha
+                        && other.uiCornerSearchFollow == uiCornerSearchFollow
+                        && other.uiCornerReplyFollow == uiCornerReplyFollow
             }
             return false
         }
@@ -643,7 +681,11 @@ object ThemeConfig {
             "backgroundImgBlur" to backgroundImgBlur,
             "bookInfoBackgroundImgPath" to bookInfoBackgroundImgPath,
             "primaryTextColor" to primaryTextColor,
-            "secondaryTextColor" to secondaryTextColor
+            "secondaryTextColor" to secondaryTextColor,
+            "uiCornerScale" to uiCornerScale,
+            "uiLayoutAlpha" to uiLayoutAlpha,
+            "uiCornerSearchFollow" to uiCornerSearchFollow,
+            "uiCornerReplyFollow" to uiCornerReplyFollow
         )
 
     }
