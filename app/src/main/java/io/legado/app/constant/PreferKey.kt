@@ -14,6 +14,7 @@ object PreferKey {
     const val showUnread = "showUnread"
     const val showBooknameLayout = "showBooknameLayout"
     const val bookshelfMargin = "bookshelfMargin"
+    const val bookshelfShelfEffect = "bookshelfShelfEffect"
     const val bookGroupStyle = "bookGroupStyle"
     const val bookshelfHiddenTags = "bookshelfHiddenTags"
     const val bookshelfGroupTags = "bookshelfGroupTags"
