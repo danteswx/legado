@@ -125,6 +125,8 @@ object PreferKey {
     const val autoReadMode = "autoReadMode"
     const val barElevation = "barElevation"
     const val bottomBarEffectMode = "bottomBarEffectMode"
+    const val bottomBarLayoutMode = "bottomBarLayoutMode"
+    const val bottomBarSidebarGravity = "bottomBarSidebarGravity"
     const val liquidGlassLevel = "liquidGlassLevel"
     const val frostedGlassLevel = "frostedGlassLevel"
     const val uiCornerScale = "uiCornerScale"

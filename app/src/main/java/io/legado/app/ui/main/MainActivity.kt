@@ -685,9 +685,9 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             cornerRadii = if (isEnd) {
-                floatArrayOf(12.dpToPx(), 12.dpToPx(), 0f, 0f, 0f, 0f, 12.dpToPx(), 12.dpToPx())
+                floatArrayOf(12.dpToPx().toFloat(), 12.dpToPx().toFloat(), 0f, 0f, 0f, 0f, 12.dpToPx().toFloat(), 12.dpToPx().toFloat())
             } else {
-                floatArrayOf(0f, 0f, 12.dpToPx(), 12.dpToPx(), 12.dpToPx(), 12.dpToPx(), 0f, 0f)
+                floatArrayOf(0f, 0f, 12.dpToPx().toFloat(), 12.dpToPx().toFloat(), 12.dpToPx().toFloat(), 12.dpToPx().toFloat(), 0f, 0f)
             }
             setColor(AppColorUtils.withAlpha(baseColor, 0.88f))
             setStroke(
