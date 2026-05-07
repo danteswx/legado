@@ -1531,13 +1531,15 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         }
     }
 
-    private fun applyMergedDiscoveryIcon() = binding.run {
+    private fun applyMergedDiscoveryIcon() {
+        binding.run {
         val showDiscovery = AppConfig.showDiscovery
         val showRss = AppConfig.showRSS && bottomNavigationView.menu.findItem(R.id.menu_rss) != null
-        if (!(AppConfig.mergeDiscoveryRss && showDiscovery && showRss)) return
+        if (!(AppConfig.mergeDiscoveryRss && showDiscovery && showRss)) return@run
         val key = if (resolveDiscoveryNavTarget() == idRss) "rss" else "discovery"
         NavigationBarIconConfig.currentMenuDrawable(this@MainActivity, key)?.let { icon ->
             bottomNavigationView.menu.findItem(R.id.menu_discovery)?.icon = icon
+        }
         }
     }
 
