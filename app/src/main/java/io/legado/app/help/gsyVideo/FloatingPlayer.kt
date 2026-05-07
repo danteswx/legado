@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.AttributeSet
 import android.view.Surface
 import android.view.SurfaceView
+import android.view.View
 import android.widget.ImageView
 import androidx.core.view.isInvisible
 import androidx.core.view.isNotEmpty
@@ -19,6 +20,8 @@ class FloatingPlayer : StandardGSYVideoPlayer {
     constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
 
     lateinit var fullscreenB: ImageView
+    private lateinit var rewindButton: ImageView
+    private lateinit var forwardButton: ImageView
 
     override fun init(context: Context?) {
         if (activityContext != null) {
@@ -37,6 +40,10 @@ class FloatingPlayer : StandardGSYVideoPlayer {
         mBackButton = findViewById(R.id.back)
         mBottomProgressBar = findViewById(R.id.bottom_progressbar)
         fullscreenB = findViewById(R.id.fullscreenB)
+        rewindButton = findViewById(R.id.rewindB)
+        forwardButton = findViewById(R.id.forwardB)
+        rewindButton.setOnClickListener { seekByOffset(-SEEK_STEP_MS) }
+        forwardButton.setOnClickListener { seekByOffset(SEEK_STEP_MS) }
     }
 
     override fun getLayoutId(): Int {
@@ -99,9 +106,40 @@ class FloatingPlayer : StandardGSYVideoPlayer {
     fun showControlUi() {
         if (mStartButton.isInvisible) {
             resolveUIState(mCurrentState)
+            syncSeekButtonVisibility()
         } else {
             hideAllWidget()
         }
+    }
+
+    override fun hideAllWidget() {
+        super.hideAllWidget()
+        syncSeekButtonVisibility()
+    }
+
+    override fun resolveUIState(state: Int) {
+        super.resolveUIState(state)
+        syncSeekButtonVisibility()
+    }
+
+    private fun syncSeekButtonVisibility() {
+        if (!::rewindButton.isInitialized || !::forwardButton.isInitialized) {
+            return
+        }
+        val visibility = if (mStartButton.visibility == View.VISIBLE) View.VISIBLE else View.INVISIBLE
+        rewindButton.visibility = visibility
+        forwardButton.visibility = visibility
+    }
+
+    fun seekByOffset(offsetMs: Long) {
+        if (mCurrentState == CURRENT_STATE_NORMAL || mCurrentState == CURRENT_STATE_ERROR) {
+            return
+        }
+        val duration = getDuration().takeIf { it > 0 } ?: 0L
+        val current = getCurrentPositionWhenPlaying()
+        val target = (current + offsetMs).coerceIn(0L, duration.takeIf { it > 0 } ?: Long.MAX_VALUE)
+        seekTo(target)
+        resetProgressAndTime()
     }
 
     override fun getFullWindowPlayer(): GSYVideoPlayer? = null
@@ -167,5 +205,9 @@ class FloatingPlayer : StandardGSYVideoPlayer {
 
     fun cloneState(switchVideo: StandardGSYVideoPlayer) {
         cloneParams(switchVideo, this)
+    }
+
+    companion object {
+        private const val SEEK_STEP_MS = 10_000L
     }
 }

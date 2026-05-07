@@ -55,6 +55,34 @@
         android:layout_centerHorizontal="true"
         android:layout_marginBottom="20dp" />
 
+    <ImageView
+        android:id="@+id/rewindB"
+        android:layout_width="35dp"
+        android:layout_height="35dp"
+        android:layout_alignBottom="@id/start"
+        android:layout_marginEnd="18dp"
+        android:layout_toStartOf="@id/start"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/previous"
+        android:padding="6dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_fast_rewind"
+        android:tint="@android:color/white" />
+
+    <ImageView
+        android:id="@+id/forwardB"
+        android:layout_width="35dp"
+        android:layout_height="35dp"
+        android:layout_alignBottom="@id/start"
+        android:layout_marginStart="18dp"
+        android:layout_toEndOf="@id/start"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/next"
+        android:padding="6dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_fast_forward"
+        android:tint="@android:color/white" />
+
     <ProgressBar
         android:id="@+id/bottom_progressbar"
         style="?android:attr/progressBarStyleHorizontal"

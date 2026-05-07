@@ -167,6 +167,7 @@ class VideoPlayService : BaseService() {
     override fun onCreate() {
         super.onCreate()
         initMediaSession()
+        startForegroundNotification()
         initBroadcastReceiver()
         application.registerActivityLifecycleCallbacks(activityLifecycleCallbacks)
         execute {
@@ -271,20 +272,39 @@ class VideoPlayService : BaseService() {
                 val notification = createNotification()
                 notificationManager.notify(NotificationId.VideoPlayService, notification.build())
             } catch (e: Exception) {
-                AppLog.put("创建视频播放通知出错,${e.localizedMessage}", e, true)
+                AppLog.put("创建视频播放通知出错1,${e.localizedMessage}", e, true)
             }
         }
     }
 
     override fun startForegroundNotification() {
-        try {
-            val notification = createNotification()
-            startForeground(NotificationId.VideoPlayService, notification.build())
+        val notification = try {
+            createNotification().build()
         } catch (e: Exception) {
-            AppLog.put("创建视频播放通知出错,${e.localizedMessage}", e, true)
+            AppLog.put("创建视频播放通知出错2,${e.localizedMessage}", e, true)
+            createFallbackNotification().build()
+        }
+        try {
+            startForeground(NotificationId.VideoPlayService, notification)
+        } catch (e: Exception) {
+            AppLog.put("创建视频播放通知出错3,${e.localizedMessage}", e, true)
             //创建通知出错不结束服务就会崩溃,服务必须绑定通知
             stopSelf()
         }
+    }
+
+    private fun createFallbackNotification(): NotificationCompat.Builder {
+        return NotificationCompat.Builder(this@VideoPlayService, AppConst.channelIdReadAloud)
+            .setSmallIcon(R.drawable.ic_volume_up)
+            .setSubText(getString(R.string.video))
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setContentTitle(getString(R.string.video))
+            .setContentText(VideoPlay.videoTitle ?: getString(R.string.app_name))
+            .setContentIntent(
+                activityPendingIntent<VideoPlayerActivity>("activity")
+            )
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
     }
 
     /**

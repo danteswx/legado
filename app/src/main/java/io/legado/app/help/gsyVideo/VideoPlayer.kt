@@ -93,8 +93,10 @@ class VideoPlayer: StandardGSYVideoPlayer {
                 getContext().applicationContext,
                 object : GestureDetector.SimpleOnGestureListener() {
                     override fun onDoubleTap(e: MotionEvent): Boolean {
-                        touchDoubleUp(e)
-                        return super.onDoubleTap(e)
+                        val player = getCurrentPlayer()
+                        val offset = if (e.x < player.width / 2f) -SEEK_STEP_MS else SEEK_STEP_MS
+                        player.seekByOffset(offset)
+                        return true
                     }
 
                     override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
@@ -120,6 +122,18 @@ class VideoPlayer: StandardGSYVideoPlayer {
                 VideoPlay.lockCurScreen = lock
             }
         }
+    }
+
+    fun seekByOffset(offsetMs: Long) {
+        if (mCurrentState == CURRENT_STATE_NORMAL || mCurrentState == CURRENT_STATE_ERROR) {
+            return
+        }
+        val duration = getDuration().takeIf { it > 0 } ?: 0L
+        val current = getCurrentPositionWhenPlaying()
+        val target = (current + offsetMs).coerceIn(0L, duration.takeIf { it > 0 } ?: Long.MAX_VALUE)
+        seekTo(target)
+        resolveDanmakuSeek(target)
+        showOverlayTip(if (offsetMs < 0) "-10s" else "+10s", 800)
     }
     override fun touchSurfaceUp(){
         if (isLongPressSpeed) {
@@ -225,6 +239,10 @@ class VideoPlayer: StandardGSYVideoPlayer {
                 alpha = 0f
             }
         }
+    }
+
+    companion object {
+        private const val SEEK_STEP_MS = 10_000L
     }
 
     private fun initView() {
