@@ -664,28 +664,30 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         }
     }
 
-    private fun placeSideNavigation(animate: Boolean) = binding.run {
+    private fun placeSideNavigation(animate: Boolean) {
         if (!isSidebarMode()) return
-        sideNavigationPanel.animate().cancel()
-        updateSideNavigationPanelWidth()
-        if (sideNavigationPanel.width == 0) {
-            sideNavigationPanel.doOnLayout { placeSideNavigation(animate) }
-            return
-        }
-        applySideNavigationEdge(sideNavigationGravity)
-        val closedOffset = sideNavigationClosedOffset()
-        val target = if (sideNavigationOpen) 0f else closedOffset.toFloat()
-        if (animate) {
-            animateSideNavigationScrim(sideNavigationOpen)
-            sideNavigationPanel.animate()
-                .translationX(target)
-                .setDuration(220L)
-                .setInterpolator(bottomGlassPulseInterpolator)
-                .start()
-        } else {
-            sideNavigationPanel.translationX = target
-            sideNavigationScrim.alpha = if (sideNavigationOpen) 1f else 0f
-            sideNavigationScrim.isVisible = sideNavigationOpen
+        binding.run {
+            sideNavigationPanel.animate().cancel()
+            updateSideNavigationPanelWidth()
+            if (sideNavigationPanel.width == 0) {
+                sideNavigationPanel.doOnLayout { placeSideNavigation(animate) }
+                return@run
+            }
+            applySideNavigationEdge(sideNavigationGravity)
+            val closedOffset = sideNavigationClosedOffset()
+            val target = if (sideNavigationOpen) 0f else closedOffset.toFloat()
+            if (animate) {
+                animateSideNavigationScrim(sideNavigationOpen)
+                sideNavigationPanel.animate()
+                    .translationX(target)
+                    .setDuration(220L)
+                    .setInterpolator(bottomGlassPulseInterpolator)
+                    .start()
+            } else {
+                sideNavigationPanel.translationX = target
+                sideNavigationScrim.alpha = if (sideNavigationOpen) 1f else 0f
+                sideNavigationScrim.isVisible = sideNavigationOpen
+            }
         }
     }
 
