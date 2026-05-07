@@ -28,6 +28,7 @@ import androidx.constraintlayout.widget.ConstraintSet
 import androidx.activity.viewModels
 import androidx.appcompat.widget.AppCompatImageButton
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.doOnPreDraw
 import androidx.core.view.get
 import androidx.core.view.isVisible
@@ -390,7 +391,17 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             windowInsets.inset(0, 0, 0, height)
         }
         sideNavigationPanel.setOnApplyWindowInsetsListenerCompat { view, windowInsets ->
-            view.bottomPadding = windowInsets.navigationBarHeight + 8.dpToPx()
+            view.bottomPadding = 0
+            val statusTop = windowInsets.getInsets(WindowInsetsCompat.Type.statusBars()).top
+            val navigationBottom = windowInsets.navigationBarHeight
+            sideNavigationContent.setPadding(
+                resources.getDimensionPixelSize(R.dimen.main_sidebar_panel_padding_horizontal),
+                resources.getDimensionPixelSize(R.dimen.main_sidebar_header_padding_top) +
+                        statusTop + 8.dpToPx(),
+                resources.getDimensionPixelSize(R.dimen.main_sidebar_panel_padding_horizontal),
+                resources.getDimensionPixelSize(R.dimen.main_sidebar_panel_padding_vertical) +
+                        navigationBottom + 8.dpToPx()
+            )
             windowInsets
         }
         bindMergedDiscoveryLongClick()
@@ -658,8 +669,10 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
                 }
             )
             maxLines = 1
+            includeFontPadding = false
             ellipsize = android.text.TextUtils.TruncateAt.END
             gravity = android.view.Gravity.CENTER
+            textAlignment = View.TEXT_ALIGNMENT_CENTER
             setPadding(14.dpToPx(), 0, 14.dpToPx(), 0)
             background = createSideNavigationGroupDrawable(selected)
             layoutParams = LinearLayout.LayoutParams(

@@ -2,12 +2,15 @@ package io.legado.app.ui.book.read.page.delegate
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
+import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.Region
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
@@ -15,11 +18,13 @@ import android.view.MotionEvent
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.ui.book.read.page.ReadView
 import io.legado.app.ui.book.read.page.entities.PageDirection
+import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.utils.screenshot
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 
@@ -99,6 +104,10 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
     private var mFrontShadowDrawableVRL: GradientDrawable
 
     private val mPaint: Paint = Paint().apply { style = Paint.Style.FILL }
+    private val mBitmapPaint: Paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val mShadePaint: Paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val mSrcRect = Rect()
+    private val mDstRect = RectF()
 
     private var curBitmap: Bitmap? = null
     private var prevBitmap: Bitmap? = null
@@ -246,6 +255,21 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
 
     override fun onDraw(canvas: Canvas) {
         if (!isRunning) return
+        if (isLandscapeDoublePage()) {
+            when (mDirection) {
+                PageDirection.NEXT -> {
+                    drawDoublePageTurn(canvas, curBitmap, nextBitmap, forward = true)
+                    return
+                }
+
+                PageDirection.PREV -> {
+                    drawDoublePageTurn(canvas, curBitmap, prevBitmap, forward = false)
+                    return
+                }
+
+                else -> return
+            }
+        }
         when (mDirection) {
             PageDirection.NEXT -> {
                 calcPoints()
@@ -265,6 +289,156 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
 
             else -> return
         }
+    }
+
+    private fun isLandscapeDoublePage(): Boolean {
+        return ChapterProvider.doublePage && viewWidth > viewHeight && viewWidth > 1 && viewHeight > 1
+    }
+
+    private fun doublePageProgress(forward: Boolean): Float {
+        val raw = if (forward) {
+            (viewWidth - touchX) / viewWidth
+        } else {
+            touchX / viewWidth
+        }
+        return raw.coerceIn(0f, 1f)
+    }
+
+    private fun drawDoublePageTurn(
+        canvas: Canvas,
+        currentBitmap: Bitmap?,
+        targetBitmap: Bitmap?,
+        forward: Boolean
+    ) {
+        currentBitmap ?: return
+        targetBitmap ?: return
+        val half = viewWidth / 2
+        if (half <= 0) return
+        val progress = doublePageProgress(forward)
+        canvas.drawBitmap(targetBitmap, 0f, 0f, null)
+        val keepAlpha = ((1f - progress * progress) * 255).toInt().coerceIn(0, 255)
+        if (forward) {
+            drawBitmapPart(canvas, currentBitmap, 0, half, 0f, half.toFloat(), keepAlpha)
+            drawForwardDoublePage(canvas, currentBitmap, half, progress)
+        } else {
+            drawBitmapPart(
+                canvas,
+                currentBitmap,
+                half,
+                viewWidth,
+                half.toFloat(),
+                viewWidth.toFloat(),
+                keepAlpha
+            )
+            drawBackwardDoublePage(canvas, currentBitmap, half, progress)
+        }
+    }
+
+    private fun drawForwardDoublePage(
+        canvas: Canvas,
+        bitmap: Bitmap,
+        half: Int,
+        progress: Float
+    ) {
+        val foldX = (viewWidth * (1f - progress)).coerceIn(0f, viewWidth.toFloat())
+        if (foldX > half) {
+            drawBitmapPart(canvas, bitmap, half, foldX.toInt(), half.toFloat(), foldX)
+            drawMirroredPart(
+                canvas,
+                bitmap,
+                (viewWidth - (viewWidth - foldX)).toInt(),
+                viewWidth,
+                foldX,
+                viewWidth.toFloat(),
+                progress
+            )
+        } else {
+            val width = (half - foldX).toInt().coerceAtLeast(1)
+            drawMirroredPart(
+                canvas,
+                bitmap,
+                half,
+                (half + width).coerceAtMost(viewWidth),
+                foldX,
+                half.toFloat(),
+                progress
+            )
+        }
+        drawDoublePageFoldShadow(canvas, foldX, progress)
+    }
+
+    private fun drawBackwardDoublePage(
+        canvas: Canvas,
+        bitmap: Bitmap,
+        half: Int,
+        progress: Float
+    ) {
+        val foldX = (viewWidth * progress).coerceIn(0f, viewWidth.toFloat())
+        if (foldX < half) {
+            drawBitmapPart(canvas, bitmap, foldX.toInt(), half, foldX, half.toFloat())
+            drawMirroredPart(canvas, bitmap, 0, foldX.toInt(), 0f, foldX, progress)
+        } else {
+            val width = (foldX - half).toInt().coerceAtLeast(1)
+            drawMirroredPart(
+                canvas,
+                bitmap,
+                (half - width).coerceAtLeast(0),
+                half,
+                half.toFloat(),
+                foldX,
+                progress
+            )
+        }
+        drawDoublePageFoldShadow(canvas, foldX, progress)
+    }
+
+    private fun drawBitmapPart(
+        canvas: Canvas,
+        bitmap: Bitmap,
+        srcLeft: Int,
+        srcRight: Int,
+        dstLeft: Float,
+        dstRight: Float,
+        alpha: Int = 255
+    ) {
+        if (srcRight <= srcLeft || dstRight <= dstLeft) return
+        mSrcRect.set(srcLeft.coerceIn(0, viewWidth), 0, srcRight.coerceIn(0, viewWidth), viewHeight)
+        mDstRect.set(dstLeft, 0f, dstRight, viewHeight.toFloat())
+        val oldAlpha = mBitmapPaint.alpha
+        mBitmapPaint.alpha = alpha
+        canvas.drawBitmap(bitmap, mSrcRect, mDstRect, mBitmapPaint)
+        mBitmapPaint.alpha = oldAlpha
+    }
+
+    private fun drawMirroredPart(
+        canvas: Canvas,
+        bitmap: Bitmap,
+        srcLeft: Int,
+        srcRight: Int,
+        dstLeft: Float,
+        dstRight: Float,
+        progress: Float
+    ) {
+        if (srcRight <= srcLeft || dstRight <= dstLeft) return
+        mSrcRect.set(srcLeft.coerceIn(0, viewWidth), 0, srcRight.coerceIn(0, viewWidth), viewHeight)
+        mDstRect.set(dstLeft, 0f, dstRight, viewHeight.toFloat())
+        canvas.save()
+        canvas.clipRect(mDstRect)
+        canvas.scale(-1f, 1f, mDstRect.centerX(), mDstRect.centerY())
+        canvas.drawBitmap(bitmap, mSrcRect, mDstRect, mBitmapPaint)
+        canvas.restore()
+        val shadeAlpha = (42 + 72 * progress).toInt().coerceIn(42, 120)
+        mShadePaint.color = Color.argb(shadeAlpha, 0, 0, 0)
+        canvas.drawRect(mDstRect, mShadePaint)
+    }
+
+    private fun drawDoublePageFoldShadow(canvas: Canvas, foldX: Float, progress: Float) {
+        if (foldX <= 0f || foldX >= viewWidth) return
+        val width = max(18, (34 * (1f - progress * 0.45f)).toInt())
+        val left = (foldX - width).toInt().coerceAtLeast(0)
+        val right = (foldX + width).toInt().coerceAtMost(viewWidth)
+        mFolderShadowDrawableRL.setBounds(left, 0, right, viewHeight)
+        mFolderShadowDrawableRL.draw(canvas)
     }
 
     /**

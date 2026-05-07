@@ -155,21 +155,20 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     private fun createPanelDrawable(
-        radiusDp: Float,
+        radiusPx: Float,
         color: Int,
         strokeColor: Int,
         topOnly: Boolean = false
     ) = GradientDrawable().apply {
-        val radius = UiCorner.scaledDp(radiusDp)
         if (topOnly) {
             cornerRadii = floatArrayOf(
-                radius, radius,
-                radius, radius,
+                radiusPx, radiusPx,
+                radiusPx, radiusPx,
                 0f, 0f,
                 0f, 0f
             )
         } else {
-            cornerRadius = radius
+            cornerRadius = radiusPx
         }
         setColor(UiCorner.surfaceColor(color))
         setStroke(1.dpToPx(), if (UiCorner.effectMode() == "solid") strokeColor else UiCorner.effectStrokeColor(color))

@@ -98,7 +98,7 @@ fun ImageView.loadReadRecordAvatar(path: String?) {
     ImageLoader.load(context, path)
         .placeholder(BookCover.defaultDrawable)
         .error(BookCover.defaultDrawable)
-        .fitCenter()
+        .dontTransform()
         .into(this)
 }
 
