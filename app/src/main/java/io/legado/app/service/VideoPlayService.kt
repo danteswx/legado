@@ -328,6 +328,7 @@ class VideoPlayService : BaseService() {
     private fun pause(fromCB: Boolean = false) {
         try {
             pause = true
+            updateFloatingKeepScreenOn(false)
             upPlayProgressJob?.cancel()
             if (!fromCB) {
                 playerView.onVideoPause()
@@ -346,6 +347,7 @@ class VideoPlayService : BaseService() {
     private fun resume(fromCB: Boolean = false) {
         try {
             pause = false
+            updateFloatingKeepScreenOn(true)
             if (!fromCB) {
                 playerView.onVideoResume()
             }
@@ -459,9 +461,7 @@ class VideoPlayService : BaseService() {
                 @Suppress("DEPRECATION")
                 WindowManager.LayoutParams.TYPE_PHONE
             },
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            floatingWindowFlags(),
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.START or Gravity.TOP
@@ -471,6 +471,34 @@ class VideoPlayService : BaseService() {
         floatingView.setOnTouchListener(FloatingTouchListener())
         windowManager.addView(floatingView, params)
 
+    }
+
+    private fun floatingWindowFlags(): Int {
+        var flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+        if (!pause) {
+            flags = flags or WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+        }
+        return flags
+    }
+
+    private fun updateFloatingKeepScreenOn(enable: Boolean) {
+        if (!::params.isInitialized) {
+            return
+        }
+        val newFlags = if (enable) {
+            params.flags or WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+        } else {
+            params.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON.inv()
+        }
+        if (params.flags == newFlags) {
+            return
+        }
+        params.flags = newFlags
+        if (::windowManager.isInitialized && floatingView.parent != null) {
+            updateViewPosition()
+        }
     }
 
     inner class FloatingTouchListener : OnTouchListener {
@@ -526,11 +554,13 @@ class VideoPlayService : BaseService() {
         }
         playerView.backButton.setOnClickListener { stop() }
         if (playerView.isInPlayingState) {
+            updateFloatingKeepScreenOn(true)
             upMediaMetadata()
             upPlayProgress()
         }
         playerView.setVideoAllCallBack(object : GSYSampleCallBack() {
             override fun onPrepared(url: String?, vararg objects: Any?) {
+                updateFloatingKeepScreenOn(true)
                 upMediaMetadata()
                 upPlayProgress()
                 upVideoPlayNotification()

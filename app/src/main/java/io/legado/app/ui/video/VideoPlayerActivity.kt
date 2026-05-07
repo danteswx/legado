@@ -719,6 +719,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             @SuppressLint("SourceLockedOrientationActivity")
             override fun onPrepared(url: String?, vararg objects: Any?) {
                 super.onPrepared(url, *objects)
+                setVideoKeepScreenOn(true)
                 playerView.post {
                     val player = playerView.getCurrentPlayer()
                     if (VideoPlay.lockCurScreen &&  !player.getLockCurScreen()) {
@@ -750,7 +751,31 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                     }
                 }
             }
+
+            override fun onClickStartIcon(url: String?, vararg objects: Any?) {
+                setVideoKeepScreenOn(true)
+            }
+
+            override fun onClickResume(url: String?, vararg objects: Any?) {
+                setVideoKeepScreenOn(true)
+            }
+
+            override fun onClickStop(url: String?, vararg objects: Any?) {
+                setVideoKeepScreenOn(false)
+            }
+
+            override fun onAutoComplete(url: String?, vararg objects: Any?) {
+                setVideoKeepScreenOn(false)
+            }
         })
+    }
+
+    private fun setVideoKeepScreenOn(enable: Boolean) {
+        if (enable) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
     }
 
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
@@ -1035,7 +1060,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         VideoPlay.saveRead()
         VideoPlay.stopLoading()
         playerView.getCurrentPlayer().release()
-        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        setVideoKeepScreenOn(false)
     }
 
     private fun destroyWeb() {
