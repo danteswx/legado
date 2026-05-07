@@ -481,9 +481,17 @@ class ReadMenu @JvmOverloads constructor(
         }
         //界面
         llFont.setOnClickListener {
-            runMenuOut {
-                callBack.showReadStyle()
-            }
+            val pageBgColor = kotlin.runCatching {
+                Color.parseColor(ReadBookConfig.durConfig.curBgStr())
+            }.getOrDefault(bgColor)
+            val pageTextColor = ReadBookConfig.durConfig.curTextColor()
+            titleBar.setBackgroundColor(pageBgColor)
+            titleBar.setTextColor(pageTextColor)
+            titleBar.setColorFilter(pageTextColor)
+            titleBarAddition.gone()
+            bottomMenu.invisible()
+            llBrightness.invisible()
+            callBack.showReadStyle()
         }
 
         //设置
@@ -500,7 +508,7 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     fun upBookView() {
-        binding.titleBar.title = ReadBook.book?.name
+        binding.titleBar.title = ReadBook.curTextChapter?.title ?: ReadBook.book?.name
         ReadBook.curTextChapter?.let {
             binding.tvChapterName.text = it.title
             binding.tvChapterName.visible()

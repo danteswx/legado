@@ -1206,7 +1206,13 @@ class ReadBookActivity : BaseReadBookActivity(),
      * 显示阅读样式配置
      */
     override fun showReadStyle() {
-        showDialogFragment<ReadStyleDialog>()
+        showDialogFragment(
+            ReadStyleDialog().apply {
+                setOnDismissListener {
+                    binding.readMenu.runMenuOut()
+                }
+            }
+        )
     }
 
     /**
