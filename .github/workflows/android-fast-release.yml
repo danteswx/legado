@@ -48,20 +48,19 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
           cat > release-notes.md <<EOF
-          阅读Archive 第三版
+          阅读Archive 第四版
           
           新增：
-          - 支持缓存管理，可统一查看和管理书籍、音频、漫画缓存。
-          - 音频播放页新增缓存入口，可选择章节范围进行后台缓存。
-          - 音频缓存支持进度展示、暂停和继续。
-          - 缓存内容不会主动清理，未手动删除前会保留。
-          - 支持将已缓存内容上传到 WebDAV。
-          - 高级标题支持 Lottie 标题渲染，并可导入、导出和编辑配置。
+          - 新增底栏管理，支持保存多套底栏配置，并可分别设置日间、夜间图标。
+          - 新增统计页组件化展示，可按需启用阅读目标、最近在读和阅读排行等组件。
+          - 新增界面圆角与透明度配置，主要界面控件显示更统一。
 
           修复：
-          - 修复音频缓存只保存地址、离线无法播放的问题。
-          - 修复缓存管理进入音频缓存列表时卡顿或长时间转圈的问题。
-          - 修复滚动模式下高级标题显示异常的问题。
+          - 修复发现页 WebView 长期驻留可能影响正文段评弹窗的问题。
+          - 修复高级标题页面底部少一行、滚动模式显示异常的问题。
+          - 修复详情页按钮样式、最近在读刷新不及时的问题。
+          - 修复底栏主题重命名、删除和导出入口相关问题。
+          - 修复主题背景图、在线图片和管理页显示相关问题。
           EOF
 
       - name: Build full release APK
@@ -89,7 +88,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: 阅读Archive 第三版 ${{ steps.version.outputs.name }}
+          name: 阅读Archive 第四版 ${{ steps.version.outputs.name }}
           prerelease: false
           make_latest: true
           generate_release_notes: false
