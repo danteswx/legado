@@ -1367,6 +1367,8 @@
     <string name="sys_image_picker">系统图片选择器</string>
     <string name="ai">AI</string>
     <string name="ai_assistant">AI 助手</string>
+    <string name="side_nav_assistant">助手</string>
+    <string name="side_nav_stats">统计</string>
     <string name="ai_setting">AI 设置</string>
     <string name="ai_setting_summary">分开配置提供商和模型</string>
     <string name="ai_enable">启用 AI</string>

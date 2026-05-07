@@ -599,6 +599,8 @@
     <string name="my">Me</string>
     <string name="ai">AI</string>
     <string name="ai_assistant">AI 助手</string>
+    <string name="side_nav_assistant">Assistant</string>
+    <string name="side_nav_stats">Stats</string>
     <string name="ai_setting">AI 设置</string>
     <string name="ai_setting_summary">分开配置提供商和模型</string>
     <string name="ai_enable">Enable AI</string>

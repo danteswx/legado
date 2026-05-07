@@ -600,10 +600,11 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             sideNavigationRowMap()[itemId]?.isVisible = visible
             button.isVisible = visible
             button.isSelected = itemId == selectedItemId
-            button.contentDescription = menuItem?.title
+            val title = sideNavigationTitle(itemId, menuItem?.title)
+            button.contentDescription = title
             button.setImageDrawable(menuItem?.icon?.constantState?.newDrawable()?.mutate() ?: menuItem?.icon)
             button.imageTintList = null
-            sideNavigationTextMap()[itemId]?.text = menuItem?.title
+            sideNavigationTextMap()[itemId]?.text = title
             sideNavigationRowMap()[itemId]?.background = createSideNavigationRowDrawable(itemId == selectedItemId)
         }
         sideNavBookshelfGroups.isVisible = sideBookshelfGroupsExpanded &&
@@ -611,6 +612,15 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         sideNavAiRow.isVisible = AppConfig.aiAssistantEnabled
         sideNavAi.setImageDrawable(NavigationBarIconConfig.currentDrawable(this@MainActivity, "ai", false))
         sideNavAi.imageTintList = bottomNavigationView.createThemeColorStateList()
+        sideNavAi.contentDescription = getString(R.string.side_nav_assistant)
+        sideNavAiText.text = getString(R.string.side_nav_assistant)
+    }
+
+    private fun sideNavigationTitle(itemId: Int, fallback: CharSequence?): CharSequence {
+        return when (itemId) {
+            R.id.menu_read_record -> getString(R.string.side_nav_stats)
+            else -> fallback ?: ""
+        }
     }
 
     private fun renderSideBookshelfGroups() = binding.run {
