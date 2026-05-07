@@ -10,7 +10,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <androidx.viewpager.widget.ViewPager
+        <io.legado.app.ui.widget.LockableViewPager
             android:id="@+id/view_pager_main"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
@@ -145,5 +145,61 @@
         </FrameLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <FrameLayout
+        android:id="@+id/side_navigation_panel"
+        android:layout_width="88dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="10dp"
+        android:elevation="@dimen/main_bottom_bar_elevation"
+        android:padding="6dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <com.google.android.material.navigationrail.NavigationRailView
+                android:id="@+id/side_navigation_view"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/transparent"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                app:itemIconSize="@dimen/main_bottom_nav_icon_size"
+                app:labelVisibilityMode="unlabeled"
+                app:menu="@menu/main_bnv" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/side_search_button"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_more_icon_button_clear"
+                android:contentDescription="@string/search"
+                android:padding="12dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_search"
+                android:tint="@color/primaryText" />
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+    <View
+        android:id="@+id/side_navigation_handle"
+        android:layout_width="18dp"
+        android:layout_height="74dp"
+        android:elevation="@dimen/main_search_button_elevation"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

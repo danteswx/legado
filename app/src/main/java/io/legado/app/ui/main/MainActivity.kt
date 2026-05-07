@@ -17,6 +17,8 @@ import android.view.WindowManager
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.OvershootInterpolator
 import androidx.activity.addCallback
+import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.constraintlayout.widget.ConstraintSet
 import androidx.activity.viewModels
 import androidx.core.view.doOnPreDraw
 import androidx.core.view.get
@@ -30,6 +32,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.viewpager.widget.ViewPager
 import com.qmdeve.liquidglass.widget.LiquidGlassView
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.google.android.material.navigation.NavigationBarView
 import io.legado.app.BuildConfig
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
@@ -139,6 +142,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     private var liquidGlassReady = false
     private val boundLiquidGlassViewIds = hashSetOf<Int>()
     private var mergedDiscoveryLongClickView: View? = null
+    private var sideNavigationOpen = false
     private val hideBottomIndicatorRunnable = Runnable {
         binding.bottomNavigationIndicatorContainer.animate()
             .alpha(0f)
@@ -187,6 +191,10 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         upBottomMenu()
         initView()
         onBackPressedDispatcher.addCallback(this) {
+            if (isSidebarMode() && sideNavigationOpen) {
+                closeSideNavigation()
+                return@addCallback
+            }
             if (pagePosition != 0) {
                 binding.viewPagerMain.currentItem = 0
                 return@addCallback
@@ -245,7 +253,11 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         refreshBottomNavigationConfig()
     }
 
-    override fun onNavigationItemSelected(item: MenuItem): Boolean = binding.run {
+    override fun onNavigationItemSelected(item: MenuItem): Boolean {
+        return handleNavigationItemSelected(item, closeSidebar = true)
+    }
+
+    private fun handleNavigationItemSelected(item: MenuItem, closeSidebar: Boolean): Boolean = binding.run {
         when (item.itemId) {
             R.id.menu_bookshelf ->
                 viewPagerMain.setCurrentItem(0, false)
@@ -263,6 +275,9 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
 
             R.id.menu_my_config ->
                 viewPagerMain.setCurrentItem(realPositions.indexOf(idMy), false)
+        }
+        if (closeSidebar && isSidebarMode()) {
+            closeSideNavigation()
         }
         return false
     }
@@ -300,10 +315,30 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         viewPagerMain.addOnPageChangeListener(PageChangeCallback())
         bottomNavigationView.setOnNavigationItemSelectedListener(this@MainActivity)
         bottomNavigationView.setOnNavigationItemReselectedListener(this@MainActivity)
+        sideNavigationView.setOnItemSelectedListener(NavigationBarView.OnItemSelectedListener {
+            handleNavigationItemSelected(it, closeSidebar = true)
+        })
         bottomNavigationView.menu.findItem(getBottomNavigationItemId(initialPage))?.isChecked = true
+        sideNavigationView.menu.findItem(getBottomNavigationItemId(initialPage))?.isChecked = true
         applyBottomNavigationIcons()
         searchButton.setOnClickListener {
             startActivity(Intent(this@MainActivity, SearchActivity::class.java))
+        }
+        sideNavigationHandle.setOnClickListener {
+            toggleSideNavigation()
+        }
+        sideSearchButton.setOnClickListener {
+            closeSideNavigation()
+            startActivity(Intent(this@MainActivity, SearchActivity::class.java))
+        }
+        sideSearchButton.setOnLongClickListener {
+            closeSideNavigation()
+            if (AppConfig.aiAssistantEnabled) {
+                startActivity(Intent(this@MainActivity, AiChatActivity::class.java))
+            } else {
+                toastOnUi(R.string.ai_enable_summary)
+            }
+            true
         }
         searchButton.setOnLongClickListener {
             if (AppConfig.aiAssistantEnabled) {
@@ -321,12 +356,20 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         bottomNavigationView.doOnLayout {
             updateBottomNavigationIndicator(animate = false)
         }
+        sideNavigationPanel.doOnLayout {
+            placeSideNavigation(animate = false)
+        }
         bottomControls.setOnApplyWindowInsetsListenerCompat { view, windowInsets ->
             val height = windowInsets.navigationBarHeight
             view.bottomPadding = height + 14.dpToPx()
             windowInsets.inset(0, 0, 0, height)
         }
+        sideNavigationPanel.setOnApplyWindowInsetsListenerCompat { view, windowInsets ->
+            view.bottomPadding = windowInsets.navigationBarHeight + 8.dpToPx()
+            windowInsets
+        }
         bindMergedDiscoveryLongClick()
+        applyBottomLayoutMode()
     }
 
     private fun scheduleLiquidGlassSetup(delayMillis: Long = 0L) {
@@ -345,10 +388,81 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     private fun refreshBottomNavigationConfig() {
         NavigationBarIconConfig.applyCurrentBottomConfig(AppConfig.isNightTheme)
         applyBottomNavigationIcons()
+        applyBottomLayoutMode()
         scheduleLiquidGlassSetup()
         binding.bottomNavigationView.doOnLayout {
             updateBottomNavigationIndicator(animate = false)
         }
+    }
+
+    private fun isSidebarMode(): Boolean {
+        return AppConfig.bottomBarLayoutMode == "sidebar"
+    }
+
+    private fun applyBottomLayoutMode() = binding.run {
+        val sidebarMode = isSidebarMode()
+        viewPagerMain.swipeEnabled = !sidebarMode
+        bottomControls.isVisible = !sidebarMode
+        sideNavigationPanel.isVisible = sidebarMode
+        sideNavigationHandle.isVisible = sidebarMode
+        if (sidebarMode) {
+            bottomIndicatorAnimator.cancel()
+            bottomNavigationIndicatorContainer.isVisible = false
+            sideNavigationView.setBackgroundColor(Color.TRANSPARENT)
+            sideNavigationPanel.background = createSideNavigationPanelDrawable()
+            sideNavigationHandle.background = createSideNavigationHandleDrawable()
+            sideNavigationView.menu.findItem(getBottomNavigationItemId(pagePosition))?.isChecked = true
+            placeSideNavigation(animate = false)
+        } else {
+            sideNavigationOpen = false
+            sideNavigationPanel.animate().cancel()
+            sideNavigationHandle.animate().cancel()
+            sideNavigationPanel.visibility = View.GONE
+            sideNavigationHandle.visibility = View.GONE
+            bottomNavigationView.menu.findItem(getBottomNavigationItemId(pagePosition))?.isChecked = true
+        }
+    }
+
+    private fun placeSideNavigation(animate: Boolean) = binding.run {
+        if (!isSidebarMode() || sideNavigationPanel.width == 0) return
+        val fromEnd = AppConfig.bottomBarSidebarGravity == "end"
+        (sideNavigationPanel.layoutParams as? ConstraintLayout.LayoutParams)?.let {
+            it.startToStart = if (fromEnd) ConstraintLayout.LayoutParams.UNSET else ConstraintSet.PARENT_ID
+            it.endToEnd = if (fromEnd) ConstraintSet.PARENT_ID else ConstraintLayout.LayoutParams.UNSET
+            sideNavigationPanel.layoutParams = it
+        }
+        (sideNavigationHandle.layoutParams as? ConstraintLayout.LayoutParams)?.let {
+            it.startToStart = if (fromEnd) ConstraintLayout.LayoutParams.UNSET else ConstraintSet.PARENT_ID
+            it.endToEnd = if (fromEnd) ConstraintSet.PARENT_ID else ConstraintLayout.LayoutParams.UNSET
+            sideNavigationHandle.layoutParams = it
+        }
+        val closedOffset = if (fromEnd) {
+            sideNavigationPanel.width + 14.dpToPx()
+        } else {
+            -sideNavigationPanel.width - 14.dpToPx()
+        }
+        val target = if (sideNavigationOpen) 0f else closedOffset.toFloat()
+        if (animate) {
+            sideNavigationPanel.animate()
+                .translationX(target)
+                .setDuration(220L)
+                .setInterpolator(bottomGlassPulseInterpolator)
+                .start()
+        } else {
+            sideNavigationPanel.translationX = target
+        }
+    }
+
+    private fun toggleSideNavigation() {
+        if (!isSidebarMode()) return
+        sideNavigationOpen = !sideNavigationOpen
+        placeSideNavigation(animate = true)
+    }
+
+    private fun closeSideNavigation() {
+        if (!sideNavigationOpen) return
+        sideNavigationOpen = false
+        placeSideNavigation(animate = true)
     }
 
     private fun setupLiquidGlass() {
@@ -508,16 +622,24 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             this@MainActivity,
             AppConfig.isNightTheme
         )
+        NavigationBarIconConfig.applyTo(
+            sideNavigationView.menu,
+            this@MainActivity,
+            AppConfig.isNightTheme
+        )
         if (hasCustom) {
             bottomNavigationView.itemIconTintList = null
+            sideNavigationView.itemIconTintList = null
         } else {
             bottomNavigationView.restoreThemeIconTint()
+            sideNavigationView.itemIconTintList = bottomNavigationView.createThemeColorStateList()
         }
         syncSearchButtonTint()
     }
 
     private fun syncSearchButtonTint() = binding.run {
         searchButtonIcon.imageTintList = bottomNavigationView.createThemeColorStateList()
+        sideSearchButton.imageTintList = bottomNavigationView.createThemeColorStateList()
     }
 
     private fun createSolidBottomShellDrawable(cornerRadius: Float, oval: Boolean): GradientDrawable {
@@ -554,6 +676,43 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             shape = GradientDrawable.RECTANGLE
             cornerRadius = bottomIndicatorCornerRadius
             setColor(primaryColor)
+        }
+    }
+
+    private fun createSideNavigationHandleDrawable(): GradientDrawable {
+        val baseColor = bottomBackground
+        val isEnd = AppConfig.bottomBarSidebarGravity == "end"
+        return GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadii = if (isEnd) {
+                floatArrayOf(12.dpToPx(), 12.dpToPx(), 0f, 0f, 0f, 0f, 12.dpToPx(), 12.dpToPx())
+            } else {
+                floatArrayOf(0f, 0f, 12.dpToPx(), 12.dpToPx(), 12.dpToPx(), 12.dpToPx(), 0f, 0f)
+            }
+            setColor(AppColorUtils.withAlpha(baseColor, 0.88f))
+            setStroke(
+                1.dpToPx(),
+                AppColorUtils.withAlpha(
+                    if (AppColorUtils.isColorLight(baseColor)) Color.BLACK else Color.WHITE,
+                    0.16f
+                )
+            )
+        }
+    }
+
+    private fun createSideNavigationPanelDrawable(): GradientDrawable {
+        val baseColor = bottomBackground
+        return GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = bottomBarCornerRadius
+            setColor(baseColor)
+            setStroke(
+                1.dpToPx(),
+                AppColorUtils.withAlpha(
+                    if (AppColorUtils.isColorLight(baseColor)) Color.BLACK else Color.WHITE,
+                    0.12f
+                )
+            )
         }
     }
 
@@ -623,6 +782,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     }
 
     private fun updateBottomNavigationIndicator(animate: Boolean) {
+        if (isSidebarMode()) return
         if (AppConfig.isEInkMode) return
         val menuView = binding.bottomNavigationView.getChildAt(0) as? ViewGroup ?: return
         val itemView = findBottomNavigationItemView(menuView, getBottomNavigationItemId(pagePosition))
@@ -654,6 +814,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     }
 
     private fun playBottomNavigationIndicatorAnimation(animate: Boolean) {
+        if (isSidebarMode()) return
         if (AppConfig.isEInkMode) return
         val indicator = binding.bottomNavigationIndicatorContainer
         indicator.removeCallbacks(hideBottomIndicatorRunnable)
@@ -932,6 +1093,8 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
                 if (it) {
                     bottomNavigationView.menu.clear()
                     bottomNavigationView.inflateMenu(R.menu.main_bnv)
+                    sideNavigationView.menu.clear()
+                    sideNavigationView.inflateMenu(R.menu.main_bnv)
                     applyBottomNavigationIcons()
                     onUpBooksBadgeView = null
                 }
@@ -952,7 +1115,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         val showRss = AppConfig.showRSS && binding.bottomNavigationView.menu.findItem(R.id.menu_rss) != null
         val showReadRecord = AppConfig.showReadRecord
         val mergedDiscovery = AppConfig.mergeDiscoveryRss && showDiscovery && showRss
-        binding.bottomNavigationView.menu.let { menu ->
+        listOf(binding.bottomNavigationView.menu, binding.sideNavigationView.menu).forEach { menu ->
             menu.findItem(R.id.menu_discovery).isVisible = showDiscovery || (mergedDiscovery && showRss)
             menu.findItem(R.id.menu_rss)?.isVisible = showRss && !mergedDiscovery
             menu.findItem(R.id.menu_read_record)?.isVisible = showReadRecord
@@ -1031,6 +1194,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         override fun onPageSelected(position: Int) {
             pagePosition = position
             binding.bottomNavigationView.menu.findItem(getBottomNavigationItemId(position))?.isChecked = true
+            binding.sideNavigationView.menu.findItem(getBottomNavigationItemId(position))?.isChecked = true
             updateBottomNavigationIndicator(animate = true)
         }
 

@@ -1585,6 +1585,12 @@
     <string name="bottom_bar_effect_solid">常规</string>
     <string name="bottom_bar_effect_glass">玻璃</string>
     <string name="bottom_bar_effect_frosted">磨砂玻璃</string>
+    <string name="bottom_bar_layout_mode">底栏样式</string>
+    <string name="bottom_bar_layout_floating">悬浮底栏</string>
+    <string name="bottom_bar_layout_sidebar">侧边栏</string>
+    <string name="bottom_bar_sidebar_gravity">侧边栏位置</string>
+    <string name="bottom_bar_sidebar_left">左侧滑出</string>
+    <string name="bottom_bar_sidebar_right">右侧滑出</string>
     <string name="bottom_bar_opacity">不透明度</string>
     <string name="theme_day">日间主题</string>
     <string name="theme_night">夜间主题</string>

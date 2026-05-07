@@ -205,6 +205,8 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
             NavigationBarIconConfig.Config(
                 name = nextPackageName(),
                 isNightMode = isNightMode,
+                layoutMode = AppConfig.bottomBarLayoutMode,
+                sidebarGravity = AppConfig.bottomBarSidebarGravity,
                 effectMode = AppConfig.bottomBarEffectMode,
                 opacity = if (AppConfig.bottomBarEffectMode == "frosted") AppConfig.frostedGlassLevel else AppConfig.liquidGlassLevel
             ),
@@ -252,38 +254,65 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
                 layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 44.dp)
             }
             addView(name)
-            addView(optionRow(getString(R.string.bottom_bar_effect_mode), effectModeLabel(config.effectMode)) {
+            addView(optionRow(getString(R.string.bottom_bar_layout_mode), layoutModeLabel(config.layoutMode)) {
                 selector(
-                    getString(R.string.bottom_bar_effect_mode),
+                    getString(R.string.bottom_bar_layout_mode),
                     listOf(
-                        getString(R.string.bottom_bar_effect_solid),
-                        getString(R.string.bottom_bar_effect_glass),
-                        getString(R.string.bottom_bar_effect_frosted)
+                        getString(R.string.bottom_bar_layout_floating),
+                        getString(R.string.bottom_bar_layout_sidebar)
                     )
                 ) { _, index ->
-                    config.effectMode = when (index) {
-                        0 -> "solid"
-                        2 -> "frosted"
-                        else -> "glass"
-                    }
+                    config.layoutMode = if (index == 1) "sidebar" else "floating"
                     refreshEditDialog()
                 }
             })
-            addView(optionRow(getString(R.string.bottom_bar_opacity), "${config.opacity}%") {
-                NumberPickerDialog(this@NavigationBarManageActivity)
-                    .setTitle(getString(R.string.bottom_bar_opacity))
-                    .setMinValue(0)
-                    .setMaxValue(100)
-                    .setValue(config.opacity)
-                    .setCustomButton(R.string.btn_default_s) {
-                        config.opacity = 76
+            if (config.layoutMode == "sidebar") {
+                addView(optionRow(getString(R.string.bottom_bar_sidebar_gravity), sidebarGravityLabel(config.sidebarGravity)) {
+                    selector(
+                        getString(R.string.bottom_bar_sidebar_gravity),
+                        listOf(
+                            getString(R.string.bottom_bar_sidebar_left),
+                            getString(R.string.bottom_bar_sidebar_right)
+                        )
+                    ) { _, index ->
+                        config.sidebarGravity = if (index == 1) "end" else "start"
                         refreshEditDialog()
                     }
-                    .show {
-                        config.opacity = it.coerceIn(0, 100)
+                })
+            } else {
+                addView(optionRow(getString(R.string.bottom_bar_effect_mode), effectModeLabel(config.effectMode)) {
+                    selector(
+                        getString(R.string.bottom_bar_effect_mode),
+                        listOf(
+                            getString(R.string.bottom_bar_effect_solid),
+                            getString(R.string.bottom_bar_effect_glass),
+                            getString(R.string.bottom_bar_effect_frosted)
+                        )
+                    ) { _, index ->
+                        config.effectMode = when (index) {
+                            0 -> "solid"
+                            2 -> "frosted"
+                            else -> "glass"
+                        }
                         refreshEditDialog()
                     }
-            })
+                })
+                addView(optionRow(getString(R.string.bottom_bar_opacity), "${config.opacity}%") {
+                    NumberPickerDialog(this@NavigationBarManageActivity)
+                        .setTitle(getString(R.string.bottom_bar_opacity))
+                        .setMinValue(0)
+                        .setMaxValue(100)
+                        .setValue(config.opacity)
+                        .setCustomButton(R.string.btn_default_s) {
+                            config.opacity = 76
+                            refreshEditDialog()
+                        }
+                        .show {
+                            config.opacity = it.coerceIn(0, 100)
+                            refreshEditDialog()
+                        }
+                })
+            }
             NavigationBarIconConfig.items.forEach { item ->
                 addView(iconRow(item))
             }
@@ -526,6 +555,20 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
             "solid" -> getString(R.string.bottom_bar_effect_solid)
             "frosted" -> getString(R.string.bottom_bar_effect_frosted)
             else -> getString(R.string.bottom_bar_effect_glass)
+        }
+    }
+
+    private fun layoutModeLabel(value: String): String {
+        return when (value) {
+            "sidebar" -> getString(R.string.bottom_bar_layout_sidebar)
+            else -> getString(R.string.bottom_bar_layout_floating)
+        }
+    }
+
+    private fun sidebarGravityLabel(value: String): String {
+        return when (value) {
+            "end" -> getString(R.string.bottom_bar_sidebar_right)
+            else -> getString(R.string.bottom_bar_sidebar_left)
         }
     }
 

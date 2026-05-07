@@ -79,6 +79,8 @@ object NavigationBarIconConfig {
     data class Config(
         var name: String,
         var isNightMode: Boolean,
+        var layoutMode: String = "floating",
+        var sidebarGravity: String = "start",
         var effectMode: String = "glass",
         var opacity: Int = 72,
         var updatedAt: Long = System.currentTimeMillis(),
@@ -156,16 +158,20 @@ object NavigationBarIconConfig {
     }
 
     fun apply(entry: Entry) {
-        val config = entry.config
+        val config = normalizeConfig(entry.config)
         val key = if (config.isNightMode) activeNightKey else activeDayKey
         appCtx.putPrefString(key, entry.dirName)
+        AppConfig.bottomBarLayoutMode = config.layoutMode
+        AppConfig.bottomBarSidebarGravity = config.sidebarGravity
         AppConfig.bottomBarEffectMode = config.effectMode
         AppConfig.liquidGlassLevel = config.opacity
         AppConfig.frostedGlassLevel = config.opacity
     }
 
     fun applyCurrentBottomConfig(isNight: Boolean) {
-        val config = currentEntry(isNight).config
+        val config = normalizeConfig(currentEntry(isNight).config)
+        AppConfig.bottomBarLayoutMode = config.layoutMode
+        AppConfig.bottomBarSidebarGravity = config.sidebarGravity
         AppConfig.bottomBarEffectMode = config.effectMode
         AppConfig.liquidGlassLevel = config.opacity
         AppConfig.frostedGlassLevel = config.opacity
@@ -186,12 +192,15 @@ object NavigationBarIconConfig {
             throw IllegalArgumentException(appCtx.getString(R.string.navigation_bar_name_exists))
         }
         val dir = localDir(config.isNightMode, dirName).apply { mkdirs() }
-        val normalized = config.copy(
+        val source = normalizeConfig(config)
+        val normalized = source.copy(
             name = name,
-            effectMode = config.effectMode.takeIf { it in setOf("solid", "glass", "frosted") } ?: "glass",
-            opacity = config.opacity.coerceIn(0, 100),
+            layoutMode = source.layoutMode,
+            sidebarGravity = source.sidebarGravity,
+            effectMode = source.effectMode,
+            opacity = source.opacity.coerceIn(0, 100),
             updatedAt = System.currentTimeMillis(),
-            icons = config.icons.toMutableMap()
+            icons = source.icons.toMutableMap()
         )
         File(dir, packageFileName).writeText(GSON.toJson(normalized))
         return Entry(normalized, Source.LOCAL, dirName, localDir = dir)
@@ -309,6 +318,8 @@ object NavigationBarIconConfig {
             Config(
                 name = defaultName(isNight),
                 isNightMode = isNight,
+                layoutMode = "floating",
+                sidebarGravity = "start",
                 effectMode = "glass",
                 opacity = 76,
                 updatedAt = 0L
@@ -390,7 +401,7 @@ object NavigationBarIconConfig {
     private fun readConfig(dir: File): Config? {
         val file = File(dir, packageFileName)
         if (!file.exists()) return null
-        return GSON.fromJsonObject<Config>(file.readText()).getOrNull()
+        return GSON.fromJsonObject<Config>(file.readText()).getOrNull()?.let(::normalizeConfig)
     }
 
     private fun importZipInternal(zipFile: File, remoteUpdatedAt: Long = 0L): Entry {
@@ -402,11 +413,10 @@ object NavigationBarIconConfig {
             ZipUtils.unZipToPath(zipFile, unzipDir)
             val packageFile = unzipDir.walkTopDown().firstOrNull { it.isFile && it.name == packageFileName }
                 ?: throw IllegalArgumentException(appCtx.getString(R.string.navigation_bar_config_missing))
-            val config = GSON.fromJsonObject<Config>(packageFile.readText()).getOrThrow()
+            val config = normalizeConfig(GSON.fromJsonObject<Config>(packageFile.readText()).getOrThrow())
             if (config.name.normalizeFileName() == DEFAULT_DIR_NAME) {
                 config.name = "${config.name}_${appCtx.getString(R.string.navigation_bar_import_suffix)}"
             }
-            config.effectMode = config.effectMode.takeIf { it in setOf("solid", "glass", "frosted") } ?: "glass"
             config.opacity = config.opacity.coerceIn(0, 100)
             if (remoteUpdatedAt == 0L) {
                 config.updatedAt = System.currentTimeMillis()
@@ -545,6 +555,25 @@ object NavigationBarIconConfig {
 
     private fun defaultName(isNight: Boolean): String {
         return appCtx.getString(if (isNight) R.string.navigation_bar_night_default_name else R.string.navigation_bar_day_default_name)
+    }
+
+    private fun normalizeConfig(config: Config): Config {
+        val layoutMode = runCatching { config.layoutMode }.getOrNull()
+            ?.takeIf { it in setOf("floating", "sidebar") }
+            ?: "floating"
+        val sidebarGravity = runCatching { config.sidebarGravity }.getOrNull()
+            ?.takeIf { it in setOf("start", "end") }
+            ?: "start"
+        val effectMode = runCatching { config.effectMode }.getOrNull()
+            ?.takeIf { it in setOf("solid", "glass", "frosted") }
+            ?: "glass"
+        val icons = runCatching { config.icons }.getOrNull() ?: linkedMapOf()
+        config.layoutMode = layoutMode
+        config.sidebarGravity = sidebarGravity
+        config.effectMode = effectMode
+        config.opacity = config.opacity.coerceIn(0, 100)
+        config.icons = icons.toMutableMap()
+        return config
     }
 
     private fun resetActiveIfNeeded(entry: Entry) {

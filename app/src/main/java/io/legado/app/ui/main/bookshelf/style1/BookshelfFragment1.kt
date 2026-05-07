@@ -112,6 +112,7 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
             true
         }
         binding.viewPagerBookshelf.offscreenPageLimit = 1
+        binding.viewPagerBookshelf.swipeEnabled = AppConfig.bottomBarLayoutMode != "sidebar"
         binding.viewPagerBookshelf.adapter = adapter
         binding.viewPagerBookshelf.addOnPageChangeListener(
             object : androidx.viewpager.widget.ViewPager.SimpleOnPageChangeListener() {
@@ -127,6 +128,11 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
             }
         )
         updateHeaderTitle()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        binding.viewPagerBookshelf.swipeEnabled = AppConfig.bottomBarLayoutMode != "sidebar"
     }
 
     @Synchronized

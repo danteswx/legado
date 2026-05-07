@@ -1152,6 +1152,28 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             )
         }
 
+    var bottomBarLayoutMode: String
+        get() = appCtx.getPrefString(PreferKey.bottomBarLayoutMode, "floating")
+            ?.takeIf { it in setOf("floating", "sidebar") }
+            ?: "floating"
+        set(value) {
+            appCtx.putPrefString(
+                PreferKey.bottomBarLayoutMode,
+                value.takeIf { it in setOf("floating", "sidebar") } ?: "floating"
+            )
+        }
+
+    var bottomBarSidebarGravity: String
+        get() = appCtx.getPrefString(PreferKey.bottomBarSidebarGravity, "start")
+            ?.takeIf { it in setOf("start", "end") }
+            ?: "start"
+        set(value) {
+            appCtx.putPrefString(
+                PreferKey.bottomBarSidebarGravity,
+                value.takeIf { it in setOf("start", "end") } ?: "start"
+            )
+        }
+
     var readUrlInBrowser: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.readUrlOpenInBrowser)
         set(value) {
