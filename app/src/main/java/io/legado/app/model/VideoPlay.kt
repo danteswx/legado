@@ -12,6 +12,7 @@ import androidx.core.content.edit
 import com.shuyu.gsyvideoplayer.listener.GSYMediaPlayerListener
 import com.shuyu.gsyvideoplayer.utils.CommonUtil
 import com.shuyu.gsyvideoplayer.video.StandardGSYVideoPlayer
+import com.shuyu.gsyvideoplayer.video.base.GSYBaseVideoPlayer
 import io.legado.app.R
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.EventBus
@@ -30,6 +31,7 @@ import io.legado.app.help.CacheManager
 import io.legado.app.help.book.getDanmaku
 import io.legado.app.help.book.update
 import io.legado.app.help.coroutine.Coroutine
+import io.legado.app.help.exoplayer.ExoPlayerHelper
 import io.legado.app.help.gsyVideo.ExoVideoManager
 import io.legado.app.help.gsyVideo.ExoVideoManager.Companion.FULLSCREEN_ID
 import io.legado.app.help.gsyVideo.FloatingPlayer
@@ -265,21 +267,18 @@ object VideoPlay : CoroutineScope by MainScope(){
         }
         val chapterSource = source as BookSource
         val chapterCacheKey = buildChapterCacheKey(chapterSource, book, chapter)
+        chapter.resourceUrl
+            ?.takeIf { ExoPlayerHelper.isMediaCached(it) }
+            ?.let { cachedUrl ->
+                playResolvedChapter(player, chapterSource, book, chapter, cachedUrl, emptyMap())
+                isLoading = false
+                return
+            }
         val cached = chapterLinkCache[chapterCacheKey]?.takeIf {
             System.currentTimeMillis() - it.createdAt <= CHAPTER_LINK_CACHE_TTL
         }
         if (cached != null) {
-            videoUrl = cached.mediaUrl
-            when (val danmaku = chapter.getDanmaku()) {
-                is String -> danmakuStr = danmaku
-                is File -> danmakuFile = danmaku
-            }
-            player.mapHeadData = cached.headers.toMutableMap()
-            player.setUp(cached.playUrl, false, File(appCtx.externalCache, "exoplayer"), chapter.title)
-            if (autoPlay) {
-                player.startPlayLogic()
-            }
-            preloadNextEpisode(chapterSource, book)
+            playResolvedChapter(player, chapterSource, book, chapter, cached.playUrl, cached.headers)
             isLoading = false
             return
         }
@@ -308,6 +307,10 @@ object VideoPlay : CoroutineScope by MainScope(){
                     is File -> danmakuFile = danmaku
                 }
                 val playUrl = analyzeUrl.url
+                if (chapter.resourceUrl != playUrl) {
+                    chapter.resourceUrl = playUrl
+                    appDb.bookChapterDao.update(chapter)
+                }
                 chapterLinkCache[chapterCacheKey] = CachedPlayLink(
                     playUrl = playUrl,
                     headers = analyzeUrl.headerMap.toMap(),
@@ -326,6 +329,41 @@ object VideoPlay : CoroutineScope by MainScope(){
                 AppLog.put("获取资源链接出错\n$it", it, true)
             }
         isLoading = false
+    }
+
+    private fun playResolvedChapter(
+        player: GSYBaseVideoPlayer,
+        source: BookSource,
+        book: Book,
+        chapter: BookChapter,
+        playUrl: String,
+        headers: Map<String, String>
+    ) {
+        videoUrl = playUrl
+        when (val danmaku = chapter.getDanmaku()) {
+            is String -> danmakuStr = danmaku
+            is File -> danmakuFile = danmaku
+        }
+        player.mapHeadData = headers.toMutableMap()
+        player.setUp(playUrl, false, File(appCtx.externalCache, "exoplayer"), chapter.title)
+        if (autoPlay) {
+            player.startPlayLogic()
+        }
+        preloadNextEpisode(source, book)
+    }
+
+    fun refreshCurrentChapter(player: StandardGSYVideoPlayer) {
+        val chapter = chapter ?: return
+        val book = book ?: return
+        val source = source as? BookSource ?: return
+        saveRead(videoManager.currentPosition.toInt())
+        chapterLinkCache.remove(buildChapterCacheKey(source, book, chapter))
+        chapter.resourceUrl = null
+        Coroutine.async(loadScope, IO) {
+            appDb.bookChapterDao.update(chapter)
+        }
+        videoUrl = null
+        startPlay(player)
     }
 
     private fun buildChapterCacheKey(source: BookSource, book: Book, chapter: BookChapter): String {

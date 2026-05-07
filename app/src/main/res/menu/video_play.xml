@@ -41,6 +41,16 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_video_cache"
+        android:title="@string/offline_cache"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_refresh_chapter"
+        android:title="@string/menu_refresh_dur"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_open_other_video_player"
         android:title="@string/open_other_video_player"
         app:showAsAction="never" />

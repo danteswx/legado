@@ -14,6 +14,7 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.databinding.DialogCacheChaptersBinding
 import io.legado.app.help.book.isAudio
+import io.legado.app.help.book.isVideo
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.primaryColor
@@ -187,8 +188,8 @@ class CacheChapterDialog :
         }
         lifecycleScope.launch {
             kotlin.runCatching {
-                if (book.isAudio) {
-                    viewModel.cacheAudioChapters(book, items.map { it.chapter })
+                if (book.isAudio || book.isVideo) {
+                    viewModel.cacheMediaChapters(book, items.map { it.chapter })
                 } else {
                     viewModel.cacheBookChapters(book, items.map { it.chapter })
                 }
@@ -196,7 +197,7 @@ class CacheChapterDialog :
                 callback?.onCacheChanged()
                 adapter.setSelectionMode(false)
                 updateSelectionBar()
-                if (book.isAudio && count > 0) {
+                if ((book.isAudio || book.isVideo) && count > 0) {
                     toastOnUi(getString(R.string.cache_manage_audio_cache_started, count))
                     dismissAllowingStateLoss()
                 } else {

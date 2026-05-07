@@ -4,20 +4,21 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.database.StandaloneDatabaseProvider
-import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.FileDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.cache.Cache
 import androidx.media3.datasource.cache.CacheDataSink
 import androidx.media3.datasource.cache.CacheDataSource
-import androidx.media3.datasource.cache.CacheWriter
 import androidx.media3.datasource.cache.ContentMetadata
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.offline.DefaultDownloaderFactory
+import androidx.media3.exoplayer.offline.DownloadRequest
 import androidx.media3.exoplayer.source.ConcatenatingMediaSource2
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
@@ -111,6 +112,21 @@ object ExoPlayerHelper {
             )
     }
 
+    fun createOfflineMediaSource(
+        context: Context,
+        url: String,
+        headers: Map<String, String>
+    ): MediaSource {
+        return DefaultMediaSourceFactory(offlineMediaDataSourceFactory(headers))
+            .setLiveTargetOffsetMs(5000)
+            .createMediaSource(
+                MediaItem.Builder()
+                    .setUri(url)
+                    .setMimeType(guessMediaMimeType(url))
+                    .build()
+            )
+    }
+
     private val audioCacheDataSourceFactory by lazy {
         CacheDataSource.Factory()
             .setCache(audioCache)
@@ -131,6 +147,18 @@ object ExoPlayerHelper {
             .setCacheWriteDataSinkFactory(null)
     }
 
+    private fun offlineMediaDataSourceFactory(headers: Map<String, String>): CacheDataSource.Factory {
+        return CacheDataSource.Factory()
+            .setCache(audioCache)
+            .setUpstreamDataSourceFactory(okhttpDataFactory(headers))
+            .setCacheReadDataSourceFactory(FileDataSource.Factory())
+            .setCacheWriteDataSinkFactory(
+                CacheDataSink.Factory()
+                    .setCache(audioCache)
+                    .setFragmentSize(CacheDataSink.DEFAULT_FRAGMENT_SIZE)
+            )
+    }
+
     /**
      * Okhttp DataSource.Factory
      */
@@ -140,6 +168,15 @@ object ExoPlayerHelper {
             .build()
         OkHttpDataSource.Factory(client)
             .setCacheControl(CacheControl.Builder().maxAge(1, TimeUnit.DAYS).build())
+    }
+
+    private fun okhttpDataFactory(headers: Map<String, String>): OkHttpDataSource.Factory {
+        val client = okHttpClient.newBuilder()
+            .callTimeout(0, TimeUnit.SECONDS)
+            .build()
+        return OkHttpDataSource.Factory(client)
+            .setCacheControl(CacheControl.Builder().maxAge(1, TimeUnit.DAYS).build())
+            .setDefaultRequestProperties(headers)
     }
 
     /**
@@ -209,26 +246,28 @@ object ExoPlayerHelper {
         val urls = getMediaUrls(request.url)
         require(urls.isNotEmpty()) { "media url is empty" }
         urls.forEach { url ->
+            require(isDownloadableMediaUrl(url)) { "media url is not downloadable" }
             if (shouldCancel?.invoke() == true) {
                 throw kotlinx.coroutines.CancellationException("audio cache cancelled")
             }
-            val dataSpec = DataSpec.Builder()
-                .setUri(url)
-                .setKey(url)
-                .setHttpRequestHeaders(request.headers)
-                .build()
             var cached = 0L
-            CacheWriter(
-                audioCacheDataSourceFactory.createDataSourceForDownloading(),
-                dataSpec,
-                null
-            ) { requestLength, bytesCached, newBytesCached ->
+            val downloader = DefaultDownloaderFactory(
+                offlineMediaDataSourceFactory(request.headers),
+                Runnable::run
+            ).createDownloader(
+                DownloadRequest.Builder(MD5Utils.md5Encode(url), Uri.parse(url))
+                    .setMimeType(guessMediaMimeType(url))
+                    .build()
+            )
+            downloader.download { requestLength, bytesCached, _ ->
                 if (shouldCancel?.invoke() == true) {
+                    downloader.cancel()
                     throw kotlinx.coroutines.CancellationException("audio cache cancelled")
                 }
+                val newBytesCached = (bytesCached - cached).coerceAtLeast(0L)
                 cached = bytesCached
                 progress?.invoke(requestLength, bytesCached, newBytesCached)
-            }.cache()
+            }
             markMediaUrlComplete(url)
             totalCached += cached
         }
@@ -239,6 +278,7 @@ object ExoPlayerHelper {
         if (url.isNullOrBlank()) return false
         val urls = getMediaUrls(url)
         if (urls.isEmpty()) return false
+        if (urls.any { !isDownloadableMediaUrl(it) }) return false
         return urls.all { isMediaUrlCached(it) }
     }
 
@@ -268,19 +308,28 @@ object ExoPlayerHelper {
     }
 
     private fun isMediaUrlCached(url: String): Boolean {
+        if (isAdaptiveMediaUrl(url)) {
+            return hasMediaCompleteMarker(url)
+        }
         val contentLength = ContentMetadata.getContentLength(audioCache.getContentMetadata(url))
         return if (contentLength > 0) {
             audioCache.isCached(url, 0, contentLength)
         } else {
-            mediaCompleteMarker(url).isFile &&
+            hasMediaCompleteMarker(url) &&
                 audioCache.getCachedBytes(url, 0, Long.MAX_VALUE) > 0
         }
     }
 
     private fun markMediaUrlComplete(url: String) {
         runCatching {
-            mediaCompleteMarker(url).writeText(System.currentTimeMillis().toString())
+            mediaCompleteMarker(url).writeText(COMPLETE_MARKER_VERSION)
         }
+    }
+
+    private fun hasMediaCompleteMarker(url: String): Boolean {
+        return runCatching {
+            mediaCompleteMarker(url).readText() == COMPLETE_MARKER_VERSION
+        }.getOrDefault(false)
     }
 
     private fun mediaCompleteMarker(url: String): File {
@@ -296,10 +345,33 @@ object ExoPlayerHelper {
         return listOf(url)
     }
 
+    private fun isDownloadableMediaUrl(url: String): Boolean {
+        val scheme = Uri.parse(url).scheme ?: return false
+        return scheme.equals("http", true) ||
+            scheme.equals("https", true) ||
+            (scheme.equals("file", true) && isAdaptiveMediaUrl(url))
+    }
+
+    private fun isAdaptiveMediaUrl(url: String): Boolean {
+        val lower = url.substringBefore('?').lowercase()
+        return lower.endsWith(".m3u8") || lower.endsWith(".mpd") || lower.endsWith(".ism")
+    }
+
+    private fun guessMediaMimeType(url: String): String? {
+        val lower = url.substringBefore('?').lowercase()
+        return when {
+            lower.endsWith(".m3u8") -> MimeTypes.APPLICATION_M3U8
+            lower.endsWith(".mpd") -> MimeTypes.APPLICATION_MPD
+            lower.endsWith(".ism") || lower.endsWith(".isml") -> MimeTypes.APPLICATION_SS
+            else -> null
+        }
+    }
+
     data class MediaRequest(
         val url: String,
         val headers: Map<String, String> = emptyMap()
     )
 
     private const val AUDIO_OFFLINE_CACHE_MAX_BYTES = 4L * 1024 * 1024 * 1024
+    private const val COMPLETE_MARKER_VERSION = "media_downloader_v2"
 }

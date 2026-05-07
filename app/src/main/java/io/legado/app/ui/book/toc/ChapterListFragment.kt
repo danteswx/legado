@@ -183,7 +183,7 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
         get() = viewModel.bookData.value?.isLocal == true
 
     override val isAudioBook: Boolean
-        get() = viewModel.bookData.value?.isAudio == true
+        get() = viewModel.bookData.value?.let { it.isAudio || it.isVideo } == true
 
     override fun durChapterIndex(): Int {
         return durChapterIndex

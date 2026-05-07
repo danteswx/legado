@@ -5,16 +5,20 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import android.widget.ImageView
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.R
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.lib.theme.ThemeStore.Companion.accentColor
+import io.legado.app.utils.gone
+import io.legado.app.utils.visible
 
 class ChapterAdapter(
     private var chapters: List<BookChapter>,
     private var selectedPosition: Int = -1,
     private val isVolume: Boolean = false,
+    private val isCached: (BookChapter) -> Boolean = { false },
     private val onChapterClick: (BookChapter, Int) -> Unit
 ) : RecyclerView.Adapter<ChapterAdapter.ChapterViewHolder>() {
 
@@ -60,6 +64,7 @@ class ChapterAdapter(
 
     inner class ChapterViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val tvChapterName: TextView = itemView.findViewById(R.id.tvChapterName)
+        private val ivCacheStatus: ImageView? = itemView.findViewById(R.id.ivCacheStatus)
 
         fun bind(chapter: BookChapter, isSelected: Boolean) {
             tvChapterName.text = chapter.title
@@ -68,6 +73,12 @@ class ChapterAdapter(
                 tvChapterName.setTextColor(accentColor)
             } else {
                 tvChapterName.setTextColor(ContextCompat.getColor(itemView.context,R.color.primaryText))
+            }
+            if (!isVolume && isCached(chapter)) {
+                ivCacheStatus?.setColorFilter(accentColor)
+                ivCacheStatus?.visible()
+            } else {
+                ivCacheStatus?.gone()
             }
             itemView.setOnClickListener {
                 val previousPosition = selectedPosition

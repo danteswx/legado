@@ -44,6 +44,16 @@
             android:textSize="14sp" />
 
         <TextView
+            android:id="@+id/btn_video"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_bookshelf_tag_item"
+            android:gravity="center"
+            android:text="@string/cache_manage_video"
+            android:textSize="14sp" />
+
+        <TextView
             android:id="@+id/btn_manga"
             android:layout_width="0dp"
             android:layout_height="match_parent"

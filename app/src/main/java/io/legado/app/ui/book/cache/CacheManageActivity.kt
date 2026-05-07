@@ -57,7 +57,7 @@ class CacheManageActivity :
             ContextCompat.getColor(this@CacheManageActivity, R.color.background_menu),
             UiCorner.panelRadius(this@CacheManageActivity)
         )
-        listOf(btnBooks, btnAudio, btnManga).forEach {
+        listOf(btnBooks, btnAudio, btnVideo, btnManga).forEach {
             it.background = UiCorner.actionSelector(
                 Color.TRANSPARENT,
                 ContextCompat.getColor(this@CacheManageActivity, R.color.background_card),
@@ -69,6 +69,7 @@ class CacheManageActivity :
         (recyclerView.itemAnimator as? SimpleItemAnimator)?.supportsChangeAnimations = false
         btnBooks.setOnClickListener { switchMode(CacheManageMode.BOOK) }
         btnAudio.setOnClickListener { switchMode(CacheManageMode.AUDIO) }
+        btnVideo.setOnClickListener { switchMode(CacheManageMode.VIDEO) }
         btnManga.setOnClickListener { switchMode(CacheManageMode.MANGA) }
         btnUploadAll.setOnClickListener { uploadAll() }
         btnDeleteAll.setOnClickListener { deleteAll() }
@@ -103,7 +104,7 @@ class CacheManageActivity :
         lifecycleScope.launch {
             AudioCacheTaskManager.states.collectLatest { states ->
                 adapter.updateTaskStates(states)
-                if (viewModel.mode == CacheManageMode.AUDIO) {
+                if (viewModel.mode == CacheManageMode.AUDIO || viewModel.mode == CacheManageMode.VIDEO) {
                     reloadAudioItemsWhenNeeded(states)
                 }
             }
@@ -148,8 +149,9 @@ class CacheManageActivity :
         if (audioTaskReloadJob?.isActive == true) return
         audioTaskReloadJob = lifecycleScope.launch {
             delay(delayMs)
-            if (viewModel.mode == CacheManageMode.AUDIO && !viewModel.isLoading()) {
-                viewModel.load(CacheManageMode.AUDIO)
+            val mode = viewModel.mode
+            if ((mode == CacheManageMode.AUDIO || mode == CacheManageMode.VIDEO) && !viewModel.isLoading()) {
+                viewModel.load(mode)
             }
         }
     }
@@ -163,9 +165,11 @@ class CacheManageActivity :
     private fun updateTabs(mode: CacheManageMode) = binding.run {
         btnBooks.isSelected = mode == CacheManageMode.BOOK
         btnAudio.isSelected = mode == CacheManageMode.AUDIO
+        btnVideo.isSelected = mode == CacheManageMode.VIDEO
         btnManga.isSelected = mode == CacheManageMode.MANGA
         btnBooks.setTextColor(if (mode == CacheManageMode.BOOK) accentColor else primaryTextColor)
         btnAudio.setTextColor(if (mode == CacheManageMode.AUDIO) accentColor else primaryTextColor)
+        btnVideo.setTextColor(if (mode == CacheManageMode.VIDEO) accentColor else primaryTextColor)
         btnManga.setTextColor(if (mode == CacheManageMode.MANGA) accentColor else primaryTextColor)
     }
 

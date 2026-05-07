@@ -31,6 +31,24 @@ class Exo2MediaPlayer(context: Context) : IjkExo2MediaPlayer(context) {
     }
     private val window = Timeline.Window()
 
+    override fun setDataSource(context: Context?, uri: Uri?, headers: MutableMap<String, String>?) {
+        if (headers != null) {
+            mHeaders.clear()
+            mHeaders.putAll(headers)
+        }
+        setDataSource(context, uri)
+    }
+
+    override fun setDataSource(context: Context?, uri: Uri?) {
+        val dataSource = uri?.toString() ?: return
+        mDataSource = dataSource
+        mMediaSource = ExoPlayerHelper.createOfflineMediaSource(
+            context ?: mAppContext,
+            dataSource,
+            mHeaders
+        )
+    }
+
     /**
      * 上一集
      */

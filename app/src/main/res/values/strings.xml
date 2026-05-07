@@ -1745,10 +1745,11 @@
     <string name="theme_background_downloading">Downloading background image...</string>
     <string name="theme_background_downloaded">Background image downloaded</string>
     <string name="cache_manage_title">Cache Manager</string>
-    <string name="cache_manage_summary">Manage book, audio, and manga caches in one place.</string>
+    <string name="cache_manage_summary">Manage book, audio, video, and manga caches in one place.</string>
     <string name="cache_manage_cached_only">Only cached chapters</string>
     <string name="cache_manage_books">Books</string>
     <string name="cache_manage_audio">Audio</string>
+    <string name="cache_manage_video">Video</string>
     <string name="cache_manage_manga">Manga</string>
     <string name="cache_manage_summary_state">%1$d book(s), %2$d cached chapter(s)</string>
     <string name="cache_manage_empty">No %1$s cache</string>

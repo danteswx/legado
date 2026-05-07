@@ -38,12 +38,14 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.RssSource
 import io.legado.app.databinding.ActivityVideoPlayerBinding
+import io.legado.app.databinding.DialogDownloadChoiceBinding
 import io.legado.app.help.GlideImageGetter
 import io.legado.app.help.TextViewTagHandler
 import io.legado.app.help.WebCacheManager
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.removeType
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.exoplayer.ExoPlayerHelper
 import io.legado.app.help.gsyVideo.VideoPlayer
 import io.legado.app.help.webView.PooledWebView
 import io.legado.app.help.webView.WebJsExtensions
@@ -62,6 +64,9 @@ import io.legado.app.service.VideoPlayService
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.model.SourceCallBack
 import io.legado.app.ui.association.OnLineImportActivity
+import io.legado.app.ui.book.cache.AudioCacheTaskManager
+import io.legado.app.ui.book.cache.CacheTaskStatus
+import io.legado.app.ui.book.cache.CacheManageViewModel
 import io.legado.app.ui.book.changesource.ChangeBookSourceDialog
 import io.legado.app.ui.book.info.BookInfoViewModel
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
@@ -95,6 +100,7 @@ import io.noties.markwon.ext.tables.TablePlugin
 import io.noties.markwon.html.HtmlPlugin
 import io.noties.markwon.image.glide.GlideImagesPlugin
 import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -109,6 +115,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
 
     override val binding by viewBinding(ActivityVideoPlayerBinding::inflate)
     override val viewModel by viewModels<VideoPlayerViewModel>()
+    private val cacheViewModel by viewModels<CacheManageViewModel>()
     private val bookInfoViewModel by viewModels<BookInfoViewModel>()
     private val playerView: VideoPlayer by lazy { binding.playerView }
     private var starMenuItem: MenuItem? = null
@@ -227,6 +234,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             initView()
         }
         upView()
+        observeVideoCacheTasks()
         onBackPressedDispatcher.addCallback(this) {
             if (isFullScreen) {
                 toggleFullScreen()
@@ -316,6 +324,8 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                 if (!VideoPlay.inBookshelf) {
                     book.addType(BookType.notShelf)
                 }
+                book.removeType(BookType.text, BookType.audio, BookType.image)
+                book.addType(BookType.video)
                 book.save()
                 appDb.bookChapterDao.delByBook(book.bookUrl)
                 appDb.bookChapterDao.insert(*chapters.toTypedArray())
@@ -543,7 +553,12 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         val recyclerView = binding.chapters
         val layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
         recyclerView.layoutManager = layoutManager
-        val adapter = ChapterAdapter(toc,VideoPlay.chapterInVolumeIndex, false) { chapter, index ->
+        val adapter = ChapterAdapter(
+            chapters = toc,
+            selectedPosition = VideoPlay.chapterInVolumeIndex,
+            isVolume = false,
+            isCached = { chapter -> ExoPlayerHelper.isMediaCached(chapter.resourceUrl) }
+        ) { chapter, index ->
             if (index != VideoPlay.chapterInVolumeIndex) {
                 VideoPlay.chapterInVolumeIndex = index
                 VideoPlay.saveRead(0)
@@ -559,7 +574,11 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         val recyclerView = binding.volumes
         val layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         recyclerView.layoutManager = layoutManager
-        val adapter = ChapterAdapter(volumes,VideoPlay.durVolumeIndex, true) { chapter, index ->
+        val adapter = ChapterAdapter(
+            chapters = volumes,
+            selectedPosition = VideoPlay.durVolumeIndex,
+            isVolume = true
+        ) { chapter, index ->
             if (index != VideoPlay.durVolumeIndex) {
                 VideoPlay.durVolumeIndex = index
                 VideoPlay.chapterInVolumeIndex = 0
@@ -826,6 +845,12 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                     }
                 }
             }
+            R.id.menu_video_cache -> VideoPlay.book?.let {
+                showVideoCacheRangeDialog(it)
+            }
+            R.id.menu_refresh_chapter -> {
+                VideoPlay.refreshCurrentChapter(playerView)
+            }
             R.id.menu_open_other_video_player -> {
                 val url = VideoPlay.videoUrl
                 if (url.isNullOrBlank()){
@@ -851,6 +876,75 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             R.id.menu_log -> showDialogFragment<AppLogDialog>()
         }
         return super.onCompatOptionsItemSelected(item)
+    }
+
+    private fun showVideoCacheRangeDialog(book: Book) {
+        alert(titleResource = R.string.offline_cache) {
+            val total = book.totalChapterNum.takeIf { it > 0 } ?: VideoPlay.toc?.size ?: 0
+            val alertBinding = DialogDownloadChoiceBinding.inflate(layoutInflater).apply {
+                editStart.setText((book.durChapterIndex + 1).coerceAtLeast(1).toString())
+                editEnd.setText(total.coerceAtLeast(1).toString())
+            }
+            customView { alertBinding.root }
+            okButton {
+                lifecycleScope.launch {
+                    val start = alertBinding.editStart.text?.toString()?.toIntOrNull()
+                        ?.coerceAtLeast(1) ?: 1
+                    val end = alertBinding.editEnd.text?.toString()?.toIntOrNull()
+                        ?.coerceAtLeast(start) ?: total.coerceAtLeast(start)
+                    val chapters = withContext(IO) {
+                        appDb.bookChapterDao.getChapterList(book.bookUrl, start - 1, end - 1)
+                    }
+                    if (chapters.isEmpty()) {
+                        toastOnUi(R.string.chapter_list_empty)
+                        return@launch
+                    }
+                    kotlin.runCatching {
+                        book.removeType(BookType.text, BookType.audio, BookType.image)
+                        book.addType(BookType.video)
+                        cacheViewModel.cacheMediaChapters(book, chapters)
+                    }.onSuccess { count ->
+                        if (count > 0) {
+                            toastOnUi(getString(R.string.cache_manage_audio_cache_started, count))
+                        } else {
+                            toastOnUi(R.string.cache_manage_batch_empty)
+                        }
+                    }.onFailure {
+                        toastOnUi(getString(R.string.cache_manage_cache_failed, it.localizedMessage))
+                    }
+                }
+            }
+            cancelButton()
+        }
+    }
+
+    private fun observeVideoCacheTasks() {
+        lifecycleScope.launch {
+            AudioCacheTaskManager.states.collectLatest { states ->
+                val bookUrl = VideoPlay.book?.bookUrl ?: return@collectLatest
+                val state = states[bookUrl] ?: return@collectLatest
+                if (!state.active && state.status.isTerminalForVideoCacheRefresh()) {
+                    refreshVideoCacheState(bookUrl)
+                }
+            }
+        }
+    }
+
+    private suspend fun refreshVideoCacheState(bookUrl: String) {
+        val chapters = withContext(IO) {
+            appDb.bookChapterDao.getChapterList(bookUrl)
+        }
+        if (chapters.isEmpty()) return
+        VideoPlay.toc = chapters
+        VideoPlay.volumes.clear()
+        chapters.forEach { chapter ->
+            if (chapter.isVolume) {
+                VideoPlay.volumes.add(chapter)
+            }
+        }
+        VideoPlay.upEpisodes()
+        (binding.chapters.adapter as? ChapterAdapter)?.updateData(VideoPlay.episodes)
+        (binding.volumes.adapter as? ChapterAdapter)?.updateData(VideoPlay.volumes)
     }
 
     private fun startFloatingWindow() {
@@ -948,4 +1042,11 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         pooledWebView?.let { WebViewPool.release(it) }
         pooledWebView = null
     }
+}
+
+private fun CacheTaskStatus.isTerminalForVideoCacheRefresh(): Boolean {
+    return this == CacheTaskStatus.COMPLETED ||
+        this == CacheTaskStatus.PAUSED ||
+        this == CacheTaskStatus.CANCELLED ||
+        this == CacheTaskStatus.FAILED
 }
