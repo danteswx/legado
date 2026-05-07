@@ -7,7 +7,6 @@ import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
-import android.view.WindowInsets
 import android.view.WindowManager
 import androidx.activity.viewModels
 import androidx.core.view.WindowInsetsCompat
@@ -44,7 +43,9 @@ import io.legado.app.utils.gone
 import io.legado.app.utils.isTv
 import io.legado.app.utils.setLightStatusBar
 import io.legado.app.utils.setNavigationBarColorAuto
+import io.legado.app.utils.setNavigationBarHiddenCompat
 import io.legado.app.utils.setOnApplyWindowInsetsListenerCompat
+import io.legado.app.utils.setStatusBarHiddenCompat
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import java.time.LocalDate
@@ -165,20 +166,8 @@ abstract class BaseReadBookActivity :
         toolBarHide: Boolean = true,
         useBgMeanColor: Boolean = false
     ) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.insetsController?.run {
-                if (toolBarHide && ReadBookConfig.hideNavigationBar) {
-                    hide(WindowInsets.Type.navigationBars())
-                } else {
-                    show(WindowInsets.Type.navigationBars())
-                }
-                if (toolBarHide && ReadBookConfig.hideStatusBar) {
-                    hide(WindowInsets.Type.statusBars())
-                } else {
-                    show(WindowInsets.Type.statusBars())
-                }
-            }
-        }
+        setNavigationBarHiddenCompat(toolBarHide && ReadBookConfig.hideNavigationBar)
+        setStatusBarHiddenCompat(toolBarHide && ReadBookConfig.hideStatusBar)
         upSystemUiVisibilityO(isInMultiWindow, toolBarHide)
         if (toolBarHide) {
             setLightStatusBar(ReadBookConfig.durConfig.curStatusIconDark())
