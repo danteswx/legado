@@ -19,20 +19,33 @@ object PreferenceItemStyle {
         val hasNext = hasVisibleSibling(parent, preference, forward = true)
         holder.isDividerAllowedAbove = false
         holder.isDividerAllowedBelow = false
-        holder.itemView.background = PreferenceGroupBackgroundDrawable(
-            normalColor = UiCorner.surfaceColor(
-                ContextCompat.getColor(preference.context, R.color.background_card)
-            ),
-            pressedColor = UiCorner.surfaceColor(
-                ContextCompat.getColor(preference.context, R.color.btn_bg_press),
-                pressed = true
-            ),
-            dividerColor = ContextCompat.getColor(preference.context, R.color.bg_divider_line),
-            radius = UiCorner.panelRadius(preference.context),
-            hasPrev = hasPrev,
-            hasNext = hasNext,
-            dividerInset = holder.itemView.dp(16).toFloat()
+        val itemColor = UiCorner.surfaceColor(
+            ContextCompat.getColor(preference.context, R.color.background_card)
         )
+        val dividerColor = ContextCompat.getColor(preference.context, R.color.bg_divider_line)
+        val radius = UiCorner.panelRadius(preference.context)
+        val dividerInset = holder.itemView.dp(16).toFloat()
+        val current = holder.itemView.background as? PreferenceGroupBackgroundDrawable
+        if (current == null || !current.hasSameConfig(
+                normalColor = itemColor,
+                pressedColor = itemColor,
+                dividerColor = dividerColor,
+                radius = radius,
+                hasPrev = hasPrev,
+                hasNext = hasNext,
+                dividerInset = dividerInset
+            )
+        ) {
+            holder.itemView.background = PreferenceGroupBackgroundDrawable(
+                normalColor = itemColor,
+                pressedColor = itemColor,
+                dividerColor = dividerColor,
+                radius = radius,
+                hasPrev = hasPrev,
+                hasNext = hasNext,
+                dividerInset = dividerInset
+            )
+        }
         holder.itemView.updateGroupMargins(!hasPrev, !hasNext, parent)
     }
 

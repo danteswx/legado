@@ -19,6 +19,7 @@ import androidx.recyclerview.widget.SimpleItemAnimator
 import io.legado.app.R
 import io.legado.app.base.BaseActivity
 import io.legado.app.constant.EventBus
+import io.legado.app.constant.PreferKey
 import io.legado.app.databinding.ActivityThemeManageBinding
 import io.legado.app.databinding.ItemThemePackageBinding
 import io.legado.app.help.config.AppConfig
@@ -30,11 +31,14 @@ import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.lib.theme.secondaryTextColor
 import io.legado.app.ui.file.HandleFileContract
+import io.legado.app.ui.image.ImageCropContract
 import io.legado.app.ui.widget.number.NumberPickerDialog
+import io.legado.app.utils.ImageCropHelper
 import io.legado.app.utils.externalFiles
 import io.legado.app.utils.getFile
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.postEvent
+import io.legado.app.utils.putPrefBoolean
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers
@@ -56,6 +60,7 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
     private var editingDialog: LinearLayout? = null
     private var pendingConfig: NavigationBarIconConfig.Config? = null
     private var pendingIconRequest: IconRequest? = null
+    private var pendingSidebarBackgroundEntry: NavigationBarIconConfig.Entry? = null
     private val dateFormat by lazy { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
 
     private val selectIcon = registerForActivityResult(HandleFileContract()) { result ->
@@ -93,6 +98,56 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
     private val exportPackage = registerForActivityResult(HandleFileContract()) {
         it.uri?.let {
             toastOnUi(R.string.export_success)
+        }
+    }
+
+    private val selectSidebarBackground = registerForActivityResult(HandleFileContract()) { result ->
+        val entry = pendingSidebarBackgroundEntry ?: return@registerForActivityResult
+        val uri = result.uri ?: return@registerForActivityResult
+        val metrics = resources.displayMetrics
+        val request = ImageCropHelper.buildRequest(
+            context = this,
+            sourceUri = uri,
+            requestCode = requestSidebarBackground,
+            aspectWidth = minOf(metrics.widthPixels, metrics.heightPixels),
+            aspectHeight = maxOf(metrics.widthPixels, metrics.heightPixels),
+            dirName = "navigationBarSidebarBackground",
+            prefix = "sidebar_bg",
+            targetWidth = 1440
+        )
+        pendingSidebarBackgroundEntry = entry
+        cropSidebarBackground.launch(request.params)
+    }
+
+    private val cropSidebarBackground = registerForActivityResult(ImageCropContract()) { result ->
+        val entry = pendingSidebarBackgroundEntry ?: return@registerForActivityResult
+        pendingSidebarBackgroundEntry = null
+        if (result == null) {
+            return@registerForActivityResult
+        }
+        if (!File(result).exists()) {
+            toastOnUi(getString(R.string.image_crop_failed, getString(R.string.unknown)))
+            return@registerForActivityResult
+        }
+        lifecycleScope.launch {
+            kotlin.runCatching {
+                withContext(Dispatchers.IO) {
+                    NavigationBarIconConfig.saveSidebarBackgroundToPackage(
+                        this@NavigationBarManageActivity,
+                        result,
+                        entry
+                    )
+                }
+            }.onSuccess {
+                editingEntry = it
+                pendingConfig = it.config.copy(icons = it.config.icons.toMutableMap())
+                notifyAppliedIfNeeded(it)
+                refreshEditDialog()
+                loadPackages()
+                toastOnUi(R.string.success)
+            }.onFailure {
+                toastOnUi(it.localizedMessage ?: getString(R.string.navigation_icon_decode_failed))
+            }
         }
     }
 
@@ -205,6 +260,8 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
             NavigationBarIconConfig.Config(
                 name = nextPackageName(),
                 isNightMode = isNightMode,
+                layoutMode = AppConfig.bottomBarLayoutMode,
+                sidebarGravity = AppConfig.bottomBarSidebarGravity,
                 effectMode = AppConfig.bottomBarEffectMode,
                 opacity = if (AppConfig.bottomBarEffectMode == "frosted") AppConfig.frostedGlassLevel else AppConfig.liquidGlassLevel
             ),
@@ -235,6 +292,7 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
 
     private fun buildEditView(): LinearLayout {
         val config = pendingConfig!!
+        val currentEntry = editingEntry
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(2, 2, 2, 4)
@@ -252,41 +310,98 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
                 layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 44.dp)
             }
             addView(name)
-            addView(optionRow(getString(R.string.bottom_bar_effect_mode), effectModeLabel(config.effectMode)) {
+            addView(optionRow(getString(R.string.bottom_bar_layout_mode), layoutModeLabel(config.layoutMode)) {
                 selector(
-                    getString(R.string.bottom_bar_effect_mode),
+                    getString(R.string.bottom_bar_layout_mode),
                     listOf(
-                        getString(R.string.bottom_bar_effect_solid),
-                        getString(R.string.bottom_bar_effect_glass),
-                        getString(R.string.bottom_bar_effect_frosted)
+                        getString(R.string.bottom_bar_layout_floating),
+                        getString(R.string.bottom_bar_layout_sidebar)
                     )
                 ) { _, index ->
-                    config.effectMode = when (index) {
-                        0 -> "solid"
-                        2 -> "frosted"
-                        else -> "glass"
-                    }
+                    config.layoutMode = if (index == 1) "sidebar" else "floating"
                     refreshEditDialog()
                 }
             })
-            addView(optionRow(getString(R.string.bottom_bar_opacity), "${config.opacity}%") {
-                NumberPickerDialog(this@NavigationBarManageActivity)
-                    .setTitle(getString(R.string.bottom_bar_opacity))
-                    .setMinValue(0)
-                    .setMaxValue(100)
-                    .setValue(config.opacity)
-                    .setCustomButton(R.string.btn_default_s) {
-                        config.opacity = 76
+            if (config.layoutMode != "sidebar") {
+                addView(optionRow(
+                    getString(R.string.merge_discovery_rss),
+                    getString(if (AppConfig.mergeDiscoveryRss) R.string.enabled else R.string.disabled)
+                ) {
+                    putPrefBoolean(PreferKey.mergeDiscoveryRss, !AppConfig.mergeDiscoveryRss)
+                    postEvent(EventBus.NOTIFY_MAIN, false)
+                    refreshEditDialog()
+                })
+                addView(optionRow(getString(R.string.bottom_bar_effect_mode), effectModeLabel(config.effectMode)) {
+                    selector(
+                        getString(R.string.bottom_bar_effect_mode),
+                        listOf(
+                            getString(R.string.bottom_bar_effect_solid),
+                            getString(R.string.bottom_bar_effect_glass),
+                            getString(R.string.bottom_bar_effect_frosted)
+                        )
+                    ) { _, index ->
+                        config.effectMode = when (index) {
+                            0 -> "solid"
+                            2 -> "frosted"
+                            else -> "glass"
+                        }
                         refreshEditDialog()
                     }
-                    .show {
-                        config.opacity = it.coerceIn(0, 100)
-                        refreshEditDialog()
+                })
+                addView(optionRow(getString(R.string.bottom_bar_opacity), "${config.opacity}%") {
+                    NumberPickerDialog(this@NavigationBarManageActivity)
+                        .setTitle(getString(R.string.bottom_bar_opacity))
+                        .setMinValue(0)
+                        .setMaxValue(100)
+                        .setValue(config.opacity)
+                        .setCustomButton(R.string.btn_default_s) {
+                            config.opacity = 76
+                            refreshEditDialog()
+                        }
+                        .show {
+                            config.opacity = it.coerceIn(0, 100)
+                            refreshEditDialog()
+                        }
+                })
+            } else {
+                addView(optionRow(
+                    getString(R.string.navigation_bar_sidebar_background),
+                    if (config.sidebarBackgroundPath.isNullOrBlank()) {
+                        getString(R.string.select_image)
+                    } else {
+                        getString(R.string.theme_image_selected)
                     }
-            })
-            NavigationBarIconConfig.items.forEach { item ->
-                addView(iconRow(item))
+                ) {
+                    selector(
+                        getString(R.string.navigation_bar_sidebar_background),
+                        buildList {
+                            add(getString(R.string.select_image))
+                            if (!config.sidebarBackgroundPath.isNullOrBlank()) {
+                                add(getString(R.string.delete))
+                            }
+                        }
+                    ) { _, index ->
+                        if (index == 0) {
+                            pendingSidebarBackgroundEntry = currentEntry
+                            selectSidebarBackground.launch {
+                                mode = HandleFileContract.IMAGE
+                                title = getString(R.string.navigation_bar_sidebar_background)
+                            }
+                        } else if (currentEntry != null) {
+                            editingEntry = NavigationBarIconConfig.clearSidebarBackground(currentEntry)
+                            pendingConfig = editingEntry!!.config.copy(icons = editingEntry!!.config.icons.toMutableMap())
+                            notifyAppliedIfNeeded(editingEntry!!)
+                            refreshEditDialog()
+                            loadPackages()
+                        }
+                    }
+                })
             }
+            NavigationBarIconConfig.items
+                .filter { config.layoutMode == "sidebar" || it.key != "ai" }
+                .forEach { item ->
+                    addView(iconRow(item))
+                }
         }
     }
 
@@ -529,6 +644,13 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
         }
     }
 
+    private fun layoutModeLabel(value: String): String {
+        return when (value) {
+            "sidebar" -> getString(R.string.bottom_bar_layout_sidebar)
+            else -> getString(R.string.bottom_bar_layout_floating)
+        }
+    }
+
     private fun nextPackageName(): String {
         val base = getString(R.string.navigation_bar_custom_name)
         val usedNames = adapter.items.map { it.config.name }.toSet()
@@ -546,6 +668,10 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
         val item: NavigationBarIconConfig.NavItem,
         val selected: Boolean
     )
+
+    private companion object {
+        const val requestSidebarBackground = 7001
+    }
 
     private enum class NavAction(val titleRes: Int) {
         APPLY(R.string.theme_apply),

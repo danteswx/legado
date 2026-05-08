@@ -150,7 +150,7 @@
 
     </FrameLayout>
 
-    <androidx.viewpager.widget.ViewPager
+    <io.legado.app.ui.widget.LockableViewPager
         android:id="@+id/view_pager_bookshelf"
         android:layout_width="0dp"
         android:layout_height="0dp"

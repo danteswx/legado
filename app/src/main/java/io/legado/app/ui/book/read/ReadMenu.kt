@@ -155,24 +155,23 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     private fun createPanelDrawable(
-        radiusDp: Float,
+        radiusPx: Float,
         color: Int,
         strokeColor: Int,
         topOnly: Boolean = false
     ) = GradientDrawable().apply {
-        val radius = UiCorner.scaledDp(radiusDp)
         if (topOnly) {
             cornerRadii = floatArrayOf(
-                radius, radius,
-                radius, radius,
+                radiusPx, radiusPx,
+                radiusPx, radiusPx,
                 0f, 0f,
                 0f, 0f
             )
         } else {
-            cornerRadius = radius
+            cornerRadius = radiusPx
         }
-        setColor(UiCorner.surfaceColor(color))
-        setStroke(1.dpToPx(), if (UiCorner.effectMode() == "solid") strokeColor else UiCorner.effectStrokeColor(color))
+        setColor(color)
+        setStroke(1.dpToPx(), strokeColor)
     }
 
     private fun createFillDrawable(color: Int) = GradientDrawable().apply {
@@ -196,7 +195,7 @@ class ReadMenu @JvmOverloads constructor(
         tvChapterUrl.setTextColor(
             ColorUtils.withAlpha(primaryTextColor, 0.72f)
         )
-        val menuOpacity = 1f
+        val menuOpacity = (AppConfig.readMenuAlpha / 100f).coerceIn(0.35f, 1f)
         val isBgLight = ColorUtils.isColorLight(bgColor)
         val headerBaseColor = ColorUtils.blendColors(
             palette.surface,
@@ -213,9 +212,9 @@ class ReadMenu @JvmOverloads constructor(
             palette.primaryColor,
             if (isBgLight) 0.18f else 0.28f
         )
-        val sheetColor = ColorUtils.withAlpha(sheetBaseColor, menuOpacity.coerceAtLeast(0.92f))
-        val headerColor = ColorUtils.withAlpha(headerBaseColor, menuOpacity.coerceAtLeast(0.9f))
-        val actionColor = ColorUtils.withAlpha(actionBaseColor, menuOpacity.coerceAtLeast(0.96f))
+        val sheetColor = ColorUtils.withAlpha(sheetBaseColor, menuOpacity)
+        val headerColor = ColorUtils.withAlpha(headerBaseColor, menuOpacity)
+        val actionColor = ColorUtils.withAlpha(actionBaseColor, menuOpacity)
         val panelStrokeColor = palette.stroke
         vwMenuBg.setBackgroundColor(0x00000000)
         if (AppConfig.isEInkMode) {
@@ -232,15 +231,21 @@ class ReadMenu @JvmOverloads constructor(
             titleBarAddition.background = null
             llTitleInfo.background = null
             bottomMenu.background = null
-            llBottomBg.background = createPanelDrawable(28F, sheetColor, panelStrokeColor, topOnly = true)
+            llBottomBg.background = createPanelDrawable(
+                UiCorner.panelRadius(context),
+                sheetColor,
+                panelStrokeColor,
+                topOnly = true
+            )
             quickActionBarContainer.background = null
             llFloatingButton.background = null
             llBrightness.background = null
             llChapterPanel.background = null
             llActionPanel.background = null
-            tvSourceAction.background = createPanelDrawable(12F, actionColor, panelStrokeColor)
-            tvPre.background = createPanelDrawable(12F, actionColor, panelStrokeColor)
-            tvNext.background = createPanelDrawable(12F, actionColor, panelStrokeColor)
+            val actionRadius = UiCorner.actionRadius(context)
+            tvSourceAction.background = createPanelDrawable(actionRadius, actionColor, panelStrokeColor)
+            tvPre.background = createPanelDrawable(actionRadius, actionColor, panelStrokeColor)
+            tvNext.background = createPanelDrawable(actionRadius, actionColor, panelStrokeColor)
         }
         tvSourceAction.setTextColor(primaryTextColor)
         fabSearch.backgroundTintList = null

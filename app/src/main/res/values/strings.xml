@@ -599,6 +599,8 @@
     <string name="my">Me</string>
     <string name="ai">AI</string>
     <string name="ai_assistant">AI 助手</string>
+    <string name="side_nav_assistant">Assistant</string>
+    <string name="side_nav_stats">Stats</string>
     <string name="ai_setting">AI 设置</string>
     <string name="ai_setting_summary">分开配置提供商和模型</string>
     <string name="ai_enable">Enable AI</string>
@@ -1693,6 +1695,9 @@
     <string name="bottom_bar_effect_solid">Solid</string>
     <string name="bottom_bar_effect_glass">Glass</string>
     <string name="bottom_bar_effect_frosted">Frosted glass</string>
+    <string name="bottom_bar_layout_mode">Bottom bar layout</string>
+    <string name="bottom_bar_layout_floating">Floating bottom bar</string>
+    <string name="bottom_bar_layout_sidebar">Sidebar</string>
     <string name="bottom_bar_opacity">Opacity</string>
     <string name="theme_day">Day theme</string>
     <string name="theme_night">Night theme</string>
@@ -1829,18 +1834,20 @@
     <string name="theme_color_accent">Accent color</string>
     <string name="theme_color_background">Background color</string>
     <string name="theme_color_bottom_background">Bottom bar color</string>
-    <string name="theme_color_primary_text">Primary text color</string>
-    <string name="theme_color_secondary_text">Secondary text color</string>
     <string name="theme_image_main_background">Main background</string>
     <string name="theme_image_book_info_background">Book detail background</string>
     <string name="theme_image_blur">Background image blur</string>
     <string name="theme_image_select">Select image</string>
-    <string name="theme_image_online">Online image link</string>
-    <string name="theme_image_online_invalid">Please enter an image URL starting with http:// or https://</string>
     <string name="theme_image_delete">Delete image</string>
     <string name="theme_image_value_unselected">Not selected</string>
     <string name="theme_image_value_unselected_blur">Not selected · blur %d</string>
     <string name="theme_image_value_file_blur">%1$s · blur %2$d</string>
+    <string name="image_crop_title">Crop image</string>
+    <string name="image_crop_failed">Image crop failed: %1$s</string>
+    <string name="image_crop_hint">Move or pinch the image, then confirm</string>
+    <string name="theme_image_selected">Selected</string>
+    <string name="navigation_bar_sidebar_background">Sidebar wallpaper</string>
+    <string name="color_format_error">Invalid color format</string>
     <string name="unknown">Unknown</string>
     <string name="ai_read_prompt_template">You are the Ask AI assistant inside the reading page. Answer around the current book and selected text. Prioritize explaining the original text, context, character relationships, foreshadowing, or the user question. Do not invent plot details not provided.
 

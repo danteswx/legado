@@ -27,16 +27,4 @@
         android:title="@string/modern_rss_page"
         android:visible="false" />
 
-    <io.legado.app.lib.prefs.SwitchPreference
-        android:defaultValue="false"
-        android:key="mergeDiscoveryRss"
-        android:summary="@string/merge_discovery_rss_summary"
-        android:title="@string/merge_discovery_rss"
-        app:iconSpaceReserved="false" />
-
-    <Preference
-        android:key="search_jump_mergeDiscoveryRss"
-        android:title="@string/merge_discovery_rss"
-        android:visible="false" />
-
 </androidx.preference.PreferenceScreen>
