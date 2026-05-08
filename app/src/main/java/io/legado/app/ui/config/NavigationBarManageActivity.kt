@@ -319,18 +319,22 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
                     )
                 ) { _, index ->
                     config.layoutMode = if (index == 1) "sidebar" else "floating"
+                    if (config.layoutMode == "sidebar" && AppConfig.mergeDiscoveryRss) {
+                        putPrefBoolean(PreferKey.mergeDiscoveryRss, false)
+                        postEvent(EventBus.NOTIFY_MAIN, false)
+                    }
                     refreshEditDialog()
                 }
             })
-            addView(optionRow(
-                getString(R.string.merge_discovery_rss),
-                getString(if (AppConfig.mergeDiscoveryRss) R.string.enabled else R.string.disabled)
-            ) {
-                putPrefBoolean(PreferKey.mergeDiscoveryRss, !AppConfig.mergeDiscoveryRss)
-                postEvent(EventBus.NOTIFY_MAIN, false)
-                refreshEditDialog()
-            })
             if (config.layoutMode != "sidebar") {
+                addView(optionRow(
+                    getString(R.string.merge_discovery_rss),
+                    getString(if (AppConfig.mergeDiscoveryRss) R.string.enabled else R.string.disabled)
+                ) {
+                    putPrefBoolean(PreferKey.mergeDiscoveryRss, !AppConfig.mergeDiscoveryRss)
+                    postEvent(EventBus.NOTIFY_MAIN, false)
+                    refreshEditDialog()
+                })
                 addView(optionRow(getString(R.string.bottom_bar_effect_mode), effectModeLabel(config.effectMode)) {
                     selector(
                         getString(R.string.bottom_bar_effect_mode),
@@ -397,9 +401,11 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
                     }
                 })
             }
-            NavigationBarIconConfig.items.forEach { item ->
-                addView(iconRow(item))
-            }
+            NavigationBarIconConfig.items
+                .filter { config.layoutMode == "sidebar" || it.key != "ai" }
+                .forEach { item ->
+                    addView(iconRow(item))
+                }
         }
     }
 

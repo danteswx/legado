@@ -19,6 +19,7 @@ import androidx.annotation.StringRes
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.DrawableCompat
 import io.legado.app.R
+import io.legado.app.constant.PreferKey
 import io.legado.app.help.AppWebDav
 import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.lib.theme.bottomBackground
@@ -110,9 +111,9 @@ object NavigationBarIconConfig {
         NavItem("bookshelf", R.string.bookshelf, R.id.menu_bookshelf, R.drawable.ic_bottom_books),
         NavItem("discovery", R.string.discovery, R.id.menu_discovery, R.drawable.ic_bottom_explore),
         NavItem("rss", R.string.rss, R.id.menu_rss, R.drawable.ic_bottom_rss_feed),
-        NavItem("readRecord", R.string.read_record, R.id.menu_read_record, R.drawable.ic_bottom_read_record),
+        NavItem("readRecord", R.string.side_nav_stats, R.id.menu_read_record, R.drawable.ic_bottom_read_record),
         NavItem("my", R.string.my, R.id.menu_my_config, R.drawable.ic_bottom_person),
-        NavItem("ai", R.string.ai_assistant, R.id.menu_ai, R.drawable.ic_bottom_ai_assistant)
+        NavItem("ai", R.string.side_nav_assistant, R.id.menu_ai, R.drawable.ic_bottom_ai_assistant)
     )
 
     fun activeDirName(isNight: Boolean): String {
@@ -168,6 +169,9 @@ object NavigationBarIconConfig {
         AppConfig.bottomBarEffectMode = config.effectMode
         AppConfig.liquidGlassLevel = config.opacity
         AppConfig.frostedGlassLevel = config.opacity
+        if (config.layoutMode == "sidebar") {
+            appCtx.putPrefBoolean(PreferKey.mergeDiscoveryRss, false)
+        }
     }
 
     fun applyCurrentBottomConfig(isNight: Boolean) {
@@ -177,6 +181,9 @@ object NavigationBarIconConfig {
         AppConfig.bottomBarEffectMode = config.effectMode
         AppConfig.liquidGlassLevel = config.opacity
         AppConfig.frostedGlassLevel = config.opacity
+        if (config.layoutMode == "sidebar") {
+            appCtx.putPrefBoolean(PreferKey.mergeDiscoveryRss, false)
+        }
     }
 
     fun addOrUpdate(config: Config, oldEntry: Entry? = null): Entry {

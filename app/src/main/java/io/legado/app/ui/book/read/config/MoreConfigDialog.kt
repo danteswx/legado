@@ -64,6 +64,7 @@ class MoreConfigDialog : BasePrefDialogFragment() {
             background = ReaderSheetStyle.topSheetDrawable(ReaderSheetStyle.resolve(requireContext()))
             clipChildren = true
             clipToPadding = true
+            clipToOutline = true
             id = R.id.tag1
         }
     }

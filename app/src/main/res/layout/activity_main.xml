@@ -205,9 +205,10 @@
                     android:background="@drawable/bg_main_search_button"
                     app:cardCornerRadius="@dimen/main_sidebar_goal_avatar_radius"
                     app:cardElevation="0dp"
+                    app:cardPreventCornerOverlap="false"
                     app:cardUseCompatPadding="false">
 
-                    <io.legado.app.ui.widget.image.CoverImageView
+                    <androidx.appcompat.widget.AppCompatImageView
                         android:id="@+id/side_goal_avatar"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"

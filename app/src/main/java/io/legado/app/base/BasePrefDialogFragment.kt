@@ -1,12 +1,15 @@
 package io.legado.app.base
 
+import android.os.Bundle
 import android.view.Gravity
+import android.view.View
 import android.view.WindowManager
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import io.legado.app.R
 import io.legado.app.help.config.AppConfig
+import io.legado.app.lib.theme.dialogSurfaceBackground
 import io.legado.app.utils.dpToPx
 
 
@@ -39,6 +42,16 @@ abstract class BasePrefDialogFragment(
                     }
                 }
             })
+        } else {
+            dialog?.window?.setBackgroundDrawableResource(R.color.transparent)
+        }
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        view.clipToOutline = true
+        if (!AppConfig.isEInkMode && view.background == null) {
+            view.background = requireContext().dialogSurfaceBackground
         }
     }
 }
