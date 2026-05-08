@@ -1851,4 +1851,26 @@ Current chapter: %4$s (chapter %5$d)
 
 Selected text or question:
 %6$s</string>
+    <string name="read_menu_theme_title">Theme</string>
+    <string name="read_menu_theme_preset">Preset theme</string>
+    <string name="read_menu_theme_custom">Custom theme</string>
+    <string name="read_menu_theme_eye_mode">Eye-care mode</string>
+    <string name="read_menu_theme_follow_system">Follow system</string>
+    <string name="read_menu_theme_paper">Paper</string>
+    <string name="read_menu_theme_eye_green">Eye-care green</string>
+    <string name="read_menu_theme_quiet_blue">Quiet blue</string>
+    <string name="read_menu_theme_night">Night</string>
+    <string name="read_menu_contrast">Contrast</string>
+    <string name="read_menu_texture_strength">Texture strength</string>
+    <string name="read_menu_texture_none">None</string>
+    <string name="read_menu_texture_weak">Weak</string>
+    <string name="read_menu_texture_medium">Medium</string>
+    <string name="read_menu_texture_strong">Strong</string>
+    <string name="read_menu_layout_spacing">Spacing</string>
+    <string name="read_menu_layout_style">Style</string>
+    <string name="read_menu_text_spacing">Text spacing</string>
+    <string name="read_menu_page_margin">Page margin</string>
+    <string name="read_menu_region_spacing">Interface spacing</string>
+    <string name="read_menu_header_spacing">Header margin</string>
+    <string name="read_menu_footer_spacing">Footer margin</string>
 </resources>

@@ -1743,4 +1743,26 @@
 
 用户选中或追问：
 %6$s</string>
+    <string name="read_menu_theme_title">主题</string>
+    <string name="read_menu_theme_preset">预设主题</string>
+    <string name="read_menu_theme_custom">自定义主题</string>
+    <string name="read_menu_theme_eye_mode">护眼模式</string>
+    <string name="read_menu_theme_follow_system">跟随系统</string>
+    <string name="read_menu_theme_paper">纸张</string>
+    <string name="read_menu_theme_eye_green">护眼绿</string>
+    <string name="read_menu_theme_quiet_blue">静谧蓝</string>
+    <string name="read_menu_theme_night">夜间</string>
+    <string name="read_menu_contrast">对比度</string>
+    <string name="read_menu_texture_strength">纹理强度</string>
+    <string name="read_menu_texture_none">无</string>
+    <string name="read_menu_texture_weak">弱</string>
+    <string name="read_menu_texture_medium">中</string>
+    <string name="read_menu_texture_strong">强</string>
+    <string name="read_menu_layout_spacing">间距</string>
+    <string name="read_menu_layout_style">版式</string>
+    <string name="read_menu_text_spacing">文字间距</string>
+    <string name="read_menu_page_margin">页面边距</string>
+    <string name="read_menu_region_spacing">界面区域间距</string>
+    <string name="read_menu_header_spacing">顶栏边距</string>
+    <string name="read_menu_footer_spacing">底栏边距</string>
 </resources>

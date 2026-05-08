@@ -1,4 +1,4 @@
-package io.legado.app.ui.book.read
+﻿package io.legado.app.ui.book.read
 
 import android.annotation.SuppressLint
 import android.content.Intent
@@ -81,7 +81,6 @@ import io.legado.app.ui.book.read.config.BgTextConfigDialog.Companion.TEXT_ACCEN
 import io.legado.app.ui.book.read.config.BgTextConfigDialog.Companion.TEXT_COLOR
 import io.legado.app.ui.book.read.config.MoreConfigDialog
 import io.legado.app.ui.book.read.config.ReadAloudDialog
-import io.legado.app.ui.book.read.config.ReadStyleDialog
 import io.legado.app.ui.book.read.config.TipConfigDialog.Companion.TIP_COLOR
 import io.legado.app.ui.book.read.config.TipConfigDialog.Companion.TIP_DIVIDER_COLOR
 import io.legado.app.ui.book.read.page.ContentTextView
@@ -95,6 +94,7 @@ import io.legado.app.ui.book.searchContent.SearchContentActivity
 import io.legado.app.ui.book.searchContent.SearchResult
 import io.legado.app.model.SourceCallBack
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
+import io.legado.app.ui.font.FontSelectDialog
 import io.legado.app.ui.book.toc.TocActivityResult
 import io.legado.app.ui.book.toc.rule.TxtTocRuleDialog
 import io.legado.app.ui.browser.WebViewActivity
@@ -147,7 +147,7 @@ import io.legado.app.model.analyzeRule.AnalyzeUrl.Companion.paramPattern
 import io.legado.app.ui.login.SourceLoginJsExtensions
 
 /**
- * 阅读界面
+ * 闃呰鐣岄潰
  */
 class ReadBookActivity : BaseReadBookActivity(),
     View.OnTouchListener,
@@ -158,6 +158,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     ReadMenu.CallBack,
     SearchMenu.CallBack,
     ReadAloudDialog.CallBack,
+    FontSelectDialog.CallBack,
     ChangeBookSourceDialog.CallBack,
     ChangeChapterSourceDialog.CallBack,
     ReadBook.CallBack,
@@ -200,7 +201,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                 viewModel.searchResultIndex = index
                 binding.searchMenu.updateSearchResultIndex(index)
                 binding.searchMenu.selectedSearchResult?.let { currentResult ->
-                    ReadBook.saveCurrentBookProgress() //退出全文搜索恢复此时进度
+                    ReadBook.saveCurrentBookProgress() //閫€鍑哄叏鏂囨悳绱㈡仮澶嶆鏃惰繘搴?
                     skipToSearch(currentResult)
                     showActionMenu()
                 }
@@ -261,7 +262,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
     }
 
-    //恢复跳转前进度对话框的交互结果
+    //鎭㈠璺宠浆鍓嶈繘搴﹀璇濇鐨勪氦浜掔粨鏋?
     private var confirmRestoreProcess: Boolean? = null
     private val networkChangedListener by lazy {
         NetworkChangedListener(this)
@@ -290,7 +291,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                 restoreLastBookProcess()
                 return@addCallback
             }
-            //拦截返回供恢复阅读进度
+            //鎷︽埅杩斿洖渚涙仮澶嶉槄璇昏繘搴?
             if (ReadBook.lastBookProgress != null && confirmRestoreProcess != false) {
                 restoreLastBookProcess()
                 return@addCallback
@@ -358,7 +359,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             viewModel.initData(intent)
             justInitData = true
         } else {
-            //web端阅读时，app处于阅读界面，本地记录会覆盖web保存的进度，在此处恢复
+            //web绔槄璇绘椂锛宎pp澶勪簬闃呰鐣岄潰锛屾湰鍦拌褰曚細瑕嗙洊web淇濆瓨鐨勮繘搴︼紝鍦ㄦ澶勬仮澶?
             ReadBook.webBookProgress?.let {
                 ReadBook.setProgress(it)
                 ReadBook.webBookProgress = null
@@ -368,10 +369,10 @@ class ReadBookActivity : BaseReadBookActivity(),
         registerReceiver(timeBatteryReceiver, timeBatteryReceiver.filter)
         binding.readView.upTime()
         screenOffTimerStart()
-        // 网络监听，当从无网切换到网络环境时同步进度（注意注册的同时就会收到监听，因此界面激活时无需重复执行同步操作）
+        // 缃戠粶鐩戝惉锛屽綋浠庢棤缃戝垏鎹㈠埌缃戠粶鐜鏃跺悓姝ヨ繘搴︼紙娉ㄦ剰娉ㄥ唽鐨勫悓鏃跺氨浼氭敹鍒扮洃鍚紝鍥犳鐣岄潰婵€娲绘椂鏃犻渶閲嶅鎵ц鍚屾鎿嶄綔锛?
         networkChangedListener.register()
         networkChangedListener.onNetworkChanged = {
-            // 当网络是可用状态且无需初始化时同步进度（初始化中已有同步进度逻辑）
+            // 褰撶綉缁滄槸鍙敤鐘舵€佷笖鏃犻渶鍒濆鍖栨椂鍚屾杩涘害锛堝垵濮嬪寲涓凡鏈夊悓姝ヨ繘搴﹂€昏緫锛?
             if (AppConfig.syncBookProgressPlus && NetworkUtils.isAvailable() && !justInitData && ReadBook.inBookshelf) {
                 ReadBook.syncProgress({ progress -> sureNewProgress(progress) })
             }
@@ -435,7 +436,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 更新菜单
+     * 鏇存柊鑿滃崟
      */
     private fun upMenu() {
         val menu = menu ?: return
@@ -472,7 +473,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 菜单
+     * 鑿滃崟
      */
     override fun onCompatOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
@@ -606,7 +607,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                     val imageStyle = imgStyles[index]
                     ReadBook.book?.setImageStyle(imageStyle)
                     if (imageStyle == Book.imgStyleSingle) {
-                        ReadBook.book?.setPageAnim(0)  // 切换图片样式single后，自动切换为覆盖
+                        ReadBook.book?.setPageAnim(0)  // 鍒囨崲鍥剧墖鏍峰紡single鍚庯紝鑷姩鍒囨崲涓鸿鐩?
                         binding.readView.upPageAnim()
                     }
                     ReadBook.loadContent(false)
@@ -632,7 +633,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                         && !BookHelp.getChapterCacheFileNames(it, textChapter.chapter, "nr")
                             .any(contentProcessor.removeSameTitleCache::contains)
                     ) {
-                        toastOnUi("未找到可移除的重复标题")
+                        toastOnUi("鏈壘鍒板彲绉婚櫎鐨勯噸澶嶆爣棰?)
                     }
                 }
                 viewModel.reverseRemoveSameTitle()
@@ -656,7 +657,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 按键拦截,显示菜单
+     * 鎸夐敭鎷︽埅,鏄剧ず鑿滃崟
      */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val keyCode = event.keyCode
@@ -677,17 +678,17 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 鼠标滚轮事件
+     * 榧犳爣婊氳疆浜嬩欢
      */
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {
         if (0 != (event.source and InputDevice.SOURCE_CLASS_POINTER)) {
             if (event.action == MotionEvent.ACTION_SCROLL) {
                 val axisValue = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
                 LogUtils.d("onGenericMotionEvent", "axisValue = $axisValue")
-                // 获得垂直坐标上的滚动方向
-                if (axisValue < 0.0f) { // 滚轮向下滚
+                // 鑾峰緱鍨傜洿鍧愭爣涓婄殑婊氬姩鏂瑰悜
+                if (axisValue < 0.0f) { // 婊氳疆鍚戜笅婊?
                     mouseWheelPage(PageDirection.NEXT, axisValue)
-                } else { // 滚轮向上滚
+                } else { // 婊氳疆鍚戜笂婊?
                     mouseWheelPage(PageDirection.PREV, axisValue)
                 }
                 return true
@@ -697,7 +698,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 按键事件
+     * 鎸夐敭浜嬩欢
      */
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (menuLayoutIsVisible) {
@@ -744,7 +745,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 松开按键事件
+     * 鏉惧紑鎸夐敭浜嬩欢
      */
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
         when (keyCode) {
@@ -759,7 +760,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * view触摸,文字选择
+     * view瑙︽懜,鏂囧瓧閫夋嫨
      */
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouch(v: View, event: MotionEvent): Boolean = binding.run {
@@ -805,7 +806,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 更新文字选择开始位置
+     * 鏇存柊鏂囧瓧閫夋嫨寮€濮嬩綅缃?
      */
     override fun upSelectedStart(x: Float, y: Float, top: Float) = binding.run {
         cursorLeft.x = x - cursorLeft.width
@@ -816,7 +817,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 更新文字选择结束位置
+     * 鏇存柊鏂囧瓧閫夋嫨缁撴潫浣嶇疆
      */
     override fun upSelectedEnd(x: Float, y: Float) = binding.run {
         cursorRight.x = x
@@ -825,7 +826,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 取消文字选择
+     * 鍙栨秷鏂囧瓧閫夋嫨
      */
     override fun onCancelSelect() = binding.run {
         cursorLeft.invisible()
@@ -838,7 +839,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 显示文本操作菜单
+     * 鏄剧ず鏂囨湰鎿嶄綔鑿滃崟
      */
     override fun showTextActionMenu() {
         val navigationBarHeight =
@@ -868,12 +869,12 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 当前选择的文本
+     * 褰撳墠閫夋嫨鐨勬枃鏈?
      */
     override val selectedText: String get() = binding.readView.getSelectText()
 
     /**
-     * 文本选择菜单操作
+     * 鏂囨湰閫夋嫨鑿滃崟鎿嶄綔
      */
     override fun onMenuItemSelected(itemId: Int): Boolean {
         when (itemId) {
@@ -966,7 +967,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 文本选择菜单操作完成
+     * 鏂囨湰閫夋嫨鑿滃崟鎿嶄綔瀹屾垚
      */
     override fun onMenuActionFinally() = binding.run {
         textActionMenu.dismiss()
@@ -981,14 +982,14 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 鼠标滚轮翻页
+     * 榧犳爣婊氳疆缈婚〉
      */
     private fun mouseWheelPage(direction: PageDirection, distance: Float) {
         if (menuLayoutIsVisible || !AppConfig.mouseWheelPage) {
             return
         }
         if (binding.readView.isScroll) {
-            // 滚动视图时滚动,否则翻页
+            // 婊氬姩瑙嗗浘鏃舵粴鍔?鍚﹀垯缈婚〉
             (binding.readView.pageDelegate as? ScrollPageDelegate)?.curPage?.scroll((distance * 50).toInt())
         } else {
             keyPageDebounce(direction, mouseWheel = true, longPress = false)
@@ -996,7 +997,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 音量键翻页
+     * 闊抽噺閿炕椤?
      */
     private fun volumeKeyPage(direction: PageDirection, longPress: Boolean): Boolean {
         if (!AppConfig.volumeKeyPage) {
@@ -1061,7 +1062,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 内容加载完成
+     * 鍐呭鍔犺浇瀹屾垚
      */
     override fun contentLoadFinish() {
         if (intent.getBooleanExtra("readAloud", false)) {
@@ -1072,7 +1073,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 更新内容
+     * 鏇存柊鍐呭
      */
     override fun upContent(
         relativePosition: Int,
@@ -1121,7 +1122,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 页面改变
+     * 椤甸潰鏀瑰彉
      */
     override fun pageChanged() {
         pageChanged = true
@@ -1135,7 +1136,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 更新进度条位置
+     * 鏇存柊杩涘害鏉′綅缃?
      */
     private fun upSeekBarProgress() {
         val progress = when (AppConfig.progressBarBehavior) {
@@ -1146,7 +1147,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 显示菜单
+     * 鏄剧ず鑿滃崟
      */
     override fun showMenuBar() {
         binding.readMenu.runMenuIn()
@@ -1189,14 +1190,14 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 显示朗读菜单
+     * 鏄剧ず鏈楄鑿滃崟
      */
     override fun showReadAloudDialog() {
         showDialogFragment<ReadAloudDialog>()
     }
 
     /**
-     * 自动翻页
+     * 鑷姩缈婚〉
      */
     override fun autoPage() {
         ReadAloud.stop(this)
@@ -1237,14 +1238,14 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 替换
+     * 鏇挎崲
      */
     override fun openReplaceRule() {
         replaceActivity.launch(Intent(this, ReplaceRuleActivity::class.java))
     }
 
     /**
-     * 打开目录
+     * 鎵撳紑鐩綍
      */
     override fun openChapterList() {
         ReadBook.book?.let {
@@ -1253,7 +1254,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 打开搜索界面
+     * 鎵撳紑鎼滅储鐣岄潰
      */
     override fun openSearchActivity(searchWord: String?) {
         val book = ReadBook.book ?: return
@@ -1270,21 +1271,26 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 禁用书源
+     * 绂佺敤涔︽簮
      */
     override fun disableSource() {
         viewModel.disableSource()
     }
 
-    /**
-     * 显示阅读样式配置
-     */
-    override fun showReadStyle() {
-        showDialogFragment<ReadStyleDialog>()
+    override val curFontPath: String
+        get() = ReadBookConfig.textFont
+
+    override fun selectFont(path: String) {
+        if (path != ReadBookConfig.textFont || path.isEmpty()) {
+            ReadBookConfig.textFont = path
+            ReadBookConfig.save()
+            binding.readMenu.reset()
+            postEvent(EventBus.UP_CONFIG, arrayListOf(2, 5))
+        }
     }
 
     /**
-     * 显示更多设置
+     * 鏄剧ず鏇村璁剧疆
      */
     override fun showMoreSetting() {
         showDialogFragment<MoreConfigDialog>()
@@ -1295,14 +1301,14 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 更新状态栏,导航栏
+     * 鏇存柊鐘舵€佹爮,瀵艰埅鏍?
      */
     override fun upSystemUiVisibility() {
         upSystemUiVisibility(isInMultiWindow, !menuLayoutIsVisible, bottomDialog > 0)
         upNavigationBarColor()
     }
 
-    // 退出全文搜索
+    // 閫€鍑哄叏鏂囨悳绱?
     override fun exitSearchMenu() {
         if (isShowingSearchResult) {
             isShowingSearchResult = false
@@ -1313,7 +1319,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
     }
 
-    /* 恢复到 全文搜索/进度条跳转前的位置 */
+    /* 鎭㈠鍒?鍏ㄦ枃鎼滅储/杩涘害鏉¤烦杞墠鐨勪綅缃?*/
     private fun restoreLastBookProcess() {
         if (confirmRestoreProcess == true) {
             ReadBook.restoreLastBookProgress()
@@ -1322,7 +1328,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                 setMessage(R.string.restore_last_book_process)
                 yesButton {
                     confirmRestoreProcess = true
-                    ReadBook.restoreLastBookProgress() //恢复启动全文搜索前的进度
+                    ReadBook.restoreLastBookProgress() //鎭㈠鍚姩鍏ㄦ枃鎼滅储鍓嶇殑杩涘害
                 }
                 noButton {
                     ReadBook.lastBookProgress = null
@@ -1385,7 +1391,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                             putExtra("sourceType", bookSource?.getSourceType())
                         }
                     } else if (it.isTrue()) {
-                        //购买成功后刷新目录
+                        //璐拱鎴愬姛鍚庡埛鏂扮洰褰?
                         ReadBook.book?.let {
                             ReadBook.curTextChapter = null
                             BookHelp.delContent(book, chapter)
@@ -1393,7 +1399,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                         }
                     }
                 }.onError {
-                    AppLog.put("执行购买操作出错\n${it.localizedMessage}", it, true)
+                    AppLog.put("鎵ц璐拱鎿嶄綔鍑洪敊\n${it.localizedMessage}", it, true)
                 }
             }
             noButton()
@@ -1401,7 +1407,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 点击图片
+     * 鐐瑰嚮鍥剧墖
      */
     override fun oldClickImg(src: String): Boolean {
         val urlMatcher = paramPattern.matcher(src)
@@ -1424,7 +1430,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                         }
                     }
                 }.onError {
-                    AppLog.put("执行图片链接click键值出错\n${it.localizedMessage}", it, true)
+                    AppLog.put("鎵ц鍥剧墖閾炬帴click閿€煎嚭閿橽n${it.localizedMessage}", it, true)
                 }
                 return true
             }
@@ -1441,7 +1447,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                     evalJS(jsStr, urlNoOption)
                 }
             }.onError {
-                AppLog.put("执行图片链接js键值出错\n${it.localizedMessage}", it, true)
+                AppLog.put("鎵ц鍥剧墖閾炬帴js閿€煎嚭閿橽n${it.localizedMessage}", it, true)
             }
             return true
         }
@@ -1463,13 +1469,13 @@ class ReadBookActivity : BaseReadBookActivity(),
                 }
             }
         }.onError {
-            AppLog.put("执行图片链接click键值出错\n${it.localizedMessage}", it, true)
+            AppLog.put("鎵ц鍥剧墖閾炬帴click閿€煎嚭閿橽n${it.localizedMessage}", it, true)
         }
     }
 
 
     /**
-     * 朗读按钮
+     * 鏈楄鎸夐挳
      */
     override fun onClickReadAloud() {
         autoPageStop()
@@ -1529,7 +1535,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 长按图片
+     * 闀挎寜鍥剧墖
      */
     @SuppressLint("RtlHardcoded")
     override fun onImageLongPress(x: Float, y: Float, src: String) {
@@ -1636,13 +1642,13 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
     }
 
-    /* 进度条跳转到指定章节 */
+    /* 杩涘害鏉¤烦杞埌鎸囧畾绔犺妭 */
     override fun skipToChapter(index: Int) {
-        ReadBook.saveCurrentBookProgress() //退出章节跳转恢复此时进度
+        ReadBook.saveCurrentBookProgress() //閫€鍑虹珷鑺傝烦杞仮澶嶆鏃惰繘搴?
         viewModel.openChapter(index)
     }
 
-    /* 全文搜索跳转 */
+    /* 鍏ㄦ枃鎼滅储璺宠浆 */
     override fun navigateToSearch(searchResult: SearchResult, index: Int) {
         viewModel.searchResultIndex = index
         skipToSearch(searchResult)
@@ -1661,7 +1667,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         binding.readView.onLayoutPageCompleted(index, page)
     }
 
-    /* 全文搜索跳转 */
+    /* 鍏ㄦ枃鎼滅储璺宠浆 */
     private fun skipToSearch(searchResult: SearchResult) {
         if (searchResult.chapterIndex != ReadBook.durChapterIndex) {
             viewModel.openChapter(searchResult.chapterIndex) {
@@ -1784,7 +1790,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         popupAction.dismiss()
         binding.readView.onDestroy()
         ReadBook.unregister(this)
-        handler.removeCallbacksAndMessages(null) // 清理Handler消息
+        handler.removeCallbacksAndMessages(null) // 娓呯悊Handler娑堟伅
         if (!ReadBook.inBookshelf && !isChangingConfigurations) {
             viewModel.removeFromBookshelf(null)
         }
@@ -1864,7 +1870,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         observeEvent<Boolean>(EventBus.UP_SEEK_BAR) {
             readMenu.upSeekBar()
         }
-        observeEvent<Boolean>(EventBus.REFRESH_BOOK_CONTENT) { //书源js函数触发刷新
+        observeEvent<Boolean>(EventBus.REFRESH_BOOK_CONTENT) { //涔︽簮js鍑芥暟瑙﹀彂鍒锋柊
             if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
                 ReadBook.book?.let {
                     ReadBook.curTextChapter = null
@@ -1873,7 +1879,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                 }
             }
         }
-        observeEvent<Boolean>(EventBus.REFRESH_BOOK_TOC) { //书源js函数触发刷新
+        observeEvent<Boolean>(EventBus.REFRESH_BOOK_TOC) { //涔︽簮js鍑芥暟瑙﹀彂鍒锋柊
             if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
                 ReadBook.book?.let {
                     loadChapterList(it)
@@ -1889,7 +1895,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     /**
-     * 重置黑屏时间
+     * 閲嶇疆榛戝睆鏃堕棿
      */
     override fun screenOffTimerStart() {
         handler.post {
