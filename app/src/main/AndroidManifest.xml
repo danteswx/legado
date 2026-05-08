@@ -175,6 +175,9 @@
         <activity
             android:name=".ui.book.info.BookInfoActivity"
             android:launchMode="singleTop" />
+        <activity
+            android:name=".ui.book.toc.BookTocLoadingActivity"
+            android:launchMode="standard" />
         <!-- 书籍信息编辑 -->
         <activity
             android:name=".ui.book.info.edit.BookInfoEditActivity"

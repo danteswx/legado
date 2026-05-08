@@ -26,6 +26,17 @@
         app:showAsAction="always" />
 
     <item
+        android:id="@+id/menu_video_cache"
+        android:icon="@drawable/ic_download"
+        android:title="@string/offline_cache"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/menu_view_toc"
+        android:title="@string/view_toc"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_config_settings"
         android:title="@string/config_settings"
         app:showAsAction="never" />
@@ -38,11 +49,6 @@
     <item
         android:id="@+id/menu_copy_video_url"
         android:title="@string/copy_play_url"
-        app:showAsAction="never" />
-
-    <item
-        android:id="@+id/menu_video_cache"
-        android:title="@string/offline_cache"
         app:showAsAction="never" />
 
     <item

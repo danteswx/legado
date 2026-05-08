@@ -521,6 +521,7 @@
     <string name="content_empty">文章內容為空</string>
     <string name="on_change_source">正在換源請等待…</string>
     <string name="chapter_list_empty">目錄列表為空</string>
+    <string name="toc_loading">加載目錄中…</string>
     <string name="text_letter_spacing">字距</string>
 
     <string name="source_tab_base">基本</string>

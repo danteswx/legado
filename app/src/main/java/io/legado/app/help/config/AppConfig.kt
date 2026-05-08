@@ -1475,7 +1475,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             ReadBookConfig.durConfig.setCurReadScrollFollowBackground(value)
         }
     var readMenuAlpha: Int
-        get() = appCtx.getPrefInt(PreferKey.readMenuAlpha, 75).coerceIn(35, 100)
+        get() = appCtx.getPrefInt(PreferKey.readMenuAlpha, 100).coerceIn(35, 100)
         set(value) {
             appCtx.putPrefInt(PreferKey.readMenuAlpha, value.coerceIn(35, 100))
         }
