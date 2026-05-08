@@ -1,5 +1,5 @@
 import { fileURLToPath, URL } from "node:url";
-import { defineConfig } from "vite";
+import { defineConfig, type UserConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import Icons from "unplugin-icons/vite";
 import IconsResolver from "unplugin-icons/resolver";
@@ -9,7 +9,7 @@ import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  return {
+  const config: UserConfig = {
     plugins: [
       vue(),
       AutoImport({
@@ -51,9 +51,6 @@ export default defineConfig(({ mode }) => {
         "@utils": fileURLToPath(new URL("./src/utils/", import.meta.url)),
       },
     },
-    esbuild: {
-      drop: mode === "development" ? undefined : ["console", "debugger"],
-    },
     build: {
       rollupOptions: {
         output: {
@@ -65,12 +62,7 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
-    css: {
-      preprocessorOptions: {
-        scss: {
-          api: 'modern-compiler', // or 'modern'
-        },
-      },
-    },
-  }
+  };
+
+  return config;
 });
