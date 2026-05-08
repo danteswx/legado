@@ -21,6 +21,9 @@ package-lock.json
 .vscode/
 .local-tools/
 .local-signing/
+.dev-tools/
+app/legado.jks
+docs/superpowers/
 # Claude AI
 .claude/
 CLAUDE.md
