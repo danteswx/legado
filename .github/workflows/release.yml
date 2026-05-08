@@ -93,7 +93,7 @@ jobs:
         run: |
           mkdir -p ${{ github.workspace }}/apk/
           cp -rf ${{ github.workspace }}/app/build/outputs/apk/*/*/*.apk ${{ github.workspace }}/apk/
-          
+
       - name: Upload App To Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -112,7 +112,7 @@ jobs:
           files: ${{ github.workspace }}/apk/legado_app_*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Prepare For GooglePlay
         if: env.product == 'google' && env.play == 'yes'
         run: |
@@ -142,7 +142,7 @@ jobs:
           git add *.apk
           git commit -m "${{ env.VERSION }}"
           git push -f -u origin release
-          
+
       - name: Purge Jsdelivr Cache
         if: ${{ github.actor == 'gedoor' }}
         run: |

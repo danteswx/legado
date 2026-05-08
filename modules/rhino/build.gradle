@@ -12,9 +12,6 @@ android {
             languageVersion.set(JavaLanguageVersion.of(21))
         }
     }
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
-    }
     defaultConfig {
         minSdk 24
         targetSdk 36
@@ -23,8 +20,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
     }
     lint {
         checkDependencies = true
