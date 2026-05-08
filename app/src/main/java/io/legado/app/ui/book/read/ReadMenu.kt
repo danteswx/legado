@@ -170,8 +170,8 @@ class ReadMenu @JvmOverloads constructor(
         } else {
             cornerRadius = radiusPx
         }
-        setColor(UiCorner.surfaceColor(color))
-        setStroke(1.dpToPx(), if (UiCorner.effectMode() == "solid") strokeColor else UiCorner.effectStrokeColor(color))
+        setColor(color)
+        setStroke(1.dpToPx(), strokeColor)
     }
 
     private fun createFillDrawable(color: Int) = GradientDrawable().apply {
@@ -212,9 +212,9 @@ class ReadMenu @JvmOverloads constructor(
             palette.primaryColor,
             if (isBgLight) 0.18f else 0.28f
         )
-        val sheetColor = ColorUtils.withAlpha(sheetBaseColor, menuOpacity.coerceAtLeast(0.92f))
-        val headerColor = ColorUtils.withAlpha(headerBaseColor, menuOpacity.coerceAtLeast(0.9f))
-        val actionColor = ColorUtils.withAlpha(actionBaseColor, menuOpacity.coerceAtLeast(0.96f))
+        val sheetColor = ColorUtils.withAlpha(sheetBaseColor, menuOpacity)
+        val headerColor = ColorUtils.withAlpha(headerBaseColor, menuOpacity)
+        val actionColor = ColorUtils.withAlpha(actionBaseColor, menuOpacity)
         val panelStrokeColor = palette.stroke
         vwMenuBg.setBackgroundColor(0x00000000)
         if (AppConfig.isEInkMode) {

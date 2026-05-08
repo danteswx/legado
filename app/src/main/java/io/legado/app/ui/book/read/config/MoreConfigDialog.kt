@@ -233,8 +233,14 @@ class MoreConfigDialog : BasePrefDialogFragment() {
                         .setMaxValue(100)
                         .setMinValue(35)
                         .setValue(AppConfig.readMenuAlpha)
+                        .setCustomButton(R.string.btn_default_s) {
+                            AppConfig.readMenuAlpha = 75
+                            upPreferenceSummary(PreferKey.readMenuAlpha, AppConfig.readMenuAlpha.toString())
+                            postEvent(EventBus.UPDATE_READ_ACTION_BAR, true)
+                        }
                         .show {
-                            AppConfig.readMenuAlpha = it
+                            AppConfig.readMenuAlpha = it.coerceIn(35, 100)
+                            upPreferenceSummary(PreferKey.readMenuAlpha, AppConfig.readMenuAlpha.toString())
                             postEvent(EventBus.UPDATE_READ_ACTION_BAR, true)
                         }
                 }
@@ -249,7 +255,7 @@ class MoreConfigDialog : BasePrefDialogFragment() {
                 PreferKey.pageTouchSlop -> preference.summary =
                     getString(R.string.page_touch_slop_summary, value)
                 PreferKey.readMenuAlpha -> preference.summary =
-                    getString(R.string.read_menu_alpha_summary)
+                    getString(R.string.ui_layout_alpha_value, AppConfig.readMenuAlpha)
             }
         }
 

@@ -136,19 +136,15 @@
         app:iconSpaceReserved="false"
         app:isBottomBackground="true" />
 
-    <io.legado.app.lib.prefs.SeekBarPreference
-        android:clickable="false"
+    <io.legado.app.lib.prefs.Preference
         android:defaultValue="75"
         android:key="readMenuAlpha"
         android:summary="@string/read_menu_alpha_summary"
         android:title="@string/read_menu_alpha"
-        app:MaxValue="100"
-        app:MinValue="35"
         app:allowDividerAbove="false"
         app:allowDividerBelow="false"
         app:iconSpaceReserved="false"
-        app:isBottomBackground="true"
-        app:selectable="false" />
+        app:isBottomBackground="true" />
 
     <io.legado.app.lib.prefs.SwitchPreference
         android:defaultValue="true"

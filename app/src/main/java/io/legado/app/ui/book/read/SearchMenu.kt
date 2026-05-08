@@ -12,6 +12,7 @@ import android.widget.FrameLayout
 import androidx.core.view.isVisible
 import io.legado.app.R
 import io.legado.app.databinding.ViewSearchMenuBinding
+import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.Selector
 import io.legado.app.lib.theme.UiCorner
 import io.legado.app.lib.theme.accentColor
@@ -97,18 +98,16 @@ class SearchMenu @JvmOverloads constructor(
             if (isBgLight) dividerColor else textColor,
             if (isBgLight) 1f else 0.14f
         )
+        val menuOpacity = (AppConfig.readMenuAlpha / 100f).coerceIn(0.35f, 1f)
         llBottomMenu.background = GradientDrawable().apply {
             cornerRadius = UiCorner.scaledDp(18F)
-            setColor(UiCorner.surfaceColor(panelBaseColor))
-            setStroke(1.dpToPx(), if (UiCorner.effectMode() == "solid") panelStrokeColor else UiCorner.effectStrokeColor(panelBaseColor))
+            setColor(ColorUtils.withAlpha(panelBaseColor, menuOpacity))
+            setStroke(1.dpToPx(), panelStrokeColor)
         }
         llSearchBaseInfo.background = GradientDrawable().apply {
             cornerRadius = UiCorner.searchRadius(14F)
-            setColor(UiCorner.surfaceColor(panelInnerColor))
-            setStroke(
-                1.dpToPx(),
-                if (UiCorner.effectMode() == "solid") panelStrokeColor else UiCorner.effectStrokeColor(panelInnerColor)
-            )
+            setColor(ColorUtils.withAlpha(panelInnerColor, menuOpacity))
+            setStroke(1.dpToPx(), panelStrokeColor)
         }
         tvCurrentSearchInfo.setTextColor(textColor)
         llBottomBg.setBackgroundColor(android.graphics.Color.TRANSPARENT)
