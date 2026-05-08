@@ -37,6 +37,7 @@ import io.legado.app.ui.about.ReadRecordRankItem
 import io.legado.app.ui.about.ReadRecordWidgetStore
 import io.legado.app.ui.about.ReadRecentVisualItem
 import io.legado.app.ui.about.loadReadRecordAvatar
+import io.legado.app.ui.about.loadReadRecordCover
 import io.legado.app.ui.about.openReadRecordBook
 import io.legado.app.ui.about.showReadRecordBookActionDialog
 import io.legado.app.ui.about.showReadRecordGoalDialog
