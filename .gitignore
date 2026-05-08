@@ -12,6 +12,8 @@ node_modules/
 /app/app
 /app/google
 /app/gradle.properties
+app/cronetlib/
+app/src/main/assets/web/vue/
 package-lock.json
 .idea/
 # Kotlin 2.0
@@ -23,6 +25,9 @@ package-lock.json
 .local-signing/
 .dev-tools/
 app/legado.jks
+*.jks
+*.keystore
+modules/rhino/lib/
 docs/superpowers/
 # Claude AI
 .claude/
