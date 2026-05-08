@@ -633,7 +633,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                         && !BookHelp.getChapterCacheFileNames(it, textChapter.chapter, "nr")
                             .any(contentProcessor.removeSameTitleCache::contains)
                     ) {
-                        toastOnUi("鏈壘鍒板彲绉婚櫎鐨勯噸澶嶆爣棰?)
+                        toastOnUi("未找到可移除的重复标题")
                     }
                 }
                 viewModel.reverseRemoveSameTitle()

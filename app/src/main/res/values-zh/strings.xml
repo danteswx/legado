@@ -1743,6 +1743,16 @@
 
 用户选中或追问：
 %6$s</string>
+    <string name="compose_type">排版</string>
+    <string name="read_style_font_source">思源宋体</string>
+    <string name="read_style_font_sans">思源黑体</string>
+    <string name="read_style_font_art">站酷文艺体</string>
+    <string name="read_style_font_custom">霞鹜文楷</string>
+    <string name="read_style_font_weight">字重</string>
+    <string name="read_style_weight_standard">标准 / %d</string>
+    <string name="read_style_weight_bold">加粗 / %d</string>
+    <string name="read_style_weight_light">细体 / %d</string>
+    <string name="read_style_page">翻页</string>
     <string name="read_menu_theme_title">主题</string>
     <string name="read_menu_theme_preset">预设主题</string>
     <string name="read_menu_theme_custom">自定义主题</string>
