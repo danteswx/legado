@@ -100,10 +100,10 @@ jobs:
       - name: Build With Gradle
         run: |
           echo "统一版本号"
-          sed "/def version/c def version = \"${{ env.VERSION }}\"" $GITHUB_WORKSPACE/app/build.gradle  -i
+          echo "VERSION_NAME=${{ env.VERSION }}"
           echo "开始构建 release 版本"
           chmod +x gradlew
-          ./gradlew assembleAppRelease --build-cache --parallel --daemon --warning-mode all
+          ./gradlew -PVERSION_NAME="${{ env.VERSION }}" assembleAppRelease --build-cache --parallel --daemon --warning-mode all
           echo "修改APK文件名"
           mkdir -p ${{ github.workspace }}/apk/
           for file in `ls ${{ github.workspace }}/app/build/outputs/apk/*/*/*.apk`; do
