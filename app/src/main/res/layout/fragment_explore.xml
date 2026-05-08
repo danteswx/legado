@@ -110,10 +110,10 @@
                         android:layout_width="@dimen/bookshelf_action_button_size"
                         android:layout_height="@dimen/bookshelf_action_button_size"
                         android:background="@drawable/bg_discover_embedded_action"
-                        android:contentDescription="@string/sort"
+                        android:contentDescription="@string/setting"
                         android:padding="@dimen/bookshelf_action_button_padding"
                         android:scaleType="centerInside"
-                        android:src="@drawable/ic_sort"
+                        android:src="@drawable/ic_settings"
                         android:tint="@color/primaryText" />
 
                     <Space

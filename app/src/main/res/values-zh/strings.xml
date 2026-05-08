@@ -1,9 +1,9 @@
 <resources>
     <!--App-->
-    <string name="app_name">阅读Archive</string>
-    <string name="app_name_a">阅读Archive·A</string>
-    <string name="app_name_s">阅读ArchivePlus</string>
-    <string name="receiving_shared_label">阅读Archive·搜索</string>
+    <string name="app_name">阅读R</string>
+    <string name="app_name_a">阅读R·A</string>
+    <string name="app_name_s">阅读R·Plus</string>
+    <string name="receiving_shared_label">阅读R·搜索</string>
     <string name="tip_perm_request_storage">阅读需要访问存储卡权限，请前往“设置”—“应用权限”，打开所需权限</string>
 
     <!--Other-->
@@ -103,7 +103,7 @@
         \u3000\u3000这是一款使用 Kotlin 全新开发的开源的阅读软件，欢迎您的加入。
     </string>
     <string name="app_share_description">
-        阅读 3.0 下载地址：\nhttps://github.com/Rimchars/legado/releases
+        阅读 3.0 下载地址：\nhttps://github.com/refgd/legado/releases
     </string>
     <string name="version_name">版本 %s</string>
     <string name="pt_background_verification">后台校验书源</string>
@@ -1515,7 +1515,7 @@
     <string name="discover_group_other">其他</string>
     <string name="ai_view_log">查看日志</string>
     <string name="change_book_source_action">更换书源</string>
-    <string name="ai_import_default_skill">安装默认 阅读Archive Skill</string>
+    <string name="ai_import_default_skill">安装默认 阅读R Skill</string>
     <string name="ai_import_default_skill_summary">从 DandanLLab/legadoSkill 下载真实 SKILL.md</string>
     <string name="ai_skill_prompt">管理 Skill</string>
     <string name="ai_skill_prompt_hint">粘贴 SKILL.md 内容</string>

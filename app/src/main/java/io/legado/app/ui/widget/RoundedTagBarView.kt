@@ -1,6 +1,7 @@
 package io.legado.app.ui.widget
 
 import android.content.Context
+import android.text.TextUtils
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.widget.FrameLayout
@@ -20,7 +21,8 @@ class RoundedTagBarView @JvmOverloads constructor(
 
     data class Item(
         val text: CharSequence,
-        val alpha: Float = 1f
+        val alpha: Float = 1f,
+        val showFullText: Boolean = false
     )
 
     private val layoutManager = LinearLayoutManager(context, RecyclerView.HORIZONTAL, false)
@@ -156,6 +158,14 @@ class RoundedTagBarView @JvmOverloads constructor(
         override fun onBindViewHolder(holder: TagViewHolder, position: Int) {
             val item = items[position]
             holder.textView.text = item.text
+            if (item.showFullText) {
+                holder.textView.maxWidth = Int.MAX_VALUE
+                holder.textView.ellipsize = null
+            } else {
+                holder.textView.maxWidth = holder.textView.resources
+                    .getDimensionPixelSize(R.dimen.bookshelf_tag_item_max_width)
+                holder.textView.ellipsize = TextUtils.TruncateAt.END
+            }
             holder.textView.alpha = item.alpha
             holder.textView.isSelected = position == selectedIndex
             holder.textView.setOnClickListener {

@@ -5,14 +5,14 @@
 </a>
 
 <div align="center">
-<img width="125" height="125" src="docs/archive_icon.svg" alt="阅读Archive"/>
+<img width="125" height="125" src="docs/archive_icon.svg" alt="阅读R"/>
 <br>
-阅读Archive
+阅读R
 <br>
-阅读Archive继承自 Lyc 维护的 Legado 分支，并延续 <a href="https://github.com/gedoor/legado" target="_blank">Legado</a> 的开源阅读体验，在其基础上继续增强界面、AI、EPUB、漫画、视频和主题能力。
+阅读R继承自 Rimchars 维护的 Legado 分支，并延续 <a href="https://github.com/gedoor/legado" target="_blank">Legado</a> 的开源阅读体验，在其基础上继续增强界面、AI、EPUB、漫画、视频和主题能力。
 </div>
 
-## 阅读Archive特色
+## 阅读R特色
 - 重做主题管理，支持日间/夜间主题、背景图、界面颜色、主题导入导出和云端同步。
 - 深化 EPUB 原生阅读，持续补全图片、注解、分页缓存、复杂样式和大文件导入体验。
 - 增强 AI 助手，支持工具调用、书源搜索、书籍与章节读取、阅读记录查询和联网搜索。

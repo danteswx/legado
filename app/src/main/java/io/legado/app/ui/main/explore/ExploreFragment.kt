@@ -1,16 +1,11 @@
 package io.legado.app.ui.main.explore
 
 import android.content.Intent
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.text.TextUtils
-import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.PopupWindow
-import android.widget.LinearLayout
-import android.widget.TextView
 import android.view.SubMenu
 import android.view.View
 import androidx.appcompat.widget.SearchView
@@ -32,13 +27,13 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.data.entities.rule.ExploreKind
+import io.legado.app.data.entities.rule.RowUi
 import io.legado.app.databinding.FragmentExploreBinding
 import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.source.clearExploreKindsCache
 import io.legado.app.help.source.exploreKinds
 import io.legado.app.lib.dialogs.alert
-import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.primaryTextColor
@@ -51,8 +46,8 @@ import io.legado.app.ui.book.source.edit.BookSourceEditActivity
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.login.SourceLoginJsExtensions
 import io.legado.app.ui.main.MainFragmentInterface
-import io.legado.app.ui.widget.ModernActionPopup
 import io.legado.app.ui.widget.RoundedTagBarView
+import io.legado.app.ui.widget.RowUiDialog
 import io.legado.app.ui.widget.SourceSelectDialog
 import io.legado.app.utils.applyMainBottomBarPadding
 import io.legado.app.utils.applyStatusBarPadding
@@ -122,6 +117,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private val discoverAllTagItems = mutableListOf<DiscoverTagItem>()
     private val discoverTagItems = mutableListOf<DiscoverTagItem>()
     private val discoverSelectItems = mutableListOf<DiscoverTagItem>()
+    private val discoverSettingItems = mutableListOf<DiscoverTagItem>()
     private val discoverMajorGroups = mutableListOf<String>()
     private val discoverBookshelf = linkedSetOf<String>()
     private val discoverBooks = linkedSetOf<SearchBook>()
@@ -260,6 +256,8 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         discoverAllTagItems.clear()
         discoverMajorGroups.clear()
         discoverTagItems.clear()
+        discoverSelectItems.clear()
+        discoverSettingItems.clear()
         selectedDiscoverMajorGroup = null
         selectedDiscoverTagIndex = -1
         selectedDiscoverUrlIndex = -1
@@ -292,8 +290,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             selectDiscoverTag(index, item, selectTab = true)
         }
         binding.rvDiscoverSelects.setOnTagClickListener { index ->
-            val item = discoverSelectItems.getOrNull(index) ?: return@setOnTagClickListener
-            showDiscoverSelectDialog(item)
+            val group = discoverMajorGroups.getOrNull(index) ?: return@setOnTagClickListener
+            selectedDiscoverMajorGroup = group
+            applyDiscoverTagFilterAndSelect(preferredUrl = discoverCurrentUrl)
         }
         binding.rvDiscoverBooks.layoutManager = discoverBookLayoutManager
         binding.rvDiscoverBooks.adapter = discoverBookAdapter
@@ -324,7 +323,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             openDiscoverSearch()
         }
         binding.btnDiscoverTagFilter.setOnClickListener {
-            showDiscoverTagFilterMenu()
+            showDiscoverSettingsDialog()
         }
         updateDiscoverTagFilterButtonState()
         updateDiscoverSearchButtonState()
@@ -401,9 +400,11 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                         discoverCurrentUrl = null
                         discoverAllTagItems.clear()
                         discoverMajorGroups.clear()
+                        discoverSettingItems.clear()
                         selectedDiscoverMajorGroup = null
                         clearDiscoverBooksToEmpty(getString(R.string.explore_empty))
                         renderDiscoverTags(emptyList(), -1)
+                        renderDiscoverMajorGroups()
                         binding.tvDiscoverSourceSelect.text = getString(R.string.explore_empty)
                         updateDiscoverLoginButtonState()
                         updateDiscoverSearchButtonState()
@@ -495,9 +496,10 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         discoverAllTagItems.clear()
         discoverMajorGroups.clear()
         discoverSelectItems.clear()
+        discoverSettingItems.clear()
         selectedDiscoverMajorGroup = null
         renderDiscoverTags(emptyList(), -1)
-        renderDiscoverSelects(emptyList())
+        renderDiscoverMajorGroups()
         updateDiscoverTagFilterButtonState()
         viewLifecycleOwner.lifecycleScope.launch {
             val fullSource = withContext(IO) {
@@ -532,7 +534,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             discoverMajorGroups.clear()
             selectedDiscoverMajorGroup = null
             renderDiscoverTags(emptyList(), -1)
-            renderDiscoverSelects(emptyList())
+            renderDiscoverMajorGroups()
             updateDiscoverTagFilterButtonState()
             clearDiscoverBooksToEmpty(getString(R.string.explore_empty))
             return
@@ -548,20 +550,20 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         var currentGroup: String? = null
         val result = mutableListOf<DiscoverTagItem>()
         kinds.forEach { kind ->
-            if (isDiscoverMajorGroupKind(kind)) {
-                currentGroup = resolveDiscoverGroupTitle(kind)
-                return@forEach
-            }
-
             val action = kind.action?.takeIf { it.isNotBlank() }
             val url = kind.url?.takeIf { it.isNotBlank() }
             val isSelect = kind.type == ExploreKind.Type.select
             val isButton = kind.type == ExploreKind.Type.button && !action.isNullOrBlank()
 
+            if (isDiscoverMajorGroupKind(kind)) {
+                currentGroup = resolveDiscoverGroupTitle(kind)
+                return@forEach
+            }
+
             if (!url.isNullOrBlank() && !isButton && !isSelect) {
                 result += DiscoverTagItem(
                     kind = kind.copy(url = url),
-                    text = resolveDiscoverTagText(kind).limitDiscoverText(6),
+                    text = resolveDiscoverTagText(kind),
                     isButton = false,
                     group = currentGroup
                 )
@@ -571,7 +573,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             if (isSelect) {
                 result += DiscoverTagItem(
                     kind = kind.copy(type = ExploreKind.Type.select),
-                    text = resolveDiscoverTagText(kind).limitDiscoverText(6),
+                    text = resolveDiscoverTagText(kind),
                     isButton = false,
                     group = currentGroup
                 )
@@ -582,7 +584,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 if (blocked?.contains(action) == true) return@forEach
                 result += DiscoverTagItem(
                     kind = kind.copy(type = ExploreKind.Type.button),
-                    text = resolveDiscoverTagText(kind).limitDiscoverText(6),
+                    text = resolveDiscoverTagText(kind),
                     isButton = true,
                     group = currentGroup
                 )
@@ -599,6 +601,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     private fun isDiscoverMajorGroupKind(kind: ExploreKind): Boolean {
         if (!kind.action.isNullOrBlank() || !kind.url.isNullOrBlank()) return false
+        if (kind.type == ExploreKind.Type.button || kind.type == ExploreKind.Type.select) return false
         val style = kind.style()
         if (style.layout_flexBasisPercent >= 0.95f) return true
         if (style.layout_flexGrow >= 1f && style.layout_flexBasisPercent < 0f) return true
@@ -609,9 +612,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         val raw = resolveDiscoverTagText(kind).trim()
         if (raw.isBlank()) return getString(R.string.discovery)
         val normalized = raw
-            .replace("🟣", " ")
-            .replace("🟪", " ")
-            .replace("•", " ")
+            .replace(Regex("^[^\\p{L}\\p{N}]+|[^\\p{L}\\p{N}]+$"), "")
             .replace(Regex("\\s{2,}"), " ")
             .trim()
         return normalized.ifBlank { raw }
@@ -644,27 +645,17 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             }
         }
 
-        var filtered = if (discoverMajorGroups.isEmpty()) {
+        val filtered = if (discoverMajorGroups.isEmpty()) {
             discoverAllTagItems.toList()
         } else {
             discoverAllTagItems.filter { it.group == selectedDiscoverMajorGroup }
         }
-        if (filtered.isEmpty() && discoverMajorGroups.isNotEmpty()) {
-            val fallbackGroup = discoverMajorGroups.firstOrNull { group ->
-                discoverAllTagItems.any { it.group == group }
-            }
-            selectedDiscoverMajorGroup = fallbackGroup
-            filtered = if (fallbackGroup.isNullOrBlank()) {
-                discoverAllTagItems.toList()
-            } else {
-                discoverAllTagItems.filter { it.group == fallbackGroup }
-            }
-        }
 
-        val selectItems = filtered.filter { it.kind.type == ExploreKind.Type.select }
-        val tagItems = filtered.filter { it.kind.type != ExploreKind.Type.select }
+        discoverSettingItems.clear()
+        discoverSettingItems.addAll(buildDiscoverSettingItems())
+        renderDiscoverMajorGroups()
         updateDiscoverTagFilterButtonState()
-        renderDiscoverSelects(selectItems)
+        val tagItems = filtered.filter { it.kind.type != ExploreKind.Type.select && !it.isButton }
         val targetIndexByUrl = preferredUrl
             ?.takeIf { it.isNotBlank() }
             ?.let { url ->
@@ -682,32 +673,89 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     }
 
     private fun updateDiscoverTagFilterButtonState() {
-        val enabled = discoverMajorGroups.size > 1
+        val enabled = discoverSettingItems.isNotEmpty()
         binding.btnDiscoverTagFilter.isVisible = enabled
         binding.btnDiscoverTagFilter.isEnabled = enabled
         binding.btnDiscoverTagFilter.alpha = if (enabled) 1f else 0.45f
     }
 
-    private fun showDiscoverTagFilterMenu() {
-        if (discoverMajorGroups.size <= 1) return
-        val current = selectedDiscoverMajorGroup
-        val actions = buildList {
-            discoverMajorGroups.forEach { group ->
-                add(
-                    ModernActionPopup.Action(
-                        (if (group == current) "✓ " else "") + group.limitDiscoverText(10)
-                    ) {
-                        selectedDiscoverMajorGroup = group
-                        applyDiscoverTagFilterAndSelect(preferredUrl = discoverCurrentUrl)
-                    }
-                )
-            }
+    private fun buildDiscoverSettingItems(): List<DiscoverTagItem> {
+        val hasMajorGroup = discoverMajorGroups.isNotEmpty()
+        return discoverAllTagItems.filter {
+            it.kind.type == ExploreKind.Type.select
+                || it.isButton
+                || (hasMajorGroup && it.group.isNullOrBlank())
         }
-        tagFilterPopup = ModernActionPopup.show(
-            binding.btnDiscoverTagFilter,
-            actions,
-            tagFilterPopup
+    }
+
+    private fun showDiscoverSettingsDialog() {
+        if (discoverSettingItems.isEmpty()) return
+        val itemMap = discoverSettingItems.associateBy { it.toDiscoverRowUi().name }
+        RowUiDialog.show(
+            requireContext(),
+            RowUiDialog.Config(
+                title = getString(R.string.discovery_settings_title),
+                rows = discoverSettingItems.map { it.toDiscoverRowUi() },
+                values = discoverSettingItems.associate {
+                    it.toDiscoverRowUi().name to currentDiscoverSelectValue(it)
+                },
+                dismissOnAction = true,
+                dismissOnSelect = true,
+                dismissOnToggle = false
+            ),
+            object : RowUiDialog.Callback {
+                override fun onValueChanged(rowUi: RowUi, value: String) {
+                    val item = itemMap[rowUi.name] ?: return
+                    when (rowUi.type) {
+                        RowUi.Type.select -> handleDiscoverSelectValue(item, value)
+                    }
+                }
+
+                override fun onAction(rowUi: RowUi, isLongClick: Boolean) {
+                    val item = itemMap[rowUi.name] ?: return
+                    if (item.isButton) {
+                        handleDiscoverButtonTag(item)
+                    } else {
+                        selectDiscoverSettingUrl(item)
+                    }
+                }
+            }
         )
+    }
+
+    private fun DiscoverTagItem.toDiscoverRowUi(): RowUi {
+        val type = when {
+            kind.type == ExploreKind.Type.select -> RowUi.Type.select
+            isButton || isDefaultUrlKind -> RowUi.Type.button
+            else -> RowUi.Type.text
+        }
+        return RowUi(
+            name = if (type == RowUi.Type.select) kind.title else text,
+            type = type,
+            action = kind.action,
+            chars = kind.chars,
+            default = kind.default,
+            viewName = kind.viewName,
+            style = kind.style
+        )
+    }
+
+    private val DiscoverTagItem.isDefaultUrlKind: Boolean
+        get() = kind.type == ExploreKind.Type.url && !kind.url.isNullOrBlank()
+
+    private fun selectDiscoverSettingUrl(item: DiscoverTagItem) {
+        val url = item.kind.url?.takeIf { it.isNotBlank() } ?: return
+        if (executeDiscoverUrlScriptIfNeeded(item, url)) {
+            return
+        }
+        selectedDiscoverTagIndex = -1
+        selectedDiscoverUrlIndex = -1
+        binding.rvDiscoverTags.setSelectedIndex(-1, smooth = false)
+        if (discoverCurrentUrl == url && discoverBooks.isNotEmpty()) {
+            return
+        }
+        discoverCurrentUrl = url
+        loadDiscoverBooks(reset = true)
     }
 
     private fun renderDiscoverTags(items: List<DiscoverTagItem>, selectedIndex: Int) {
@@ -720,26 +768,22 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             items.indexOfFirst { !it.isButton && !it.kind.url.isNullOrBlank() }
         }
         binding.rvDiscoverTags.submitItems(
-            items.map { RoundedTagBarView.Item(it.text, if (it.isButton) 0.9f else 1f) },
+            items.map { RoundedTagBarView.Item(it.text, if (it.isButton) 0.9f else 1f, showFullText = true) },
             selectedDiscoverTagIndex
         )
     }
 
-    private fun renderDiscoverSelects(items: List<DiscoverTagItem>) {
+    private fun renderDiscoverMajorGroups() {
         discoverSelectItems.clear()
-        discoverSelectItems.addAll(items)
-        if (items.isEmpty()) {
+        if (discoverMajorGroups.isEmpty()) {
             binding.rvDiscoverSelects.gone()
             binding.rvDiscoverSelects.submitItems(emptyList(), -1)
             return
         }
         binding.rvDiscoverSelects.visible()
         binding.rvDiscoverSelects.submitItems(
-            items.map {
-                val value = currentDiscoverSelectValue(it)
-                RoundedTagBarView.Item("${it.text}：${value}", 1f)
-            },
-            -1
+            discoverMajorGroups.map { RoundedTagBarView.Item(it, 1f, showFullText = true) },
+            discoverMajorGroups.indexOf(selectedDiscoverMajorGroup)
         )
     }
 
@@ -748,35 +792,31 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         val key = item.kind.title
         if (key.isBlank()) return item.kind.default ?: ""
         val info = getDiscoverInfoMap(source.bookSourceUrl)
-        return info[key]?.toString()?.takeIf { it.isNotBlank() }
+        return info[key]?.takeIf { it.isNotBlank() }
             ?: item.kind.default?.takeIf { it.isNotBlank() }
             ?: item.kind.chars?.firstOrNull()?.orEmpty()
             ?: ""
     }
 
-    private fun showDiscoverSelectDialog(item: DiscoverTagItem) {
+    private fun handleDiscoverSelectValue(item: DiscoverTagItem, value: String) {
         val source = selectedDiscoverSource ?: return
         val key = item.kind.title
         if (key.isBlank()) return
-        val options = item.kind.chars?.filterNotNull()?.filter { it.isNotBlank() } ?: emptyList()
-        if (options.isEmpty()) return
         val infoMap = getDiscoverInfoMap(source.bookSourceUrl)
-        context?.selector(item.text, options) { _, value, _ ->
-            infoMap[key] = value
-            viewLifecycleOwner.lifecycleScope.launch(IO) {
-                source.clearExploreKindsCache()
-                val action = item.kind.action?.takeIf { it.isNotBlank() }
-                if (!action.isNullOrBlank()) {
-                    runScriptWithContext {
-                        source.evalJS(action) {
-                            put("java", SourceLoginJsExtensions(activity as? AppCompatActivity, source))
-                            put("infoMap", infoMap)
-                        }
+        infoMap[key] = value
+        viewLifecycleOwner.lifecycleScope.launch(IO) {
+            source.clearExploreKindsCache()
+            val action = item.kind.action?.takeIf { it.isNotBlank() }
+            if (!action.isNullOrBlank()) {
+                runScriptWithContext {
+                    source.evalJS(action) {
+                        put("java", SourceLoginJsExtensions(activity as? AppCompatActivity, source))
+                        put("infoMap", infoMap)
                     }
                 }
-                withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    loadDiscoverKindsAndDefault()
-                }
+            }
+            withContext(kotlinx.coroutines.Dispatchers.Main) {
+                loadDiscoverKindsAndDefault()
             }
         }
     }
@@ -788,6 +828,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     private fun selectDiscoverTag(index: Int, item: DiscoverTagItem, selectTab: Boolean) {
         val url = item.kind.url?.takeIf { it.isNotBlank() } ?: return
+        if (executeDiscoverUrlScriptIfNeeded(item, url)) {
+            return
+        }
         selectedDiscoverTagIndex = index
         selectedDiscoverUrlIndex = index
         if (selectTab) {
@@ -798,6 +841,45 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         }
         discoverCurrentUrl = url
         loadDiscoverBooks(reset = true)
+    }
+
+    private fun executeDiscoverUrlScriptIfNeeded(item: DiscoverTagItem, url: String): Boolean {
+        val script = extractDiscoverUrlScript(url) ?: return false
+        val source = selectedDiscoverSource ?: return true
+        val infoMap = getDiscoverInfoMap(source.bookSourceUrl)
+        discoverActionJob?.cancel()
+        discoverActionJob = viewLifecycleOwner.lifecycleScope.launch {
+            binding.pbDiscoverLoading.visible()
+            val result = withContext(IO) {
+                kotlin.runCatching {
+                    runScriptWithContext {
+                        source.evalJS(script) {
+                            put("java", SourceLoginJsExtensions(activity as? AppCompatActivity, source))
+                            put("infoMap", infoMap)
+                        }
+                    }
+                }
+            }
+            binding.pbDiscoverLoading.gone()
+            result.onFailure {
+                AppLog.put("发现 URL 脚本执行失败: ${item.text}", it)
+                context?.toastOnUi(it.localizedMessage ?: getString(R.string.unknown_error))
+            }
+        }
+        return true
+    }
+
+    private fun extractDiscoverUrlScript(url: String): String? {
+        val trimmed = url.trim()
+        return when {
+            trimmed.startsWith("{{") && trimmed.endsWith("}}") -> {
+                trimmed.substring(2, trimmed.length - 2).trim()
+            }
+            trimmed.startsWith("{\\{") && trimmed.endsWith("}}") -> {
+                trimmed.substring(3, trimmed.length - 2).trim()
+            }
+            else -> null
+        }?.takeIf { it.isNotBlank() }
     }
 
     private fun handleDiscoverButtonTag(item: DiscoverTagItem) {
