@@ -44,6 +44,7 @@ import io.legado.app.ui.widget.number.NumberPickerDialog
 import io.legado.app.ui.widget.seekbar.SeekBarChangeListener
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.GSON
+import io.legado.app.utils.applyNavigationBarMargin
 import io.legado.app.utils.ImageCropHelper
 import io.legado.app.utils.externalFiles
 import io.legado.app.utils.fromJsonArray
@@ -175,6 +176,7 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
         btnAdd.setOnClickListener {
             showAddDialog()
         }
+        btnAdd.applyNavigationBarMargin(withInitialMargin = true)
         updateTabs()
     }
 

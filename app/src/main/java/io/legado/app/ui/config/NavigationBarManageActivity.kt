@@ -34,6 +34,7 @@ import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.image.ImageCropContract
 import io.legado.app.ui.widget.number.NumberPickerDialog
 import io.legado.app.utils.ImageCropHelper
+import io.legado.app.utils.applyNavigationBarMargin
 import io.legado.app.utils.externalFiles
 import io.legado.app.utils.getFile
 import io.legado.app.utils.observeEvent
@@ -184,6 +185,7 @@ class NavigationBarManageActivity : BaseActivity<ActivityThemeManageBinding>() {
         btnAdd.setOnClickListener {
             showAddDialog()
         }
+        btnAdd.applyNavigationBarMargin(withInitialMargin = true)
         tvSummary.text = getString(R.string.navigation_bar_package_summary)
         recyclerView.layoutManager = LinearLayoutManager(this@NavigationBarManageActivity)
         recyclerView.adapter = adapter
