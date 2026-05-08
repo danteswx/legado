@@ -78,6 +78,7 @@ import io.legado.app.ui.video.config.SettingsDialog
 import io.legado.app.ui.widget.dialog.PhotoDialog
 import io.legado.app.ui.widget.text.ScrollTextView
 import io.legado.app.utils.StartActivityContract
+import io.legado.app.utils.applyNavigationBarMargin
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.gone
 import io.legado.app.utils.invisible
@@ -197,6 +198,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
 
     @OptIn(UnstableApi::class)
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        binding.bottomPanel.applyNavigationBarMargin(withInitialMargin = true)
         playerView.enlargeImageRes = R.drawable.ic_fullscreen
         isNew = intent.getBooleanExtra("isNew", true)
         setupPlayerView()
@@ -545,11 +547,6 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     }
 
     private fun showToc(toc: List<BookChapter>) {
-        binding.ivChapter.setOnClickListener {
-            VideoPlay.book?.bookUrl?.let {
-                tocActivityResult.launch(it)
-            }
-        }
         val recyclerView = binding.chapters
         val layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
         recyclerView.layoutManager = layoutManager
@@ -788,6 +785,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             it.isVisible = (VideoPlay.source as? BookSource)?.customButton == true
         }
         starMenuItem = menu.findItem(R.id.menu_rss_star)
+        menu.findItem(R.id.menu_video_cache)?.icon?.setTintMutate(primaryTextColor)
         upStarMenu()
         return super.onPrepareOptionsMenu(menu)
     }
@@ -872,6 +870,11 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             }
             R.id.menu_video_cache -> VideoPlay.book?.let {
                 showVideoCacheRangeDialog(it)
+            }
+            R.id.menu_view_toc -> {
+                VideoPlay.book?.bookUrl?.let {
+                    tocActivityResult.launch(it)
+                }
             }
             R.id.menu_refresh_chapter -> {
                 VideoPlay.refreshCurrentChapter(playerView)

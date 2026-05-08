@@ -22,6 +22,7 @@ import io.legado.app.model.ReadManga
 import io.legado.app.ui.browser.WebViewActivity
 import io.legado.app.ui.widget.seekbar.SeekBarChangeListener
 import io.legado.app.utils.ColorUtils
+import io.legado.app.utils.applyStatusBarPadding
 import io.legado.app.utils.activity
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.gone
@@ -89,6 +90,7 @@ class MangaMenu @JvmOverloads constructor(
     }
 
     init {
+        binding.titleBar.applyStatusBarPadding(withInitialPadding = true)
         initView()
         bindEvent()
     }
@@ -97,14 +99,23 @@ class MangaMenu @JvmOverloads constructor(
         initAnimation()
         val textColor = context.getPrimaryTextColor(ColorUtils.isColorLight(bgColor))
         val secondaryTextColor = ColorUtils.withAlpha(textColor, 0.78f)
+        titleBar.setTextColor(textColor)
+        titleBar.setColorFilter(textColor)
         tvChapterName.setTextColor(secondaryTextColor)
         tvChapterUrl.setTextColor(secondaryTextColor)
         tvPre.setTextColor(textColor)
         tvNext.setTextColor(textColor)
         if (AppConfig.isEInkMode) {
             titleBar.setBackgroundResource(R.drawable.bg_eink_border_bottom)
+            titleBar.toolbar.background = null
+            titleBarAddition.background = null
+            llTitleInfo.background = null
             bottomMenu.setBackgroundResource(R.drawable.bg_eink_border_top)
         } else {
+            titleBar.setBackgroundColor(ColorUtils.withAlpha(bgColor, 0.75f))
+            titleBar.toolbar.background = null
+            titleBarAddition.background = null
+            llTitleInfo.background = null
             bottomMenu.setBackgroundColor(Color.TRANSPARENT)
         }
         if (AppConfig.showReadTitleBarAddition) {
@@ -217,9 +228,22 @@ class MangaMenu @JvmOverloads constructor(
         }
     }
 
+    fun upBookView() = binding.run {
+        titleBar.title = ReadManga.book?.name
+        ReadManga.curMangaChapter?.let {
+            tvChapterName.text = it.chapter.title
+            tvChapterName.visible()
+            tvChapterUrl.gone()
+            tvPre.isEnabled = ReadManga.durChapterIndex != 0
+            tvNext.isEnabled = ReadManga.durChapterIndex != ReadManga.simulatedChapterSize - 1
+        } ?: let {
+            tvChapterName.gone()
+            tvChapterUrl.gone()
+        }
+    }
+
     interface CallBack {
         fun openBookInfoActivity()
-        fun openMangaConfig()
         fun upSystemUiVisibility(menuIsVisible: Boolean)
         fun skipToPage(index: Int)
     }

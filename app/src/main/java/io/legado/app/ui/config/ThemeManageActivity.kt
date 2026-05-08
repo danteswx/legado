@@ -16,6 +16,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.SimpleItemAnimator
 import com.bumptech.glide.Glide
+import com.bumptech.glide.signature.ObjectKey
 import com.jaredrummler.android.colorpicker.ColorPickerDialog
 import com.jaredrummler.android.colorpicker.ColorPickerDialogListener
 import io.legado.app.R
@@ -38,10 +39,13 @@ import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.lib.theme.secondaryTextColor
 import io.legado.app.ui.file.HandleFileContract
+import io.legado.app.ui.image.ImageCropContract
 import io.legado.app.ui.widget.number.NumberPickerDialog
 import io.legado.app.ui.widget.seekbar.SeekBarChangeListener
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.GSON
+import io.legado.app.utils.applyNavigationBarMargin
+import io.legado.app.utils.ImageCropHelper
 import io.legado.app.utils.externalFiles
 import io.legado.app.utils.fromJsonArray
 import io.legado.app.utils.getCompatColor
@@ -89,16 +93,28 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
     private var syncingRemoteTasks = false
     private var appliedDayThemeOverride: String? = null
     private var appliedNightThemeOverride: String? = null
+    private var pendingImageCropRequest: ImageCropHelper.Request? = null
     private val selectImage = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
-            val targetPath = copySelectedImage(uri, if (it.requestCode == requestMainBackground) "main" else "book_info")
-            if (it.requestCode == requestMainBackground) {
-                pendingMainBackgroundPath = targetPath
+            startImageCrop(uri, it.requestCode)
+        }
+    }
+    private val cropImage = registerForActivityResult(ImageCropContract()) { result ->
+        val request = pendingImageCropRequest ?: return@registerForActivityResult
+        pendingImageCropRequest = null
+        if (result == null) {
+            return@registerForActivityResult
+        }
+        if (java.io.File(result).exists()) {
+            if (request.requestCode == requestMainBackground) {
+                pendingMainBackgroundPath = result
                 editDialogBinding?.let { binding -> updateImageRow(binding.rowMainBackground, true) }
             } else {
-                pendingBookInfoBackgroundPath = targetPath
+                pendingBookInfoBackgroundPath = result
                 editDialogBinding?.let { binding -> updateImageRow(binding.rowBookInfoBackground, false) }
             }
+        } else {
+            toastOnUi(getString(R.string.image_crop_failed, getString(R.string.unknown)))
         }
     }
     private val importThemePackage = registerForActivityResult(HandleFileContract()) {
@@ -160,6 +176,7 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
         btnAdd.setOnClickListener {
             showAddDialog()
         }
+        btnAdd.applyNavigationBarMargin(withInitialMargin = true)
         updateTabs()
     }
 
@@ -313,8 +330,6 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
             setupColorRow(rowAccent, R.string.theme_color_accent, current.accentColor, colorAccent)
             setupColorRow(rowBackground, R.string.theme_color_background, current.backgroundColor, colorBackground)
             setupColorRow(rowBottomBackground, R.string.theme_color_bottom_background, current.bottomBackground, colorBottomBackground)
-            setupColorRow(rowPrimaryText, R.string.theme_color_primary_text, current.primaryTextColor ?: "#${primaryTextColor.hexString}", colorPrimaryText)
-            setupColorRow(rowSecondaryText, R.string.theme_color_secondary_text, current.secondaryTextColor ?: "#${secondaryTextColor.hexString}", colorSecondaryText)
             setupImageRow(rowMainBackground, R.string.theme_image_main_background, true)
             setupImageRow(rowBookInfoBackground, R.string.theme_image_book_info_background, false)
             setupInterfaceRows(this)
@@ -468,7 +483,6 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
         val actions = buildList {
             if (isMain) add(ThemeImageAction.BLUR)
             add(ThemeImageAction.SELECT)
-            add(ThemeImageAction.ONLINE)
             if (hasImage) add(ThemeImageAction.DELETE)
         }
         selector(
@@ -481,7 +495,6 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
                     requestCode = if (isMain) requestMainBackground else requestBookInfoBackground
                     mode = HandleFileContract.IMAGE
                 }
-                ThemeImageAction.ONLINE -> showOnlineImageDialog(isMain)
                 ThemeImageAction.DELETE -> {
                     if (isMain) {
                         pendingMainBackgroundPath = null
@@ -492,39 +505,6 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
                     }
                 }
             }
-        }
-    }
-
-    private fun showOnlineImageDialog(isMain: Boolean) {
-        alert(R.string.theme_image_online) {
-            val alertBinding = io.legado.app.databinding.DialogEditTextBinding.inflate(layoutInflater).apply {
-                editView.hint = "https://..."
-                editView.setText(
-                    if (isMain) {
-                        pendingMainBackgroundPath?.takeIf { it.startsWith("http", ignoreCase = true) }
-                    } else {
-                        pendingBookInfoBackgroundPath?.takeIf { it.startsWith("http", ignoreCase = true) }
-                    }.orEmpty()
-                )
-            }
-            customView { alertBinding.root }
-            okButton {
-                val url = alertBinding.editView.text?.toString()?.trim().orEmpty()
-                if (!url.startsWith("http://", ignoreCase = true) &&
-                    !url.startsWith("https://", ignoreCase = true)
-                ) {
-                    toastOnUi(R.string.theme_image_online_invalid)
-                    return@okButton
-                }
-                if (isMain) {
-                    pendingMainBackgroundPath = url
-                    editDialogBinding?.let { updateImageRow(it.rowMainBackground, true) }
-                } else {
-                    pendingBookInfoBackgroundPath = url
-                    editDialogBinding?.let { updateImageRow(it.rowBookInfoBackground, false) }
-                }
-            }
-            cancelButton()
         }
     }
 
@@ -567,8 +547,6 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
                 backgroundImgPath = pendingMainBackgroundPath,
                 backgroundImgBlur = pendingBlur,
                 bookInfoBackgroundImgPath = pendingBookInfoBackgroundPath,
-                primaryTextColor = normalizeOptionalColor(dialogBinding.rowPrimaryText.tvValue.text?.toString()),
-                secondaryTextColor = normalizeOptionalColor(dialogBinding.rowSecondaryText.tvValue.text?.toString()),
                 uiCornerScale = pendingUiCornerScale,
                 uiLayoutAlpha = pendingUiLayoutAlpha,
                 uiCornerSearchFollow = pendingUiCornerSearchFollow,
@@ -576,7 +554,7 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
                 fontScale = pendingFontScale
             )
         }.onFailure {
-            toastOnUi("颜色格式不正确")
+            toastOnUi(R.string.color_format_error)
         }.getOrNull() ?: return
         addTheme(config)
     }
@@ -659,8 +637,6 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
             backgroundImgPath = getPrefString(if (isNightTheme) PreferKey.bgImageN else PreferKey.bgImage),
             backgroundImgBlur = getPrefInt(if (isNightTheme) PreferKey.bgImageNBlurring else PreferKey.bgImageBlurring, 0),
             bookInfoBackgroundImgPath = getPrefString(if (isNightTheme) PreferKey.bookInfoBgImageN else PreferKey.bookInfoBgImage),
-            primaryTextColor = "#${ThemeStore.textColorPrimary(this).hexString}",
-            secondaryTextColor = "#${ThemeStore.textColorSecondary(this).hexString}",
             uiCornerScale = AppConfig.uiCornerScale,
             uiLayoutAlpha = AppConfig.uiLayoutAlpha,
             uiCornerSearchFollow = AppConfig.uiCornerSearchFollow,
@@ -685,25 +661,21 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
         return color
     }
 
-    private fun normalizeOptionalColor(value: String?): String? {
-        val text = value?.trim().orEmpty()
-        if (text.isBlank()) return null
-        return normalizeColor(text)
-    }
-
-    private fun copySelectedImage(uri: Uri, prefix: String): String? {
-        return kotlin.runCatching {
-            val dir = externalFiles.getFile("themePackageTemp").apply { mkdirs() }
-            val suffix = contentResolver.getType(uri)?.substringAfterLast("/")?.let { ".$it" } ?: ".jpg"
-            val file = File(dir, "${prefix}_${System.currentTimeMillis()}$suffix")
-            contentResolver.openInputStream(uri)?.use { input ->
-                FileOutputStream(file).use { output -> input.copyTo(output) }
-            } ?: return null
-            file.absolutePath
-        }.onFailure {
-            if (it.isJobCancellation()) return@onFailure
-            toastOnUi(it.localizedMessage)
-        }.getOrNull()
+    private fun startImageCrop(uri: Uri, requestCode: Int) {
+        val aspect = ImageCropHelper.screenAspect(this)
+        val prefix = if (requestCode == requestMainBackground) "main" else "book_info"
+        val request = ImageCropHelper.buildRequest(
+            context = this,
+            sourceUri = uri,
+            requestCode = requestCode,
+            aspectWidth = aspect.first,
+            aspectHeight = aspect.second,
+            dirName = "themePackageTemp",
+            prefix = prefix,
+            targetWidth = 1600
+        )
+        pendingImageCropRequest = request
+        cropImage.launch(request.params)
     }
 
     private fun showActions(entry: ThemePackageManager.Entry) {
@@ -1056,10 +1028,18 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
                 if (backgroundPath.isNullOrBlank()) {
                     return
                 }
-                ImageLoader.load(ivPreview.context, backgroundPath)
+                val previewSignature = backgroundPath.takeIf { !it.startsWith("http", ignoreCase = true) }
+                    ?.let { path ->
+                        val file = File(path)
+                        if (file.exists()) ObjectKey("${file.absolutePath}:${file.length()}:${file.lastModified()}") else null
+                    }
+                val request = ImageLoader.load(ivPreview.context, backgroundPath)
                     .centerCrop()
                     .error(ColorDrawable(fallbackColor))
-                    .into(ivPreview)
+                if (previewSignature != null) {
+                    request.signature(previewSignature)
+                }
+                request.into(ivPreview)
             }
 
             private fun String?.toPreviewColor(isNightTheme: Boolean): Int {
@@ -1082,8 +1062,6 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
             colorAccent -> binding.rowAccent
             colorBackground -> binding.rowBackground
             colorBottomBackground -> binding.rowBottomBackground
-            colorPrimaryText -> binding.rowPrimaryText
-            colorSecondaryText -> binding.rowSecondaryText
             else -> null
         } ?: return
         row.tvValue.text = hex
@@ -1104,8 +1082,6 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
         private const val colorAccent = 402
         private const val colorBackground = 403
         private const val colorBottomBackground = 404
-        private const val colorPrimaryText = 405
-        private const val colorSecondaryText = 406
     }
 
     private enum class ThemeAction(val titleRes: Int) {
@@ -1122,7 +1098,6 @@ class ThemeManageActivity : BaseActivity<ActivityThemeManageBinding>(),
     private enum class ThemeImageAction(val titleRes: Int) {
         BLUR(R.string.theme_image_blur),
         SELECT(R.string.theme_image_select),
-        ONLINE(R.string.theme_image_online),
         DELETE(R.string.theme_image_delete)
     }
 

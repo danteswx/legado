@@ -63,7 +63,7 @@ object ReaderSheetStyle {
         )
     }
 
-    fun topSheetDrawable(palette: Palette, radiusDp: Float = 28f): GradientDrawable {
+    fun topSheetDrawable(palette: Palette, radiusDp: Float = 10f): GradientDrawable {
         val radius = UiCorner.scaledDp(radiusDp)
         return GradientDrawable().apply {
             cornerRadii = floatArrayOf(
@@ -77,7 +77,7 @@ object ReaderSheetStyle {
         }
     }
 
-    fun blockDrawable(fillColor: Int, strokeColor: Int, radiusDp: Float = 20f): GradientDrawable {
+    fun blockDrawable(fillColor: Int, strokeColor: Int, radiusDp: Float = 10f): GradientDrawable {
         return GradientDrawable().apply {
             cornerRadius = UiCorner.scaledDp(radiusDp)
             setColor(fillColor)

@@ -10,8 +10,6 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.R
-import io.legado.app.lib.theme.Selector
-import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.lib.theme.UiCorner
 
 class RoundedTagBarView @JvmOverloads constructor(
@@ -37,11 +35,6 @@ class RoundedTagBarView @JvmOverloads constructor(
         val verticalPadding = resources.getDimensionPixelSize(R.dimen.bookshelf_tag_recycler_padding_vertical)
         setPadding(0, verticalPadding, 0, verticalPadding)
     }
-    private val tagTextColors = Selector.colorBuild()
-        .setDefaultColor(ThemeStore.textColorSecondary(context))
-        .setSelectedColor(ThemeStore.accentColor(context))
-        .create()
-
     private var items = emptyList<Item>()
     private var selectedIndex = RecyclerView.NO_POSITION
     private var onTagClick: ((Int) -> Unit)? = null
@@ -146,7 +139,6 @@ class RoundedTagBarView @JvmOverloads constructor(
         override fun onCreateViewHolder(parent: android.view.ViewGroup, viewType: Int): TagViewHolder {
             val textView = LayoutInflater.from(parent.context)
                 .inflate(R.layout.item_bookshelf_group_tag, parent, false) as TextView
-            textView.setTextColor(tagTextColors)
             textView.background = UiCorner.actionSelector(
                 android.graphics.Color.TRANSPARENT,
                 ContextCompat.getColor(parent.context, R.color.background_card),

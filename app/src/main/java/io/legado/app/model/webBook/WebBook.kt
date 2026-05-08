@@ -20,14 +20,24 @@ import io.legado.app.model.analyzeRule.RuleData
 import io.legado.app.ui.main.explore.ExploreAdapter.Companion.exploreInfoMapList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Semaphore
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.CoroutineContext
 
 @Suppress("MemberVisibilityCanBePrivate")
 object WebBook {
+
+    private data class ChapterListResult(
+        val book: Book,
+        val chapters: List<BookChapter>
+    )
+
+    private val chapterListJobs = ConcurrentHashMap<String, Deferred<Result<ChapterListResult>>>()
 
     /**
      * 搜索
@@ -287,13 +297,46 @@ object WebBook {
         runPerJs: Boolean = false,
         isFromBookInfo : Boolean = false
     ): Result<List<BookChapter>> {
+        val key = chapterListLoadKey(bookSource, book, runPerJs)
+        val job = CoroutineScope(currentCoroutineContext()).async(start = CoroutineStart.LAZY) {
+            loadChapterListAwait(bookSource, book, runPerJs, isFromBookInfo)
+        }
+        val runningJob = chapterListJobs.putIfAbsent(key, job)
+        return if (runningJob == null) {
+            job.await()
+                .onFailure {
+                    currentCoroutineContext().ensureActive()
+                }
+                .map { it.chapters }
+                .also {
+                    chapterListJobs.remove(key, job)
+                }
+        } else {
+            job.cancel()
+            runningJob.await()
+                .onSuccess {
+                    applyChapterListBookState(book, it.book)
+                }
+                .onFailure {
+                    currentCoroutineContext().ensureActive()
+                }
+                .map { it.chapters }
+        }
+    }
+
+    private suspend fun loadChapterListAwait(
+        bookSource: BookSource,
+        book: Book,
+        runPerJs: Boolean = false,
+        isFromBookInfo : Boolean = false
+    ): Result<ChapterListResult> {
         book.removeAllBookType()
         book.addType(bookSource.getBookType())
         return kotlin.runCatching {
             if (runPerJs) {
                 runPreUpdateJs(bookSource, book, isFromBookInfo).getOrThrow()
             }
-            if (book.bookUrl == book.tocUrl && !book.tocHtml.isNullOrEmpty()) {
+            val chapters = if (book.bookUrl == book.tocUrl && !book.tocHtml.isNullOrEmpty()) {
                 BookChapterList.analyzeChapterList(
                     bookSource = bookSource,
                     book = book,
@@ -345,9 +388,49 @@ object WebBook {
                     isFromBookInfo = isFromBookInfo
                 )
             }
+            ChapterListResult(book.copy(), chapters)
         }.onFailure {
             currentCoroutineContext().ensureActive()
         }
+    }
+
+    private fun chapterListLoadKey(
+        bookSource: BookSource,
+        book: Book,
+        runPerJs: Boolean
+    ): String {
+        return listOf(
+            bookSource.bookSourceUrl,
+            book.bookUrl,
+            book.tocUrl,
+            runPerJs
+        ).joinToString("\n")
+    }
+
+    private fun applyChapterListBookState(target: Book, source: Book) {
+        target.bookUrl = source.bookUrl
+        target.tocUrl = source.tocUrl
+        target.origin = source.origin
+        target.originName = source.originName
+        target.name = source.name
+        target.author = source.author
+        target.kind = source.kind
+        target.coverUrl = source.coverUrl
+        target.intro = source.intro
+        target.charset = source.charset
+        target.type = source.type
+        target.latestChapterTitle = source.latestChapterTitle
+        target.latestChapterTime = source.latestChapterTime
+        target.lastCheckTime = source.lastCheckTime
+        target.lastCheckCount = source.lastCheckCount
+        target.totalChapterNum = source.totalChapterNum
+        target.wordCount = source.wordCount
+        target.originOrder = source.originOrder
+        target.variable = source.variable
+        target.syncTime = source.syncTime
+        target.infoHtml = source.infoHtml
+        target.tocHtml = source.tocHtml
+        target.downloadUrls = source.downloadUrls
     }
 
     /**

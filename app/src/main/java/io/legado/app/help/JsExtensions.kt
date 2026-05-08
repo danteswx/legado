@@ -1134,6 +1134,30 @@ interface JsExtensions : JsEncodeUtils {
         return AppConst.androidId
     }
 
+    /**
+     * 获取应用版本名
+     */
+    @JavascriptInterface
+    fun getAppVersionName(): String {
+        return AppConst.appInfo.versionName
+    }
+
+    /**
+     * 获取应用版本号
+     */
+    @JavascriptInterface
+    fun getAppVersionCode(): Long {
+        return AppConst.appInfo.versionCode
+    }
+
+    /**
+     * 获取应用版本变体
+     */
+    @JavascriptInterface
+    fun getAppVariant(): String {
+        return AppConst.appInfo.appVariant
+    }
+
     @JavascriptInterface
     fun openUrl(url: String) {
         openUrl(url, null)

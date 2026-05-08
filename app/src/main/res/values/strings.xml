@@ -189,7 +189,6 @@
     <string name="copy_source">Copy source</string>
     <string name="paste_source">Paste source</string>
     <string name="source_rule_s">Source rules description</string>
-    <string name="check_update">Check for Updates</string>
     <string name="camera_scan">Scan QR code</string>
     <string name="scan_image">Scan local images</string>
     <string name="rule_summary">Rules description</string>
@@ -260,7 +259,6 @@
     <string name="origin_show">Origin: %s</string>
     <string name="import_replace_rule">Import replace rules</string>
     <string name="import_replace_rule_on_line">Import online rules</string>
-    <string name="check_update_interval">Check interval for updates</string>
     <string name="bookshelf_px_0">By recent list</string>
     <string name="bookshelf_px_1">By update time</string>
     <string name="bookshelf_px_2">By book title</string>
@@ -361,7 +359,6 @@
     <string name="download_path">Cache path</string>
     <string name="sys_file_picker">System file picker</string>
     <string name="new_version">New version</string>
-    <string name="download_update">Download updates</string>
     <string name="volume_key_page_on_play">Volume keys to turn page when reading</string>
     <string name="tip_margin_change">Margin adjustment</string>
     <string name="allow_update">Enable update</string>
@@ -563,6 +560,7 @@
     <string name="content_empty">No content</string>
     <string name="on_change_source">Changing source, wait please</string>
     <string name="chapter_list_empty">Chapters is empty</string>
+    <string name="toc_loading">Loading chapters…</string>
     <string name="text_letter_spacing">Word spacing</string>
 
     <string name="source_tab_base">Basic</string>
@@ -599,6 +597,8 @@
     <string name="my">Me</string>
     <string name="ai">AI</string>
     <string name="ai_assistant">AI 助手</string>
+    <string name="side_nav_assistant">Assistant</string>
+    <string name="side_nav_stats">Stats</string>
     <string name="ai_setting">AI 设置</string>
     <string name="ai_setting_summary">分开配置提供商和模型</string>
     <string name="ai_enable">Enable AI</string>
@@ -1462,13 +1462,7 @@
     <string name="start_from">Start from</string>
     <string name="daily_chapters">Daily Chapters</string>
     <string name="start_chapter">Start Chapter</string>
-    <string name="update_to_variant_title">检查更新查找版本</string>
-    <string name="update_to_variant_summary">切换正式版/测试版</string>
-    <string name="default_version">当前</string>
     <string name="official_version">正式版</string>
-    <string name="beta_release_version">测试版</string>
-    <string name="beta_releaseA_version">共存版</string>
-    <string name="beta_releaseS_version" translatable="false">正式版</string>
     <string name="stream_read_aloud_audio">流式播放音频</string>
     <string name="stream_read_aloud_audio_summary">即边下边播，网络不好时播放会断断续续，仅TTS源有效</string>
     <string name="pause_read_aloud_while_phone_calls_title">来电期间暂停朗读</string>
@@ -1620,7 +1614,6 @@
     <string name="invalid_file_path">文件路径无效</string>
     <string name="is_system_tts_no_export">无法导出系统tts</string>
     <string name="click_image_way">点击图片方式</string>
-    <string name="auto_update_summary">每天自动检查软件是否更新</string>
     <string name="ai_import_default_skill">Install default 阅读R skill</string>
     <string name="ai_import_default_skill_summary">Download a real SKILL.md from DandanLLab/legadoSkill</string>
     <string name="ai_skill_prompt">Manage skills</string>
@@ -1693,6 +1686,9 @@
     <string name="bottom_bar_effect_solid">Solid</string>
     <string name="bottom_bar_effect_glass">Glass</string>
     <string name="bottom_bar_effect_frosted">Frosted glass</string>
+    <string name="bottom_bar_layout_mode">Bottom bar layout</string>
+    <string name="bottom_bar_layout_floating">Floating bottom bar</string>
+    <string name="bottom_bar_layout_sidebar">Sidebar</string>
     <string name="bottom_bar_opacity">Opacity</string>
     <string name="theme_day">Day theme</string>
     <string name="theme_night">Night theme</string>
@@ -1829,18 +1825,20 @@
     <string name="theme_color_accent">Accent color</string>
     <string name="theme_color_background">Background color</string>
     <string name="theme_color_bottom_background">Bottom bar color</string>
-    <string name="theme_color_primary_text">Primary text color</string>
-    <string name="theme_color_secondary_text">Secondary text color</string>
     <string name="theme_image_main_background">Main background</string>
     <string name="theme_image_book_info_background">Book detail background</string>
     <string name="theme_image_blur">Background image blur</string>
     <string name="theme_image_select">Select image</string>
-    <string name="theme_image_online">Online image link</string>
-    <string name="theme_image_online_invalid">Please enter an image URL starting with http:// or https://</string>
     <string name="theme_image_delete">Delete image</string>
     <string name="theme_image_value_unselected">Not selected</string>
     <string name="theme_image_value_unselected_blur">Not selected · blur %d</string>
     <string name="theme_image_value_file_blur">%1$s · blur %2$d</string>
+    <string name="image_crop_title">Crop image</string>
+    <string name="image_crop_failed">Image crop failed: %1$s</string>
+    <string name="image_crop_hint">Move or pinch the image, then confirm</string>
+    <string name="theme_image_selected">Selected</string>
+    <string name="navigation_bar_sidebar_background">Sidebar wallpaper</string>
+    <string name="color_format_error">Invalid color format</string>
     <string name="unknown">Unknown</string>
     <string name="ai_read_prompt_template">You are the Ask AI assistant inside the reading page. Answer around the current book and selected text. Prioritize explaining the original text, context, character relationships, foreshadowing, or the user question. Do not invent plot details not provided.
 

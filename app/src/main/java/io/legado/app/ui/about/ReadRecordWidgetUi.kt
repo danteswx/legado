@@ -22,6 +22,7 @@ import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.UiCorner
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.model.BookCover
+import io.legado.app.help.glide.ImageLoader
 import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.utils.ColorUtils
@@ -91,6 +92,14 @@ fun Context.showReadRecordBookActionDialog(
 
 fun ImageView.loadReadRecordCover(path: String?) {
     BookCover.load(context, path).into(this)
+}
+
+fun ImageView.loadReadRecordAvatar(path: String?) {
+    ImageLoader.load(context, path)
+        .placeholder(R.drawable.ic_read_record_default_avatar)
+        .error(R.drawable.ic_read_record_default_avatar)
+        .centerCrop()
+        .into(this)
 }
 
 class ReadRecordCoverAdapter(

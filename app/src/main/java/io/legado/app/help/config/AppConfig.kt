@@ -248,7 +248,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = true
 
     val isMainTransparentStatusBar: Boolean
-        get() = true
+        get() = appCtx.getPrefBoolean(PreferKey.mainTransparentStatusBar, false)
 
     val immNavigationBar: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.immNavigationBar, true)
@@ -1152,6 +1152,28 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             )
         }
 
+    var bottomBarLayoutMode: String
+        get() = appCtx.getPrefString(PreferKey.bottomBarLayoutMode, "floating")
+            ?.takeIf { it in setOf("floating", "sidebar") }
+            ?: "floating"
+        set(value) {
+            appCtx.putPrefString(
+                PreferKey.bottomBarLayoutMode,
+                value.takeIf { it in setOf("floating", "sidebar") } ?: "floating"
+            )
+        }
+
+    var bottomBarSidebarGravity: String
+        get() = appCtx.getPrefString(PreferKey.bottomBarSidebarGravity, "start")
+            ?.takeIf { it in setOf("start", "end") }
+            ?: "start"
+        set(value) {
+            appCtx.putPrefString(
+                PreferKey.bottomBarSidebarGravity,
+                value.takeIf { it in setOf("start", "end") } ?: "start"
+            )
+        }
+
     var readUrlInBrowser: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.readUrlOpenInBrowser)
         set(value) {
@@ -1359,8 +1381,6 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     val defaultHomePage get() = appCtx.getPrefString(PreferKey.defaultHomePage, "bookshelf")
 
-    val updateToVariant get() = appCtx.getPrefString(PreferKey.updateToVariant, "default_version")
-
     val streamReadAloudAudio get() = appCtx.getPrefBoolean(PreferKey.streamReadAloudAudio, false)
 
     val doublePageHorizontal: String?
@@ -1455,7 +1475,7 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             ReadBookConfig.durConfig.setCurReadScrollFollowBackground(value)
         }
     var readMenuAlpha: Int
-        get() = appCtx.getPrefInt(PreferKey.readMenuAlpha, 75).coerceIn(35, 100)
+        get() = appCtx.getPrefInt(PreferKey.readMenuAlpha, 100).coerceIn(35, 100)
         set(value) {
             appCtx.putPrefInt(PreferKey.readMenuAlpha, value.coerceIn(35, 100))
         }
@@ -1620,5 +1640,4 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefBoolean(PreferKey.welcomeShowIconDark, value)
         }
 
-    val autoUpdateVariant get() = appCtx.getPrefBoolean("autoUpdateVariant", true)
 }

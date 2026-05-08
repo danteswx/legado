@@ -43,6 +43,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import splitties.init.appCtx
 
@@ -137,19 +138,13 @@ class CoverImageView @JvmOverloads constructor(
                     }
                     ensureActive()
                 }
-                if (width == 0) {
-                    var attempts = 0
-                    do {
-                        delay(1L)
-                        attempts++
-                    } while (width == 0 && attempts < 2000)
-                }
+                val (bitmapWidth, bitmapHeight) = awaitCoverSize() ?: return@launch
                 ensureActive()
-                val bitmap = generateCoverBitmap(name, author)
+                val bitmap = generateCoverBitmap(name, author, bitmapWidth, bitmapHeight)
                 ensureActive()
                 needNameBitmap.put(bitmapPath.toString(), true)
-                nameBitmapCache.put(pathName + width, bitmap)
-                invalidate()
+                nameBitmapCache.put(pathName + bitmapWidth, bitmap)
+                postInvalidate()
             } catch (_: CancellationException) {
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -157,7 +152,20 @@ class CoverImageView @JvmOverloads constructor(
         }
     }
 
-    private fun generateCoverBitmap(name: String?, author: String?): Bitmap {
+    private suspend fun awaitCoverSize(): Pair<Int, Int>? {
+        repeat(2000) {
+            val size = withContext(Dispatchers.Main.immediate) {
+                width to height
+            }
+            if (size.first > 0 && size.second > 0) {
+                return size
+            }
+            delay(1L)
+        }
+        return null
+    }
+
+    private fun generateCoverBitmap(name: String?, author: String?, width: Int, height: Int): Bitmap {
         viewWidth = width.toFloat()
         viewHeight = height.toFloat()
         val bitmap = createBitmap(width, height)

@@ -14,6 +14,7 @@ import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.activity.viewModels
 import androidx.appcompat.widget.SearchView
+import androidx.core.content.ContextCompat
 import androidx.core.os.bundleOf
 import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
@@ -34,6 +35,7 @@ import io.legado.app.data.entities.SearchBook
 import io.legado.app.data.entities.SearchKeyword
 import io.legado.app.databinding.ActivityBookSearchBinding
 import io.legado.app.help.book.isVideo
+import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.Selector
 import io.legado.app.lib.theme.UiCorner
@@ -71,7 +73,6 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import splitties.init.appCtx
-import kotlin.math.abs
 
 class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel>(),
     BookAdapter.CallBack,
@@ -144,21 +145,33 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
     private fun initTopBar() {
         binding.root.applyStatusBarPadding()
         binding.btnMenu.setColorFilter(secondaryTextColor)
+        val isNight = AppConfig.isNightTheme
+        val searchSurfaceColor = if (isNight) {
+            ColorUtils.adjustAlpha(Color.rgb(52, 52, 56), 0.42f)
+        } else {
+            ColorUtils.adjustAlpha(Color.rgb(120, 120, 128), 0.18f)
+        }
+        val cardColor = if (isNight) {
+            ColorUtils.adjustAlpha(Color.rgb(44, 44, 46), 0.45f)
+        } else {
+            ContextCompat.getColor(this, R.color.background_menu)
+        }
+        val chipColor = if (isNight) {
+            ColorUtils.adjustAlpha(Color.rgb(58, 58, 62), 0.32f)
+        } else {
+            ContextCompat.getColor(this, R.color.background_card)
+        }
+        val chipPressedColor = if (isNight) {
+            ColorUtils.adjustAlpha(Color.rgb(82, 82, 86), 0.45f)
+        } else {
+            ContextCompat.getColor(this, R.color.background_menu)
+        }
+        val strokeColor = ColorUtils.adjustAlpha(primaryTextColor, if (isNight) 0.10f else 0.08f)
         binding.searchView.background = GradientDrawable().apply {
             cornerRadius = UiCorner.searchRadius(18f)
-            setColor(
-                ColorUtils.adjustAlpha(
-                    ColorUtils.blendColors(primaryTextColor, Color.GRAY, 0.72f),
-                    0.16f
-                )
-            )
-            setStroke(1.dpToPx(), ColorUtils.adjustAlpha(primaryTextColor, 0.08f))
+            setColor(searchSurfaceColor)
+            setStroke(1.dpToPx(), strokeColor)
         }
-        val cardColor = ColorUtils.adjustAlpha(
-            ColorUtils.blendColors(primaryTextColor, Color.GRAY, 0.72f),
-            0.12f
-        )
-        val strokeColor = ColorUtils.adjustAlpha(primaryTextColor, 0.08f)
         binding.llBookshelfHintCard.background = UiCorner.roundedStroke(
             cardColor,
             UiCorner.searchRadius(20f),
@@ -172,8 +185,8 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
             strokeColor
         )
         binding.tvClearHistory.background = UiCorner.actionSelector(
-            ColorUtils.adjustAlpha(primaryTextColor, 0.06f),
-            ColorUtils.adjustAlpha(primaryTextColor, 0.12f),
+            chipColor,
+            chipPressedColor,
             UiCorner.searchRadius(14f)
         )
         binding.btnMenu.setOnClickListener {
@@ -313,22 +326,16 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
         binding.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 super.onScrolled(recyclerView, dx, dy)
-                if (!recyclerView.canScrollVertically(1)) {
-                    val layoutManager = recyclerView.layoutManager as LinearLayoutManager
-                    val lastPosition = layoutManager.findLastCompletelyVisibleItemPosition()
-                    if (lastPosition == RecyclerView.NO_POSITION) {
-                        return
-                    }
-                    val lastView = layoutManager.findViewByPosition(lastPosition)
-                    if (lastView == null) {
-                        scrollToBottom()
-                        return
-                    }
-                    val bottom =
-                        abs(lastView.bottom - recyclerView.height) - recyclerView.paddingBottom
-                    if (bottom <= 1) {
-                        scrollToBottom()
-                    }
+                if (dy < 0) {
+                    return
+                }
+                val layoutManager = recyclerView.layoutManager as LinearLayoutManager
+                val lastPosition = layoutManager.findLastVisibleItemPosition()
+                if (lastPosition == RecyclerView.NO_POSITION) {
+                    return
+                }
+                if (adapter.itemCount - lastPosition <= 3 || !recyclerView.canScrollVertically(1)) {
+                    scrollToBottom()
                 }
             }
         })

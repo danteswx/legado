@@ -2,6 +2,7 @@ package io.legado.app.ui.main.readrecord
 
 import android.app.DatePickerDialog
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
@@ -35,18 +36,22 @@ import io.legado.app.ui.about.ReadRecordRankDialog
 import io.legado.app.ui.about.ReadRecordRankItem
 import io.legado.app.ui.about.ReadRecordWidgetStore
 import io.legado.app.ui.about.ReadRecentVisualItem
+import io.legado.app.ui.about.loadReadRecordAvatar
 import io.legado.app.ui.about.loadReadRecordCover
 import io.legado.app.ui.about.openReadRecordBook
 import io.legado.app.ui.about.showReadRecordBookActionDialog
 import io.legado.app.ui.about.showReadRecordGoalDialog
 import io.legado.app.ui.file.HandleFileContract
+import io.legado.app.ui.image.ImageCropContract
 import io.legado.app.ui.main.MainFragmentInterface
 import io.legado.app.utils.ColorUtils
+import io.legado.app.utils.ImageCropHelper
 import io.legado.app.utils.applyMainBottomBarPadding
 import io.legado.app.utils.applyStatusBarPadding
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.registerForActivityResult
 import io.legado.app.utils.startActivityForBook
+import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Job
@@ -97,9 +102,25 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
     private var currentTotalTime: Long = 0L
     private var currentReadBookCount: Int = 0
     private var pendingAvatarUpdate: ((String) -> Unit)? = null
+    private var pendingAvatarCropRequest: ImageCropHelper.Request? = null
     private val selectGoalAvatar = registerForActivityResult(HandleFileContract()) {
-        it.uri?.toString()?.let { uri ->
-            pendingAvatarUpdate?.invoke(uri)
+        it.uri?.let { uri ->
+            startAvatarCrop(uri)
+        } ?: run {
+            pendingAvatarUpdate = null
+        }
+    }
+    private val cropGoalAvatar = registerForActivityResult(ImageCropContract()) { result ->
+        val request = pendingAvatarCropRequest ?: return@registerForActivityResult
+        pendingAvatarCropRequest = null
+        if (result == null) {
+            pendingAvatarUpdate = null
+            return@registerForActivityResult
+        }
+        if (java.io.File(result).exists()) {
+            pendingAvatarUpdate?.invoke(result)
+        } else {
+            toastOnUi(getString(R.string.image_crop_failed, getString(R.string.unknown)))
         }
         pendingAvatarUpdate = null
     }
@@ -219,6 +240,21 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
             lastLoadTime = System.currentTimeMillis()
             renderDashboard(dashboard)
         }
+    }
+
+    private fun startAvatarCrop(uri: Uri) {
+        val request = ImageCropHelper.buildRequest(
+            context = requireContext(),
+            sourceUri = uri,
+            requestCode = requestGoalAvatar,
+            aspectWidth = 1,
+            aspectHeight = 1,
+            dirName = "readRecordGoalAvatar",
+            prefix = "avatar",
+            targetWidth = 512
+        )
+        pendingAvatarCropRequest = request
+        cropGoalAvatar.launch(request.params)
     }
 
     private fun buildDashboard(today: LocalDate): ReadRecordDashboard {
@@ -518,7 +554,7 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
     private fun renderGoalCard(todayTime: Long, totalTime: Long, readBookCount: Int) {
         val todayText = formatDuring(todayTime)
         val totalText = formatDuring(totalTime)
-        binding.ivGoalAvatar.loadReadRecordCover(currentGoalConfig.avatar)
+        binding.ivGoalAvatar.loadReadRecordAvatar(currentGoalConfig.avatar)
         binding.tvGoalUserName.text = currentGoalConfig.userName.orEmpty()
         binding.tvGoalUserName.isVisible = !currentGoalConfig.userName.isNullOrBlank()
         binding.tvGoalToday.text = getString(R.string.read_record_goal_today, todayText)
@@ -655,17 +691,22 @@ class ReadRecordFragment() : BaseFragment(R.layout.activity_read_record), MainFr
         val hours = mss % (1000 * 60 * 60 * 24) / (1000 * 60 * 60)
         val minutes = mss % (1000 * 60 * 60) / (1000 * 60)
         val seconds = mss % (1000 * 60) / 1000
-        val d = if (days > 0) "${days}天" else ""
-        val h = if (hours > 0) "${hours}小时" else ""
-        val m = if (minutes > 0) "${minutes}分钟" else ""
-        val s = if (seconds > 0 && days == 0L && hours == 0L) "${seconds}秒" else ""
+        val d = if (days > 0) getString(R.string.duration_day, days) else ""
+        val h = if (hours > 0) getString(R.string.duration_hour, hours) else ""
+        val m = if (minutes > 0) getString(R.string.duration_minute, minutes) else ""
+        val s = if (seconds > 0 && days == 0L && hours == 0L) {
+            getString(R.string.duration_second, seconds)
+        } else {
+            ""
+        }
         val time = "$d$h$m$s"
-        return if (time.isBlank()) "0秒" else time
+        return if (time.isBlank()) getString(R.string.duration_zero) else time
     }
 
 }
 
 private const val DATA_STALE_MS = 60_000L
+private const val requestGoalAvatar = 501
 
 private data class ReadRecordDashboard(
     val today: LocalDate,

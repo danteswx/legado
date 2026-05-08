@@ -19,6 +19,7 @@ import androidx.annotation.StringRes
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.DrawableCompat
 import io.legado.app.R
+import io.legado.app.constant.PreferKey
 import io.legado.app.help.AppWebDav
 import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.lib.theme.bottomBackground
@@ -79,9 +80,12 @@ object NavigationBarIconConfig {
     data class Config(
         var name: String,
         var isNightMode: Boolean,
+        var layoutMode: String = "floating",
+        var sidebarGravity: String = "start",
         var effectMode: String = "glass",
         var opacity: Int = 72,
         var updatedAt: Long = System.currentTimeMillis(),
+        var sidebarBackgroundPath: String? = null,
         var icons: MutableMap<String, String> = linkedMapOf()
     )
 
@@ -107,8 +111,9 @@ object NavigationBarIconConfig {
         NavItem("bookshelf", R.string.bookshelf, R.id.menu_bookshelf, R.drawable.ic_bottom_books),
         NavItem("discovery", R.string.discovery, R.id.menu_discovery, R.drawable.ic_bottom_explore),
         NavItem("rss", R.string.rss, R.id.menu_rss, R.drawable.ic_bottom_rss_feed),
-        NavItem("readRecord", R.string.read_record, R.id.menu_read_record, R.drawable.ic_bottom_read_record),
-        NavItem("my", R.string.my, R.id.menu_my_config, R.drawable.ic_bottom_person)
+        NavItem("readRecord", R.string.side_nav_stats, R.id.menu_read_record, R.drawable.ic_bottom_read_record),
+        NavItem("my", R.string.my, R.id.menu_my_config, R.drawable.ic_bottom_person),
+        NavItem("ai", R.string.side_nav_assistant, R.id.menu_ai, R.drawable.ic_bottom_ai_assistant)
     )
 
     fun activeDirName(isNight: Boolean): String {
@@ -156,19 +161,29 @@ object NavigationBarIconConfig {
     }
 
     fun apply(entry: Entry) {
-        val config = entry.config
+        val config = normalizeConfig(entry.config)
         val key = if (config.isNightMode) activeNightKey else activeDayKey
         appCtx.putPrefString(key, entry.dirName)
+        AppConfig.bottomBarLayoutMode = config.layoutMode
+        AppConfig.bottomBarSidebarGravity = config.sidebarGravity
         AppConfig.bottomBarEffectMode = config.effectMode
         AppConfig.liquidGlassLevel = config.opacity
         AppConfig.frostedGlassLevel = config.opacity
+        if (config.layoutMode == "sidebar") {
+            appCtx.putPrefBoolean(PreferKey.mergeDiscoveryRss, false)
+        }
     }
 
     fun applyCurrentBottomConfig(isNight: Boolean) {
-        val config = currentEntry(isNight).config
+        val config = normalizeConfig(currentEntry(isNight).config)
+        AppConfig.bottomBarLayoutMode = config.layoutMode
+        AppConfig.bottomBarSidebarGravity = config.sidebarGravity
         AppConfig.bottomBarEffectMode = config.effectMode
         AppConfig.liquidGlassLevel = config.opacity
         AppConfig.frostedGlassLevel = config.opacity
+        if (config.layoutMode == "sidebar") {
+            appCtx.putPrefBoolean(PreferKey.mergeDiscoveryRss, false)
+        }
     }
 
     fun addOrUpdate(config: Config, oldEntry: Entry? = null): Entry {
@@ -186,12 +201,15 @@ object NavigationBarIconConfig {
             throw IllegalArgumentException(appCtx.getString(R.string.navigation_bar_name_exists))
         }
         val dir = localDir(config.isNightMode, dirName).apply { mkdirs() }
-        val normalized = config.copy(
+        val source = normalizeConfig(config)
+        val normalized = source.copy(
             name = name,
-            effectMode = config.effectMode.takeIf { it in setOf("solid", "glass", "frosted") } ?: "glass",
-            opacity = config.opacity.coerceIn(0, 100),
+            layoutMode = source.layoutMode,
+            sidebarGravity = source.sidebarGravity,
+            effectMode = source.effectMode,
+            opacity = source.opacity.coerceIn(0, 100),
             updatedAt = System.currentTimeMillis(),
-            icons = config.icons.toMutableMap()
+            icons = source.icons.toMutableMap()
         )
         File(dir, packageFileName).writeText(GSON.toJson(normalized))
         return Entry(normalized, Source.LOCAL, dirName, localDir = dir)
@@ -283,6 +301,47 @@ object NavigationBarIconConfig {
         return addOrUpdate(config, entry)
     }
 
+    fun saveSidebarBackgroundToPackage(
+        context: Context,
+        sourcePath: String,
+        entry: Entry
+    ): Entry {
+        if (entry.dirName == DEFAULT_DIR_NAME) {
+            throw IllegalArgumentException(context.getString(R.string.navigation_bar_default_readonly))
+        }
+        val source = File(sourcePath)
+        if (!source.exists()) {
+            throw IllegalArgumentException(
+                context.getString(R.string.image_crop_failed, context.getString(R.string.unknown))
+            )
+        }
+        val dirName = entry.dirName.ifBlank {
+            entry.config.name.normalizeFileName().ifBlank { "navigation_${System.currentTimeMillis()}" }
+        }
+        val dir = entry.localDir ?: localDir(entry.config.isNightMode, dirName).apply { mkdirs() }
+        val suffix = source.name.substringAfterLast('.', "")
+            .takeIf { it.isNotBlank() }
+            ?.let { ".${it.lowercase(Locale.ROOT)}" }
+            ?: ".jpg"
+        val fileName = "sidebar_background$suffix"
+        source.copyTo(File(dir, fileName), overwrite = true)
+        val config = entry.config.copy(icons = entry.config.icons.toMutableMap())
+        config.sidebarBackgroundPath = fileName
+        return addOrUpdate(config, entry)
+    }
+
+    fun clearSidebarBackground(entry: Entry): Entry {
+        if (entry.dirName == DEFAULT_DIR_NAME) return entry
+        entry.config.sidebarBackgroundPath?.let { name ->
+            File(entry.localDir ?: localDir(entry.config.isNightMode, entry.dirName), name)
+                .takeIf { it.exists() }
+                ?.delete()
+        }
+        val config = entry.config.copy(icons = entry.config.icons.toMutableMap())
+        config.sidebarBackgroundPath = null
+        return addOrUpdate(config, entry)
+    }
+
     fun applyTo(menu: Menu, context: Context, isNight: Boolean): Boolean {
         val entry = currentEntry(isNight)
         val hasCustom = entry.dirName != DEFAULT_DIR_NAME && entry.config.icons.isNotEmpty()
@@ -299,6 +358,20 @@ object NavigationBarIconConfig {
             ?: ContextCompat.getDrawable(context, item.defaultIconRes)
     }
 
+    fun currentDrawable(context: Context, itemKey: String, selected: Boolean): Drawable? {
+        val item = items.firstOrNull { it.key == itemKey } ?: return null
+        return previewDrawable(context, currentEntry(AppConfig.isNightTheme), item, selected)
+    }
+
+    fun currentMenuDrawable(context: Context, itemKey: String): Drawable? {
+        val item = items.firstOrNull { it.key == itemKey } ?: return null
+        return createMenuDrawable(context, currentEntry(AppConfig.isNightTheme), item)
+    }
+
+    fun currentSidebarBackgroundPath(isNight: Boolean): String? {
+        return resolveSidebarBackgroundPath(currentEntry(isNight))
+    }
+
     fun getIconFileName(entry: Entry, itemKey: String, selected: Boolean): String? {
         val state = if (selected) STATE_SELECTED else STATE_NORMAL
         return entry.config.icons[iconKey(itemKey, state)]?.let { File(it).name }
@@ -309,6 +382,8 @@ object NavigationBarIconConfig {
             Config(
                 name = defaultName(isNight),
                 isNightMode = isNight,
+                layoutMode = "floating",
+                sidebarGravity = "start",
                 effectMode = "glass",
                 opacity = 76,
                 updatedAt = 0L
@@ -390,7 +465,7 @@ object NavigationBarIconConfig {
     private fun readConfig(dir: File): Config? {
         val file = File(dir, packageFileName)
         if (!file.exists()) return null
-        return GSON.fromJsonObject<Config>(file.readText()).getOrNull()
+        return GSON.fromJsonObject<Config>(file.readText()).getOrNull()?.let(::normalizeConfig)
     }
 
     private fun importZipInternal(zipFile: File, remoteUpdatedAt: Long = 0L): Entry {
@@ -402,11 +477,10 @@ object NavigationBarIconConfig {
             ZipUtils.unZipToPath(zipFile, unzipDir)
             val packageFile = unzipDir.walkTopDown().firstOrNull { it.isFile && it.name == packageFileName }
                 ?: throw IllegalArgumentException(appCtx.getString(R.string.navigation_bar_config_missing))
-            val config = GSON.fromJsonObject<Config>(packageFile.readText()).getOrThrow()
+            val config = normalizeConfig(GSON.fromJsonObject<Config>(packageFile.readText()).getOrThrow())
             if (config.name.normalizeFileName() == DEFAULT_DIR_NAME) {
                 config.name = "${config.name}_${appCtx.getString(R.string.navigation_bar_import_suffix)}"
             }
-            config.effectMode = config.effectMode.takeIf { it in setOf("solid", "glass", "frosted") } ?: "glass"
             config.opacity = config.opacity.coerceIn(0, 100)
             if (remoteUpdatedAt == 0L) {
                 config.updatedAt = System.currentTimeMillis()
@@ -445,6 +519,16 @@ object NavigationBarIconConfig {
         val value = entry.config.icons[iconKey(itemKey, state)] ?: return null
         val file = File(value)
         return if (file.isAbsolute) value else File(entry.localDir ?: localDir(entry.config.isNightMode, entry.dirName), value).absolutePath
+    }
+
+    private fun resolveSidebarBackgroundPath(entry: Entry): String? {
+        if (entry.dirName == DEFAULT_DIR_NAME) return null
+        val value = entry.config.sidebarBackgroundPath ?: return null
+        val file = File(value)
+        return if (file.isAbsolute) value else File(
+            entry.localDir ?: localDir(entry.config.isNightMode, entry.dirName),
+            value
+        ).absolutePath
     }
 
     private fun iconKey(itemKey: String, state: String): String = "${itemKey}_$state"
@@ -545,6 +629,27 @@ object NavigationBarIconConfig {
 
     private fun defaultName(isNight: Boolean): String {
         return appCtx.getString(if (isNight) R.string.navigation_bar_night_default_name else R.string.navigation_bar_day_default_name)
+    }
+
+    private fun normalizeConfig(config: Config): Config {
+        val layoutMode = runCatching { config.layoutMode }.getOrNull()
+            ?.takeIf { it in setOf("floating", "sidebar") }
+            ?: "floating"
+        val sidebarGravity = runCatching { config.sidebarGravity }.getOrNull()
+            ?.takeIf { it in setOf("start", "end") }
+            ?: "start"
+        val effectMode = runCatching { config.effectMode }.getOrNull()
+            ?.takeIf { it in setOf("solid", "glass", "frosted") }
+            ?: "glass"
+        val icons = runCatching { config.icons }.getOrNull() ?: linkedMapOf()
+        val sidebarBackgroundPath = runCatching { config.sidebarBackgroundPath }.getOrNull()
+        config.layoutMode = layoutMode
+        config.sidebarGravity = sidebarGravity
+        config.effectMode = effectMode
+        config.opacity = config.opacity.coerceIn(0, 100)
+        config.sidebarBackgroundPath = sidebarBackgroundPath
+        config.icons = icons.toMutableMap()
+        return config
     }
 
     private fun resetActiveIfNeeded(entry: Entry) {

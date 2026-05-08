@@ -87,6 +87,28 @@ fun Activity.fullScreen() {
     window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
 }
 
+val isHuaweiSystemDevice: Boolean
+    get() {
+        val manufacturer = Build.MANUFACTURER.orEmpty()
+        val brand = Build.BRAND.orEmpty()
+        return manufacturer.equals("HUAWEI", ignoreCase = true) ||
+                brand.equals("HUAWEI", ignoreCase = true) ||
+                manufacturer.equals("HONOR", ignoreCase = true) ||
+                brand.equals("HONOR", ignoreCase = true)
+    }
+
+fun Activity.setHuaweiDisplayCutoutShortEdgesCompat(enabled: Boolean) {
+    if (isHuaweiSystemDevice && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        window.attributes = window.attributes.apply {
+            layoutInDisplayCutoutMode = if (enabled) {
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            } else {
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
+            }
+        }
+    }
+}
+
 /**
  * 设置状态栏颜色
  */

@@ -73,6 +73,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * 发现界面
@@ -110,7 +112,6 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private var tagFilterPopup: PopupWindow? = null
     private var discoverSourceFlowJob: Job? = null
     private var discoverBookshelfFlowJob: Job? = null
-    private var discoverWarmupJob: Job? = null
     private var discoverLoadJob: Job? = null
     private var discoverActionJob: Job? = null
     private val discoverSources = mutableListOf<BookSourcePart>()
@@ -133,6 +134,8 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private var selectedDiscoverUrlIndex = -1
     private var discoverRequestVersion = 0L
     private var discoverSourceVersion = 0L
+    private var discoverLoadingSignals = 0
+    private var discoverLoadingGeneration = 0L
     private var discoveryModeLoaded = false
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
@@ -157,7 +160,6 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         binding.rvDiscoverBooks.clipToPadding = false
         binding.rvDiscoverBooks.applyMainBottomBarPadding(withInitialPadding = true)
         applyDiscoveryMode(loadData = false)
-        scheduleDiscoveryWarmup()
     }
 
     override fun onCompatCreateOptionsMenu(menu: Menu) {
@@ -200,15 +202,119 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         }
     }
 
-    private fun scheduleDiscoveryWarmup() {
-        discoverWarmupJob?.cancel()
-        if (!AppConfig.modernDiscoveryPage) return
-        discoverWarmupJob = viewLifecycleOwner.lifecycleScope.launch {
-            delay(1800)
-            if (!isAdded || discoveryModeLoaded || !AppConfig.modernDiscoveryPage) return@launch
-            applyDiscoveryMode(loadData = true)
-            discoveryModeLoaded = true
+    private fun showDiscoverLoading(): Long {
+        discoverLoadingSignals += 1
+        binding.tvDiscoverEmpty.gone()
+        binding.tvDiscoverLoading.setText(R.string.data_loading)
+        binding.llDiscoverLoading.visible()
+        return discoverLoadingGeneration
+    }
+
+    private fun hideDiscoverLoading(generation: Long) {
+        if (generation != discoverLoadingGeneration) return
+        discoverLoadingSignals = (discoverLoadingSignals - 1).coerceAtLeast(0)
+        if (discoverLoadingSignals == 0) {
+            binding.llDiscoverLoading.gone()
         }
+    }
+
+    private fun clearDiscoverLoading() {
+        discoverLoadingGeneration += 1
+        discoverLoadingSignals = 0
+        binding.llDiscoverLoading.gone()
+    }
+
+    private fun resetExplore() {
+        discoverRequestVersion += 1
+        discoverLoadJob?.cancel()
+        discoverLoadJob = null
+        discoverLoading = false
+        binding.swipeRefreshLayout.isRefreshing = false
+        discoverTagItems.clear()
+        discoverSelectItems.clear()
+        selectedDiscoverTagIndex = -1
+        selectedDiscoverUrlIndex = -1
+        discoverCurrentUrl = null
+        discoverHasMore = true
+        discoverPage = 1
+        discoverBooks.clear()
+        discoverBookAdapter.clearItems()
+        binding.rvDiscoverSelects.gone()
+        binding.rvDiscoverSelects.submitItems(emptyList(), -1)
+        binding.rvDiscoverTags.submitItems(emptyList(), -1)
+        binding.tvDiscoverEmpty.gone()
+    }
+
+    private inner class DiscoverRefreshController {
+        private val loadingActive = AtomicBoolean(false)
+        private val loadingGeneration = AtomicLong(Long.MIN_VALUE)
+        private val refreshRequested = AtomicBoolean(false)
+
+        val requested: Boolean
+            get() = refreshRequested.get()
+
+        fun showLoading() {
+            refreshRequested.set(true)
+            if (!loadingActive.compareAndSet(false, true)) return
+            binding.root.post {
+                if (!isAdded || !loadingActive.get()) return@post
+                loadingGeneration.set(showDiscoverLoading())
+                resetExplore()
+            }
+        }
+
+        fun finish() {
+            loadingActive.set(false)
+            if (!isAdded) return
+            val generation = loadingGeneration.get()
+            if (generation != Long.MIN_VALUE) {
+                hideDiscoverLoading(generation)
+            }
+        }
+    }
+
+    private fun discoverRefreshCallback(
+        controller: DiscoverRefreshController,
+        onOpen: (
+            name: String,
+            url: String?,
+            title: String?,
+            origin: String?
+        ) -> Boolean = { _, _, _, _ -> false }
+    ): SourceLoginJsExtensions.Callback {
+        return object : SourceLoginJsExtensions.Callback {
+            override fun upUiData(data: Map<String, Any?>?) = Unit
+
+            override fun reUiView(deltaUp: Boolean) {
+                controller.showLoading()
+            }
+
+            override fun open(
+                name: String,
+                url: String?,
+                title: String?,
+                origin: String?
+            ): Boolean {
+                return onOpen(name, url, title, origin)
+            }
+        }
+    }
+
+    private fun discoverJsExtensions(
+        source: BookSource,
+        controller: DiscoverRefreshController,
+        onOpen: (
+            name: String,
+            url: String?,
+            title: String?,
+            origin: String?
+        ) -> Boolean = { _, _, _, _ -> false }
+    ): SourceLoginJsExtensions {
+        return SourceLoginJsExtensions(
+            activity as? AppCompatActivity,
+            source,
+            callback = discoverRefreshCallback(controller, onOpen)
+        )
     }
 
     private fun initClassicMode() {
@@ -239,8 +345,6 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         sourceMenuPopup = null
         tagFilterPopup?.dismiss()
         tagFilterPopup = null
-        discoverWarmupJob?.cancel()
-        discoverWarmupJob = null
         discoverSourceFlowJob?.cancel()
         discoverSourceFlowJob = null
         discoverBookshelfFlowJob?.cancel()
@@ -252,7 +356,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         discoverSourceVersion += 1
         discoverRequestVersion += 1
         discoverLoading = false
-        binding.pbDiscoverLoading.gone()
+        clearDiscoverLoading()
         discoverAllTagItems.clear()
         discoverMajorGroups.clear()
         discoverTagItems.clear()
@@ -309,7 +413,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     private fun bindDiscoverSourceSelector() {
         val updateSourceNameWidth = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-            updateDiscoverSourceNameWidth()
+            binding.llDiscoverSourceRow.post(::updateDiscoverSourceNameWidth)
         }
         binding.llDiscoverSourceRow.addOnLayoutChangeListener(updateSourceNameWidth)
         binding.llDiscoverSourceRow.post(::updateDiscoverSourceNameWidth)
@@ -339,7 +443,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         ).filter { it.isVisible }.sumOf { it.measuredWidth.takeIf { width -> width > 0 } ?: it.layoutParams.width }
         val spacing = 36.dpToPx()
         val maxWidth = (rowWidth - actionsWidth - spacing).coerceIn(96.dpToPx(), 190.dpToPx())
-        binding.tvDiscoverSourceSelect.maxWidth = maxWidth
+        if (binding.tvDiscoverSourceSelect.maxWidth != maxWidth) {
+            binding.tvDiscoverSourceSelect.maxWidth = maxWidth
+        }
     }
 
     private fun openSelectedSourceLogin() {
@@ -409,7 +515,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                         updateDiscoverLoginButtonState()
                         updateDiscoverSearchButtonState()
                         updateDiscoverTagFilterButtonState()
-                        binding.pbDiscoverLoading.gone()
+                        clearDiscoverLoading()
                         return@collect
                     }
                     val keepSource = selectedDiscoverSourcePart?.bookSourceUrl
@@ -488,7 +594,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         discoverLoadJob?.cancel()
         discoverLoadJob = null
         discoverLoading = false
-        binding.pbDiscoverLoading.gone()
+        clearDiscoverLoading()
         discoverCurrentUrl = null
         discoverBooks.clear()
         discoverBookAdapter.clearItems()
@@ -502,16 +608,23 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         renderDiscoverMajorGroups()
         updateDiscoverTagFilterButtonState()
         viewLifecycleOwner.lifecycleScope.launch {
-            val fullSource = withContext(IO) {
-                appDb.bookSourceDao.getBookSource(source.bookSourceUrl)
+            val loadingGeneration = showDiscoverLoading()
+            try {
+                val fullSource = withContext(IO) {
+                    appDb.bookSourceDao.getBookSource(source.bookSourceUrl)
+                }
+                if (currentSourceVersion != discoverSourceVersion || !isAdded) {
+                    return@launch
+                }
+                selectedDiscoverSource = fullSource
+                updateDiscoverSourceTitle()
+                updateDiscoverSearchButtonState()
+                loadDiscoverKindsAndDefault()
+            } finally {
+                if (isAdded && currentSourceVersion == discoverSourceVersion) {
+                    hideDiscoverLoading(loadingGeneration)
+                }
             }
-            if (currentSourceVersion != discoverSourceVersion || !isAdded) {
-                return@launch
-            }
-            selectedDiscoverSource = fullSource
-            updateDiscoverSourceTitle()
-            updateDiscoverSearchButtonState()
-            loadDiscoverKindsAndDefault()
         }
     }
 
@@ -804,19 +917,27 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         if (key.isBlank()) return
         val infoMap = getDiscoverInfoMap(source.bookSourceUrl)
         infoMap[key] = value
-        viewLifecycleOwner.lifecycleScope.launch(IO) {
-            source.clearExploreKindsCache()
-            val action = item.kind.action?.takeIf { it.isNotBlank() }
-            if (!action.isNullOrBlank()) {
-                runScriptWithContext {
-                    source.evalJS(action) {
-                        put("java", SourceLoginJsExtensions(activity as? AppCompatActivity, source))
-                        put("infoMap", infoMap)
+        val refreshController = DiscoverRefreshController()
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                withContext(IO) {
+                    source.clearExploreKindsCache()
+                    val action = item.kind.action?.takeIf { it.isNotBlank() }
+                    if (!action.isNullOrBlank()) {
+                        runScriptWithContext {
+                            source.evalJS(action) {
+                                put(
+                                    "java",
+                                    discoverJsExtensions(source, refreshController)
+                                )
+                                put("infoMap", infoMap)
+                            }
+                        }
                     }
                 }
-            }
-            withContext(kotlinx.coroutines.Dispatchers.Main) {
                 loadDiscoverKindsAndDefault()
+            } finally {
+                refreshController.finish()
             }
         }
     }
@@ -847,23 +968,35 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         val script = extractDiscoverUrlScript(url) ?: return false
         val source = selectedDiscoverSource ?: return true
         val infoMap = getDiscoverInfoMap(source.bookSourceUrl)
+        val refreshController = DiscoverRefreshController()
         discoverActionJob?.cancel()
         discoverActionJob = viewLifecycleOwner.lifecycleScope.launch {
-            binding.pbDiscoverLoading.visible()
+            try {
             val result = withContext(IO) {
                 kotlin.runCatching {
                     runScriptWithContext {
                         source.evalJS(script) {
-                            put("java", SourceLoginJsExtensions(activity as? AppCompatActivity, source))
+                            put(
+                                "java",
+                                discoverJsExtensions(source, refreshController)
+                            )
                             put("infoMap", infoMap)
                         }
                     }
                 }
             }
-            binding.pbDiscoverLoading.gone()
+            if (refreshController.requested && isAdded) {
+                withContext(IO) {
+                    source.clearExploreKindsCache()
+                }
+                loadDiscoverKindsAndDefault()
+            }
             result.onFailure {
                 AppLog.put("发现 URL 脚本执行失败: ${item.text}", it)
                 context?.toastOnUi(it.localizedMessage ?: getString(R.string.unknown_error))
+            }
+            } finally {
+                refreshController.finish()
             }
         }
         return true
@@ -890,49 +1023,31 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         val isNavigationAction = actionLower.contains("showbrowser(")
             || actionLower.contains("open(\"explore\"")
             || actionLower.contains("open('explore'")
+        val refreshController = DiscoverRefreshController()
         discoverActionJob?.cancel()
         discoverActionJob = viewLifecycleOwner.lifecycleScope.launch {
-            binding.pbDiscoverLoading.visible()
+            try {
             val result = withContext(IO) {
                 kotlin.runCatching {
                     var handledByAction = false
-                    val java = SourceLoginJsExtensions(
-                        activity as? AppCompatActivity,
+                    val java = discoverJsExtensions(
                         source,
-                        callback = object : SourceLoginJsExtensions.Callback {
-                            override fun upUiData(data: Map<String, Any?>?) = Unit
-                            override fun reUiView(deltaUp: Boolean) = Unit
-                            override fun showBrowser(
-                                url: String,
-                                html: String?,
-                                preloadJs: String?,
-                                config: String?
-                            ): Boolean {
-                                return false
+                        refreshController
+                    ) { name, url, title, origin ->
+                            if (!isAdded) return@discoverJsExtensions false
+                            if (name != "explore") return@discoverJsExtensions false
+                            handledByAction = true
+                            val targetUrl = url?.takeIf { it.isNotBlank() } ?: return@discoverJsExtensions true
+                            val targetSourceUrl = origin
+                                ?.takeIf { it.isNotBlank() }
+                                ?: selectedDiscoverSource?.bookSourceUrl
+                                ?: source.bookSourceUrl
+                            val targetTitle = title ?: item.text
+                            binding.root.post {
+                                openExplore(targetSourceUrl, targetTitle, targetUrl)
                             }
-
-                            override fun open(
-                                name: String,
-                                url: String?,
-                                title: String?,
-                                origin: String?
-                            ): Boolean {
-                                if (!isAdded) return false
-                                if (name != "explore") return false
-                                handledByAction = true
-                                val targetUrl = url?.takeIf { it.isNotBlank() } ?: return true
-                                val targetSourceUrl = origin
-                                    ?.takeIf { it.isNotBlank() }
-                                    ?: selectedDiscoverSource?.bookSourceUrl
-                                    ?: source.bookSourceUrl
-                                val targetTitle = title ?: item.text
-                                binding.root.post {
-                                    openExplore(targetSourceUrl, targetTitle, targetUrl)
-                                }
-                                return true
-                            }
-                        }
-                    )
+                            true
+                    }
                     runScriptWithContext {
                         source.evalJS(action) {
                             put("java", java)
@@ -948,7 +1063,6 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     }
                 }
             }
-            binding.pbDiscoverLoading.gone()
             if (!isAdded) return@launch
             result.onSuccess { kinds ->
                 if (kinds == null) {
@@ -958,6 +1072,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             }.onFailure {
                 AppLog.put("发现标签按钮执行失败", it)
                 context?.toastOnUi(it.localizedMessage ?: getString(R.string.unknown_error))
+            }
+            } finally {
+                refreshController.finish()
             }
         }
     }
@@ -995,7 +1112,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         discoverLoadJob = null
         discoverLoading = false
         binding.swipeRefreshLayout.isRefreshing = false
-        binding.pbDiscoverLoading.gone()
+        clearDiscoverLoading()
         discoverCurrentUrl = null
         discoverHasMore = false
         discoverPage = 1
@@ -1030,7 +1147,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 binding.tvDiscoverEmpty.gone()
             }
             discoverLoading = true
-            binding.pbDiscoverLoading.visible()
+            val loadingGeneration = showDiscoverLoading()
             try {
                 val newBooks = withContext(IO) {
                     WebBook.exploreBookAwait(source, url, discoverPage)
@@ -1065,8 +1182,10 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     binding.tvDiscoverEmpty.visible()
                 }
             } finally {
+                if (isAdded) {
+                    hideDiscoverLoading(loadingGeneration)
+                }
                 if (isAdded && requestVersion == discoverRequestVersion && url == discoverCurrentUrl) {
-                    binding.pbDiscoverLoading.gone()
                     binding.swipeRefreshLayout.isRefreshing = false
                     discoverLoading = false
                 }

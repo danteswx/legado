@@ -179,7 +179,6 @@
     <string name="copy_source">拷貝源</string>
     <string name="paste_source">粘帖源</string>
     <string name="source_rule_s">源規則説明</string>
-    <string name="check_update">檢查更新</string>
     <string name="camera_scan">掃描 QR Code</string>
     <string name="scan_image">掃描本地圖片</string>
     <string name="rule_summary">規則説明</string>
@@ -234,7 +233,6 @@
     <string name="origin_show">來源: %s</string>
     <string name="import_replace_rule">導入替換規則</string>
     <string name="import_replace_rule_on_line">導入在線規則</string>
-    <string name="check_update_interval">檢查更新間隔</string>
     <string name="bookshelf_px_0">按閲讀時間</string>
     <string name="bookshelf_px_1">按更新時間</string>
     <string name="bookshelf_px_2">按書名</string>
@@ -333,7 +331,6 @@
     <string name="download_path">內容緩存路徑</string>
     <string name="sys_file_picker">系統文件選擇器</string>
     <string name="new_version">新版本</string>
-    <string name="download_update">下載更新</string>
     <string name="volume_key_page_on_play">朗讀時音量鍵翻頁</string>
     <string name="tip_margin_change">Tip 邊距跟隨邊距調整</string>
     <string name="allow_update">允許更新</string>
@@ -525,6 +522,7 @@
     <string name="content_empty">文章內容為空</string>
     <string name="on_change_source">正在換源請等待…</string>
     <string name="chapter_list_empty">目錄列表為空</string>
+    <string name="toc_loading">加載目錄中…</string>
     <string name="text_letter_spacing">字距</string>
 
     <string name="source_tab_base">基本</string>
@@ -1169,12 +1167,7 @@
     <string name="start_from">起始日期</string>
     <string name="daily_chapters">日更章數</string>
     <string name="start_chapter">開始篇章</string>
-    <string name="update_to_variant_title">检查更新查找版本</string>
-    <string name="update_to_variant_summary">检查更新时查找其他签名版本</string>
-    <string name="default_version">当前</string>
     <string name="official_version">正式版</string>
-    <string name="beta_release_version">测试版</string>
-    <string name="beta_releaseA_version">共存版</string>
     <string name="stream_read_aloud_audio">流式播放音频</string>
     <string name="stream_read_aloud_audio_summary">即边下边播，网络不好时播放会断断续续，仅TTS源有效</string>
     <string name="pause_read_aloud_while_phone_calls_title">来电期间暂停朗读</string>

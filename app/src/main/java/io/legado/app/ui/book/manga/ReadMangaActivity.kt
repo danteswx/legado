@@ -37,7 +37,6 @@ import io.legado.app.help.book.removeType
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.storage.Backup
 import io.legado.app.lib.dialogs.alert
-import io.legado.app.lib.dialogs.selector
 import io.legado.app.model.ReadManga
 import io.legado.app.receiver.NetworkChangedListener
 import io.legado.app.ui.book.changesource.ChangeBookSourceDialog
@@ -101,22 +100,6 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     private val mLabelBuilder by lazy { StringBuilder() }
 
     private var mMenu: Menu? = null
-    private val mangaConfigMenuItems = intArrayOf(
-        R.id.menu_pre_manga_number,
-        R.id.menu_disable_manga_scale,
-        R.id.menu_disable_click_scroll,
-        R.id.menu_enable_auto_page,
-        R.id.menu_enable_auto_scroll,
-        R.id.menu_manga_auto_page_speed,
-        R.id.menu_enable_horizontal_scroll,
-        R.id.menu_disable_horizontal_page_snap,
-        R.id.menu_manga_footer_config,
-        R.id.menu_manga_color_filter,
-        R.id.menu_hide_manga_title,
-        R.id.menu_epaper_manga,
-        R.id.menu_epaper_manga_setting,
-        R.id.menu_gray_manga
-    )
 
     private var mRecyclerViewPreloader: RecyclerViewPreloader<Any>? = null
 
@@ -278,6 +261,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                         }
                         if (item is MangaPage) {
                             binding.mangaMenu.upSeekBar(item.index, item.imageCount)
+                            binding.mangaMenu.upBookView()
                             upInfoBar(item)
                         }
                     }
@@ -316,7 +300,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
 
     override fun upContent() {
         lifecycleScope.launch {
-            setTitle(ReadManga.book?.name)
+            binding.mangaMenu.upBookView()
             val data = withContext(IO) { ReadManga.mangaContents }
             val pos = data.pos
             val list = data.items
@@ -332,6 +316,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                     binding.mangaMenu.upSeekBar(
                         ReadManga.durChapterPos, ReadManga.curMangaChapter!!.imageCount
                     )
+                    binding.mangaMenu.upBookView()
                 }
 
                 if (curFinish) {
@@ -526,6 +511,11 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         return super.onCompatCreateOptionsMenu(menu)
     }
 
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        upMenu(menu)
+        return super.onPrepareOptionsMenu(menu)
+    }
+
     /**
      * 菜单
      */
@@ -550,10 +540,6 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                 ReadManga.book?.let {
                     viewModel.refreshContentDur(it)
                 }
-            }
-
-            R.id.menu_manga_config -> {
-                showMangaConfigMenu()
             }
 
             R.id.menu_pre_manga_number -> {
@@ -702,10 +688,6 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         }
     }
 
-    override fun openMangaConfig() {
-        showMangaConfigMenu()
-    }
-
     override fun upSystemUiVisibility(menuIsVisible: Boolean) {
         toggleSystemBar(menuIsVisible)
         if (enableAutoScroll) {
@@ -768,10 +750,15 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             getString(R.string.pre_download_m, AppConfig.mangaPreDownloadNum)
         menu.findItem(R.id.menu_disable_manga_scale).isChecked = mangaDisableScale
         menu.findItem(R.id.menu_disable_click_scroll).isChecked = mangaDisableClickScroll
+        menu.findItem(R.id.menu_enable_auto_page).isChecked = enableAutoScrollPage
+        menu.findItem(R.id.menu_enable_auto_scroll).isChecked = enableAutoScroll
         menu.findItem(R.id.menu_manga_auto_page_speed).title =
             getString(R.string.manga_auto_page_speed, mangaAutoPageSpeed)
+        menu.findItem(R.id.menu_manga_auto_page_speed).isVisible =
+            enableAutoScrollPage || enableAutoScroll
         menu.findItem(R.id.menu_enable_horizontal_scroll).isChecked =
             mangaHorizontalScroll
+        menu.findItem(R.id.menu_hide_manga_title).isChecked = AppConfig.hideMangaTitle
         menu.findItem(R.id.menu_epaper_manga).isChecked = AppConfig.enableMangaEInk
         menu.findItem(R.id.menu_epaper_manga_setting).isVisible = AppConfig.enableMangaEInk
         menu.findItem(R.id.menu_disable_horizontal_page_snap).run {
@@ -779,9 +766,6 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             isChecked = mangaDisableHorizontalPageSnap || mangaDisablePageAnim
         }
         menu.findItem(R.id.menu_gray_manga).isChecked = AppConfig.enableMangaGray
-        mangaConfigMenuItems.forEach { id ->
-            menu.findItem(id)?.isVisible = false
-        }
     }
 
     private fun applyBookMangaReadConfig() {
@@ -789,49 +773,6 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         setDisableClickScroll(mangaDisableClickScroll)
         setDisableMangaScale(mangaDisableScale)
         mScrollTimer.setSpeed(mangaAutoPageSpeed)
-        mMenu?.let { upMenu(it) }
-    }
-
-    private fun showMangaConfigMenu() {
-        val items = listOf(
-            getString(R.string.pre_download),
-            getString(R.string.disable_manga_scale).removePrefix("禁用").removePrefix("Disable "),
-            getString(R.string.disable_manga_click_scroll).removePrefix("禁用").removePrefix("Disable "),
-            getString(R.string.enable_auto_page_scroll).removePrefix("开启").removePrefix("Enable "),
-            getString(R.string.enable_auto_scroll).removePrefix("开启").removePrefix("Enable "),
-            getString(R.string.setting_manga_auto_page_speed).removePrefix("设置"),
-            getString(R.string.enable_manga_horizontal_scroll),
-            getString(R.string.disable_horizontal_page_snap).removePrefix("禁用").removePrefix("Disable "),
-            getString(R.string.footer),
-            getString(R.string.manga_color_filter),
-            getString(R.string.title),
-            getString(R.string.manga_epaper),
-            getString(R.string.manga_epaper_stting),
-            getString(R.string.enable_manga_gray).removePrefix("开启").removePrefix("Enable ")
-        )
-        selector(R.string.manga_config, items) { _, index ->
-            when (index) {
-                0 -> triggerMangaMenuItem(R.id.menu_pre_manga_number)
-                1 -> triggerMangaMenuItem(R.id.menu_disable_manga_scale)
-                2 -> triggerMangaMenuItem(R.id.menu_disable_click_scroll)
-                3 -> triggerMangaMenuItem(R.id.menu_enable_auto_page)
-                4 -> triggerMangaMenuItem(R.id.menu_enable_auto_scroll)
-                5 -> triggerMangaMenuItem(R.id.menu_manga_auto_page_speed)
-                6 -> triggerMangaMenuItem(R.id.menu_enable_horizontal_scroll)
-                7 -> triggerMangaMenuItem(R.id.menu_disable_horizontal_page_snap)
-                8 -> triggerMangaMenuItem(R.id.menu_manga_footer_config)
-                9 -> triggerMangaMenuItem(R.id.menu_manga_color_filter)
-                10 -> triggerMangaMenuItem(R.id.menu_hide_manga_title)
-                11 -> triggerMangaMenuItem(R.id.menu_epaper_manga)
-                12 -> triggerMangaMenuItem(R.id.menu_epaper_manga_setting)
-                13 -> triggerMangaMenuItem(R.id.menu_gray_manga)
-            }
-        }
-    }
-
-    private fun triggerMangaMenuItem(id: Int) {
-        val item = mMenu?.findItem(id) ?: return
-        onCompatOptionsItemSelected(item)
         mMenu?.let { upMenu(it) }
     }
 

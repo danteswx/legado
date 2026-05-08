@@ -52,6 +52,8 @@ import kotlinx.coroutines.Dispatchers.IO
 class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     val bookData = MutableLiveData<Book>()
     val chapterListData = MutableLiveData<List<BookChapter>>()
+    val bookInfoLoadingData = MutableLiveData<Boolean>()
+    val chapterLoadingData = MutableLiveData<Boolean>()
     val webFiles = mutableListOf<WebFile>()
     var inBookshelf = false
     var hasCustomBtn = false
@@ -196,12 +198,18 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         runPreUpdateJs: Boolean = true,
         scope: CoroutineScope = viewModelScope
     ) {
+        bookInfoLoadingData.postValue(true)
         if (book.isLocal) {
-            LocalBook.upBookInfo(book)
-            bookData.postValue(book)
-            loadChapter(book)
+            try {
+                LocalBook.upBookInfo(book)
+                bookData.postValue(book)
+                loadChapter(book)
+            } finally {
+                bookInfoLoadingData.postValue(false)
+            }
         } else {
             val bookSource = bookSource ?: let {
+                bookInfoLoadingData.postValue(false)
                 chapterListData.postValue(emptyList())
                 context.toastOnUi(R.string.error_no_source)
                 return
@@ -230,6 +238,8 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 }.onError {
                     AppLog.put("获取书籍信息失败\n${it.localizedMessage}", it)
                     context.toastOnUi(R.string.error_get_book_info)
+                }.onFinally {
+                    bookInfoLoadingData.postValue(false)
                 }
         }
     }
@@ -240,6 +250,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         scope: CoroutineScope = viewModelScope,
         isFromBookInfo: Boolean = false
     ) {
+        chapterLoadingData.postValue(true)
         if (book.isLocal) {
             execute(scope) {
                 LocalBook.getChapterList(book).let {
@@ -252,9 +263,12 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                 }
             }.onError {
                 context.toastOnUi("LoadTocError:${it.localizedMessage}")
+            }.onFinally {
+                chapterLoadingData.postValue(false)
             }
         } else {
             val bookSource = bookSource ?: let {
+                chapterLoadingData.postValue(false)
                 chapterListData.postValue(emptyList())
                 context.toastOnUi(R.string.error_no_source)
                 return
@@ -283,6 +297,8 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     chapterListData.postValue(emptyList())
                     AppLog.put("获取目录失败\n${it.localizedMessage}", it)
                     context.toastOnUi(R.string.error_get_chapter_list)
+                }.onFinally {
+                    chapterLoadingData.postValue(false)
                 }
         }
     }

@@ -97,7 +97,7 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
      */
     fun search(key: String) {
         execute {
-            if ((searchKey == key) || key.isNotEmpty()) {
+            if (key.isNotEmpty()) {
                 searchModel.cancelSearch()
                 searchID = System.currentTimeMillis()
                 searchBookLiveData.postValue(emptyList())

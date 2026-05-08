@@ -24,7 +24,9 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.CheckBox
+import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -93,6 +95,7 @@ import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.model.SourceCallBack
 import io.legado.app.ui.association.OnLineImportActivity
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
+import io.legado.app.ui.book.toc.BookTocLoadingActivity
 import io.legado.app.ui.book.toc.TocActivityResult
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.login.SourceLoginActivity
@@ -228,6 +231,8 @@ class BookInfoActivity :
     override val binding by viewBinding(ActivityBookInfoBinding::inflate)
     override val viewModel by viewModels<BookInfoViewModel>()
     private var initIntroView = false
+    private var introLoadingVisible = false
+    private var tocLoadingVisible = false
     private val introTextView by lazy {
         initIntroView = true
         val inflater = LayoutInflater.from(this)
@@ -284,7 +289,15 @@ class BookInfoActivity :
                 renderTocPreview(it)
             }
         }
+        viewModel.bookInfoLoadingData.observe(this) {
+            showIntroLoading(it)
+        }
+        viewModel.chapterLoadingData.observe(this) {
+            showTocLoading(it)
+        }
         viewModel.waitDialogData.observe(this) { upWaitDialogStatus(it) }
+        showIntroLoading(true)
+        showTocLoading(true)
         viewModel.initData(intent)
         initViewEvent()
     }
@@ -511,6 +524,8 @@ class BookInfoActivity :
 
     private fun refreshBook() {
         upLoading(true)
+        showIntroLoading(true)
+        showTocLoading(true)
         viewModel.getBook()?.let {
             viewModel.refreshBook(it)
         }
@@ -518,6 +533,7 @@ class BookInfoActivity :
 
     private fun refreshToc() {
         upLoading(true)
+        showTocLoading(true)
         viewModel.getBook()?.let {
             viewModel.loadChapter(it, true, isFromBookInfo = true)
         }
@@ -607,12 +623,14 @@ class BookInfoActivity :
     }
 
     private fun showBookIntro(book: Book) {
+        introLoadingVisible = false
         introExpanded = false
         val intro = book.getDisplayIntro()
         if (intro?.startsWith("<useweb>") == true) {
             binding.tvIntroToggle.gone()
             val lastIndex = intro.lastIndexOf("<")
             if (lastIndex < 8) {
+                attachIntroTextView()
                 introTextView.text = intro
                 setIntroContent(introTextView.text)
                 return
@@ -666,11 +684,7 @@ class BookInfoActivity :
             webView.loadDataWithBaseURL(bookUrl, transparentHtml, "text/html", "utf-8", bookUrl)
             return
         }
-        if (!initIntroView || pooledWebView != null) {
-            destroyWeb()
-            binding.tvIntroContainer.removeAllViews()
-            binding.tvIntroContainer.addView(introTextView)
-        }
+        attachIntroTextView()
         if (intro.isNullOrBlank()) {
             introTextView.text = ""
             introRawText = ""
@@ -741,6 +755,15 @@ class BookInfoActivity :
         } else {
             tvIntro.text = intro
             setIntroContent(tvIntro.text)
+        }
+    }
+
+    private fun attachIntroTextView() {
+        val textView = introTextView
+        if (pooledWebView != null || binding.tvIntroContainer.getChildAt(0) !== textView) {
+            destroyWeb()
+            binding.tvIntroContainer.removeAllViews()
+            binding.tvIntroContainer.addView(textView)
         }
     }
 
@@ -885,6 +908,74 @@ class BookInfoActivity :
                 }
             }
         }
+    }
+
+    private fun loadingContent(message: String): LinearLayout {
+        return LinearLayout(this).apply {
+            gravity = Gravity.CENTER
+            orientation = LinearLayout.VERTICAL
+            addView(ProgressBar(this@BookInfoActivity).apply {
+                isIndeterminate = true
+            }, LinearLayout.LayoutParams(28.dpToPx(), 28.dpToPx()))
+            addView(TextView(this@BookInfoActivity).apply {
+                text = message
+                includeFontPadding = false
+                setTextColor(secondaryTextColor)
+                textSize = 13f
+                gravity = Gravity.CENTER
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = 10.dpToPx()
+            })
+        }
+    }
+
+    private fun showIntroLoading(isLoading: Boolean) = binding.run {
+        if (!isLoading) {
+            if (introLoadingVisible) {
+                introLoadingVisible = false
+                book?.let { showBookIntro(it) }
+            }
+            return@run
+        }
+        introLoadingVisible = true
+        introRawText = ""
+        tvIntroToggle.gone()
+        destroyWeb()
+        tvIntroContainer.removeAllViews()
+        tvIntroContainer.addView(
+            loadingContent(getString(R.string.data_loading)),
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER
+            )
+        )
+    }
+
+    private fun showTocLoading(isLoading: Boolean) = binding.run {
+        if (!isLoading) {
+            if (tocLoadingVisible) {
+                tocLoadingVisible = false
+                if (detailPage == DetailPage.TOC) {
+                    renderTocPreview(viewModel.chapterListData.value)
+                }
+            }
+            return@run
+        }
+        tocLoadingVisible = true
+        tocPreviewChapters = emptyList()
+        tocRenderedCount = 0
+        llTocPreview.removeAllViews()
+        llTocPreview.addView(
+            loadingContent(getString(R.string.load_toc)),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (tocScrollView.height.takeIf { it > 0 } ?: 180.dpToPx()).coerceAtLeast(160.dpToPx())
+            )
+        )
     }
 
     private fun initDetailTabs() = binding.run {
@@ -1426,6 +1517,17 @@ class BookInfoActivity :
     }
 
     private fun startReadActivity(book: Book) {
+        if (viewModel.chapterListData.value.isNullOrEmpty()) {
+            readBookResult.launch(
+                Intent(this, BookTocLoadingActivity::class.java)
+                    .putExtra("name", book.name)
+                    .putExtra("author", book.author)
+                    .putExtra("bookUrl", book.bookUrl)
+                    .putExtra("inBookshelf", viewModel.inBookshelf)
+                    .putExtra("chapterChanged", chapterChanged)
+            )
+            return
+        }
         when {
             book.isAudio -> readBookResult.launch(
                 Intent(this, AudioPlayActivity::class.java)

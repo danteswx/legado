@@ -41,6 +41,7 @@ import io.legado.app.utils.FileDoc
 import io.legado.app.utils.find
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.gone
+import io.legado.app.utils.isHuaweiSystemDevice
 import io.legado.app.utils.isTv
 import io.legado.app.utils.setLightStatusBar
 import io.legado.app.utils.setNavigationBarColorAuto
@@ -255,10 +256,13 @@ abstract class BaseReadBookActivity :
     private fun upLayoutInDisplayCutoutMode() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             window.attributes = window.attributes.apply {
-                layoutInDisplayCutoutMode = if (ReadBookConfig.readBodyToLh) {
-                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-                } else {
-                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER
+                layoutInDisplayCutoutMode = when {
+                    ReadBookConfig.readBodyToLh || isHuaweiSystemDevice ->
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+
+                    else -> {
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER
+                    }
                 }
             }
         }
