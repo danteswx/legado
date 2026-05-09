@@ -1,27 +1,43 @@
 package io.legado.app.ui.book.read
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.PorterDuff
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.text.TextUtils
 import android.util.AttributeSet
+import android.view.Gravity
 import android.view.LayoutInflater
+import android.view.MotionEvent
+import android.view.View
+import android.view.View.MeasureSpec
 import android.view.ViewGroup
 import android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.Animation
+import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
-import androidx.appcompat.widget.AppCompatImageView
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.qmdeve.liquidglass.widget.LiquidGlassView
 import io.legado.app.R
 import io.legado.app.constant.EventBus
+import io.legado.app.data.appDb
+import io.legado.app.data.entities.BookChapter
 import io.legado.app.constant.PreferKey
 import io.legado.app.databinding.ViewReadThemeCardBinding
 import io.legado.app.databinding.ViewReadMenuBinding
@@ -60,6 +76,7 @@ import io.legado.app.utils.startActivity
 import io.legado.app.utils.visible
 import splitties.views.onClick
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -75,10 +92,17 @@ class ReadMenu @JvmOverloads constructor(
     private var confirmSkipToChapter: Boolean = false
     private var isMenuOutAnimating = false
     private enum class BottomTab {
+        Toc,
+        Font,
         Layout,
         Theme,
         Page,
         More
+    }
+
+    private enum class BottomTabMode {
+        Primary,
+        Interface
     }
 
     private enum class ThemeTab {
@@ -94,6 +118,18 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     private var activeBottomTab: BottomTab? = null
+    private var bottomTabMode: BottomTabMode = BottomTabMode.Primary
+    private var suppressBottomNavSelection: Boolean = false
+    private var bottomTabPanelAttached: Boolean = false
+    private var bottomTabHeightAnimator: ValueAnimator? = null
+    private var bottomTabGlassStyleKey: String? = null
+    private var bottomTabGlassLayerHeight: Int = 0
+    private var tocLoadJob: Coroutine<List<BookChapter>>? = null
+    private var tocPanelFullscreen: Boolean = false
+    private var tocDragStartY: Float = 0f
+    private var tocDragStartPanelHeight: Int = 0
+    private val boundBottomTabGlassViewIds = hashSetOf<Int>()
+    private val tocAdapter by lazy { ReadMenuTocAdapter(::openTocChapter) }
     private var activeThemeTab: ThemeTab = ThemeTab.Preset
     private var activeLayoutTab: LayoutTab = LayoutTab.Spacing
     private val themePresets by lazy { ReadMenuThemePreset.defaultPresets() }
@@ -124,6 +160,12 @@ class ReadMenu @JvmOverloads constructor(
     }
     private val panelOut: Animation by lazy {
         loadAnimation(context, R.anim.anim_readbook_panel_out_down)
+    }
+    private val bottomTabIndicatorInterpolator = DecelerateInterpolator(1.8f)
+    private val bottomTabSlideInterpolator = DecelerateInterpolator(1.4f)
+    private val bottomTabPulseInterpolator = AccelerateDecelerateInterpolator()
+    private val hideBottomTabIndicatorRunnable = Runnable {
+        fadeBottomTabIndicator()
     }
     private val immersiveMenu: Boolean
         get() = AppConfig.readBarStyleFollowPage && ReadBookConfig.durConfig.curBgType() == 0
@@ -195,7 +237,10 @@ class ReadMenu @JvmOverloads constructor(
             binding.titleBar.invisible()
             binding.bottomMenu.invisible()
             binding.flExpandedPanel.gone()
+            binding.flExpandedPanel.alpha = 0f
+            setBottomTabBarHeight(bottomTabCollapsedHeight())
             activeBottomTab = null
+            switchBottomTabMode(BottomTabMode.Primary, animate = false)
             renderBottomTabState()
             canShowMenu = false
             isMenuOutAnimating = false
@@ -214,6 +259,8 @@ class ReadMenu @JvmOverloads constructor(
 
     private fun initView(reset: Boolean = false) = binding.run {
         initAnimation()
+        setupExpandableBottomTabContainer()
+        setupTocPanel()
         if (immersiveMenu) {
             val lightTextColor = ColorUtils.withAlpha(ColorUtils.lightenColor(textColor), 0.75f)
             titleBar.setTextColor(textColor)
@@ -236,9 +283,9 @@ class ReadMenu @JvmOverloads constructor(
         llBrightness.background = brightnessBackground
         if (AppConfig.isEInkMode) {
             titleBar.setBackgroundResource(R.drawable.bg_eink_border_bottom)
-        } else {
-            flExpandedPanel.backgroundTintList = bottomBackgroundList
         }
+        flExpandedPanel.background = null
+        flExpandedPanel.elevation = 0f
         tvPre.setTextColor(textColor)
         tvNext.setTextColor(textColor)
         tvPanelLayoutTitle.setTextColor(textColor)
@@ -340,6 +387,7 @@ class ReadMenu @JvmOverloads constructor(
         this.visible()
         binding.titleBar.visible()
         binding.bottomMenu.visible()
+        switchBottomTabMode(BottomTabMode.Primary, animate = false)
         hideExpandedPanel(anim = false)
         if (anim) {
             binding.titleBar.startAnimation(menuTopIn)
@@ -371,84 +419,249 @@ class ReadMenu @JvmOverloads constructor(
         return context.getPrefBoolean("brightnessAuto", true) || !showBrightnessView
     }
 
-    private fun toggleBottomTab(tab: BottomTab) {
-        if (activeBottomTab == tab && binding.flExpandedPanel.isVisible) {
-            hideExpandedPanel()
+    private fun setupExpandableBottomTabContainer() = binding.run {
+        if (bottomTabPanelAttached) {
+            return@run
+        }
+        val oldParent = flExpandedPanel.parent as? ViewGroup
+        oldParent?.removeView(flExpandedPanel)
+        flExpandedPanel.background = null
+        flExpandedPanel.elevation = 0f
+        flExpandedPanel.alpha = 0f
+        flExpandedPanel.gone()
+        val panelParams = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            Gravity.TOP
+        )
+        bottomTabBar.addView(flExpandedPanel, 2.coerceAtMost(bottomTabBar.childCount), panelParams)
+        setBottomTabBarHeight(bottomTabCollapsedHeight())
+        bottomTabPanelAttached = true
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setupTocPanel() = binding.run {
+        if (rvPanelToc.adapter == null) {
+            rvPanelToc.layoutManager = LinearLayoutManager(context)
+            rvPanelToc.adapter = tocAdapter
+        }
+        tocDragHandleIndicator.background = roundedRect(
+            ColorUtils.adjustAlpha(bottomTabContentColor(), 0.26f),
+            2f.dpToPx()
+        )
+        tocDragHandle.setOnClickListener {
+            if (activeBottomTab == BottomTab.Toc && flExpandedPanel.isVisible) {
+                animateTocPanelTo(if (tocPanelFullscreen) tocDefaultPanelHeight() else tocFullPanelHeight())
+            }
+        }
+        tocDragHandle.setOnTouchListener { _, event ->
+            if (activeBottomTab != BottomTab.Toc || !flExpandedPanel.isVisible) {
+                return@setOnTouchListener false
+            }
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    bottomTabHeightAnimator?.cancel()
+                    tocDragStartY = event.rawY
+                    tocDragStartPanelHeight = flExpandedPanel.height
+                    tocDragHandle.parent.requestDisallowInterceptTouchEvent(true)
+                    true
+                }
+
+                MotionEvent.ACTION_MOVE -> {
+                    val dragOffset = (tocDragStartY - event.rawY).roundToInt()
+                    val targetHeight = (tocDragStartPanelHeight + dragOffset)
+                        .coerceIn(tocDefaultPanelHeight(), tocFullPanelHeight())
+                    setBottomTabPanelHeight(targetHeight)
+                    true
+                }
+
+                MotionEvent.ACTION_UP,
+                MotionEvent.ACTION_CANCEL -> {
+                    val middleHeight = (tocDefaultPanelHeight() + tocFullPanelHeight()) / 2
+                    val targetHeight = if (flExpandedPanel.height >= middleHeight) {
+                        tocFullPanelHeight()
+                    } else {
+                        tocDefaultPanelHeight()
+                    }
+                    animateTocPanelTo(targetHeight)
+                    tocDragHandle.parent.requestDisallowInterceptTouchEvent(false)
+                    true
+                }
+
+                else -> false
+            }
+        }
+    }
+
+    private fun loadTocPanel() {
+        val book = ReadBook.book
+        if (book == null) {
+            tocAdapter.submit(emptyList())
+            binding.tvPanelTocCount.text = null
             return
         }
+        tocLoadJob?.cancel()
+        tocLoadJob = Coroutine.async {
+            appDb.bookChapterDao.getChapterList(book.bookUrl)
+        }.onSuccess {
+            tocAdapter.submit(it)
+            binding.tvPanelTocCount.text = if (it.isEmpty()) {
+                context.getString(R.string.chapter_list_empty)
+            } else {
+                "${ReadBook.durChapterIndex + 1}/${it.size}"
+            }
+            val currentIndex = it.indexOfFirst { chapter -> chapter.index == ReadBook.durChapterIndex }
+            if (currentIndex >= 0) {
+                binding.rvPanelToc.post {
+                    (binding.rvPanelToc.layoutManager as? LinearLayoutManager)
+                        ?.scrollToPositionWithOffset(currentIndex, 80.dpToPx())
+                }
+            }
+        }
+    }
+
+    private fun openTocChapter(chapter: BookChapter) {
+        if (chapter.isVolume) {
+            return
+        }
+        runMenuOut {
+            callBack.skipToChapter(chapter.index)
+        }
+    }
+
+    private fun animateTocPanelTo(targetHeight: Int) {
+        tocPanelFullscreen = targetHeight >= tocFullPanelHeight()
+        updateBottomTabGlassLayerHeight(tocFullPanelHeight())
+        animateBottomTabPanelHeight(
+            targetPanelHeight = targetHeight,
+            animate = !AppConfig.isEInkMode
+        ) {
+            renderBottomTabState()
+        }
+    }
+
+    private fun toggleBottomTab(tab: BottomTab): Boolean {
+        if (activeBottomTab == tab && binding.flExpandedPanel.isVisible) {
+            hideExpandedPanel(returnToPrimary = true)
+            return false
+        }
         showBottomPanel(tab)
+        return true
     }
 
     private fun showBottomPanel(tab: BottomTab) = binding.run {
-        val wasVisible = flExpandedPanel.isVisible
+        if (tab == BottomTab.Toc) {
+            if (bottomTabMode != BottomTabMode.Primary) {
+                switchBottomTabMode(BottomTabMode.Primary, animate = false)
+            }
+        } else if (bottomTabMode != BottomTabMode.Interface) {
+            switchBottomTabMode(BottomTabMode.Interface, animate = false)
+        }
+        val previousTab = activeBottomTab
+        val wasExpanded = flExpandedPanel.isVisible &&
+                bottomTabBar.height > bottomTabCollapsedHeight()
         activeBottomTab = tab
-        panelLayout.gone(tab != BottomTab.Layout)
+        when (tab) {
+            BottomTab.Toc -> {
+                if (previousTab != BottomTab.Toc) {
+                    tocPanelFullscreen = false
+                }
+                loadTocPanel()
+            }
+
+            BottomTab.Font -> {
+                activeLayoutTab = LayoutTab.Font
+                renderLayoutTabs()
+            }
+
+            BottomTab.Layout -> {
+                activeLayoutTab = LayoutTab.Spacing
+                renderLayoutTabs()
+            }
+
+            BottomTab.Theme,
+            BottomTab.Page,
+            BottomTab.More -> Unit
+        }
+        panelToc.gone(tab != BottomTab.Toc)
+        panelLayout.gone(tab != BottomTab.Font && tab != BottomTab.Layout)
         panelTheme.gone(tab != BottomTab.Theme)
         panelPage.gone(tab != BottomTab.Page)
         panelMore.gone(tab != BottomTab.More)
         updateExpandedPanelHeight(tab)
-        renderBottomTabState()
-        binding.flExpandedPanel.visible()
-        binding.flExpandedPanel.post {
-            if (activeBottomTab == tab) {
-                updateExpandedPanelHeight(tab)
-            }
+        val glassPanelHeight = expandedPanelStableHeight()
+        updateBottomTabGlassLayerHeight(glassPanelHeight)
+        val panelHeight = expandedPanelTargetHeight(tab)
+        flExpandedPanel.alpha = if (wasExpanded) 1f else 0f
+        flExpandedPanel.visible()
+        if (!wasExpanded) {
+            setExpandedPanelHeight(0)
         }
-        if (!wasVisible && !AppConfig.isEInkMode) {
-            binding.flExpandedPanel.startAnimation(panelIn)
+        renderBottomTabState()
+        animateBottomTabPanelHeight(
+            targetPanelHeight = panelHeight,
+            animate = !AppConfig.isEInkMode
+        ) {
+            if (activeBottomTab == tab && flExpandedPanel.isVisible) {
+                flExpandedPanel.animate().cancel()
+                if (wasExpanded) {
+                    flExpandedPanel.alpha = 1f
+                } else {
+                    flExpandedPanel.animate()
+                        .alpha(1f)
+                        .setDuration(if (AppConfig.isEInkMode) 0L else 90L)
+                        .start()
+                }
+            }
         }
     }
 
-    private fun hideExpandedPanel(anim: Boolean = !AppConfig.isEInkMode) {
+    private fun hideExpandedPanel(
+        anim: Boolean = !AppConfig.isEInkMode,
+        returnToPrimary: Boolean = false
+    ) {
         if (!binding.flExpandedPanel.isVisible) {
             activeBottomTab = null
-            renderBottomTabState()
+            if (returnToPrimary) {
+                switchBottomTabMode(BottomTabMode.Primary)
+            } else {
+                renderBottomTabState()
+            }
             return
         }
         activeBottomTab = null
-        renderBottomTabState()
-        if (anim) {
-            panelOut.setAnimationListener(object : Animation.AnimationListener {
-                override fun onAnimationStart(animation: Animation) = Unit
-                override fun onAnimationRepeat(animation: Animation) = Unit
-                override fun onAnimationEnd(animation: Animation) {
-                    binding.flExpandedPanel.gone()
-                    panelOut.setAnimationListener(null)
-                }
-            })
-            binding.flExpandedPanel.startAnimation(panelOut)
+        binding.flExpandedPanel.animate().cancel()
+        binding.flExpandedPanel.alpha = 0f
+        if (returnToPrimary) {
+            switchBottomTabMode(BottomTabMode.Primary)
         } else {
+            renderBottomTabState()
+        }
+        animateBottomTabPanelHeight(
+            targetPanelHeight = 0,
+            animate = anim
+        ) {
             binding.flExpandedPanel.gone()
+            binding.flExpandedPanel.updateLayoutParams<FrameLayout.LayoutParams> {
+                height = ViewGroup.LayoutParams.WRAP_CONTENT
+            }
         }
     }
 
     private fun handleBackgroundDismiss() {
         when {
-            binding.flExpandedPanel.isVisible -> hideExpandedPanel()
+            binding.flExpandedPanel.isVisible -> hideExpandedPanel(returnToPrimary = true)
             else -> runMenuOut()
         }
     }
 
     private fun renderBottomTabState() = binding.run {
-        bottomTabBar.setBackgroundResource(
-            if (activeBottomTab == null) {
-                R.drawable.bg_read_menu_island
-            } else {
-                R.drawable.bg_read_menu_island_connected
-            }
-        )
-        if (!AppConfig.isEInkMode) {
-            bottomTabBar.backgroundTintList = bottomBackgroundList
-            flExpandedPanel.backgroundTintList = bottomBackgroundList
-        }
+        configureBottomTabFrostedGlass()
         bottomTabBar.elevation = 8f.dpToPx()
-        flExpandedPanel.elevation = 10f.dpToPx()
-        ivTabBack.setColorFilter(textColor, PorterDuff.Mode.SRC_IN)
-        llTabBack.background = null
-        configureBottomTab(llTabLayout, ivTabLayout, tvTabLayout, BottomTab.Layout)
-        configureThemeBottomTab()
-        configureBottomTab(llTabPage, ivTabPage, tvTabPage, BottomTab.Page)
-        configureBottomTab(llTabMore, ivTabMore, tvTabMore, BottomTab.More)
+        flExpandedPanel.elevation = 0f
+        applyBottomNavigationColors()
+        syncBottomNavigationSelection()
+        updateBottomTabIndicator()
     }
 
     private fun updateExpandedPanelHeight(tab: BottomTab) = binding.run {
@@ -461,24 +674,22 @@ class ReadMenu @JvmOverloads constructor(
         panelTheme.updateLayoutParams<FrameLayout.LayoutParams> {
             height = ViewGroup.LayoutParams.WRAP_CONTENT
         }
-        if (tab == BottomTab.Layout || tab == BottomTab.Theme) {
+        if (tab == BottomTab.Font || tab == BottomTab.Layout || tab == BottomTab.Theme) {
             applyAdaptivePanelHeight(tab, expandedPanelMaxHeight())
         }
     }
 
     private fun applyAdaptivePanelHeight(tab: BottomTab, maxHeight: Int) = binding.run {
         when (tab) {
+            BottomTab.Font,
             BottomTab.Layout -> {
-                val measuredHeight = panelLayout.height
-                if (measuredHeight <= 0) {
-                    return@run
-                }
-                if (measuredHeight > maxHeight) {
+                val measuredHeight = measureBottomPanelHeight(panelLayout, maxHeight)
+                if (measuredHeight >= maxHeight) {
                     panelLayout.updateLayoutParams<FrameLayout.LayoutParams> {
                         height = maxHeight
                     }
-                    val fixedChromeHeight = llLayoutTabs.height +
-                            vwLayoutTabsDivider.height +
+                    val fixedChromeHeight = measuredOrLayoutHeight(llLayoutTabs) +
+                            measuredOrLayoutHeight(vwLayoutTabsDivider) +
                             panelLayout.paddingTop +
                             panelLayout.paddingBottom
                     panelLayoutScroll.updateLayoutParams<LinearLayout.LayoutParams> {
@@ -495,12 +706,9 @@ class ReadMenu @JvmOverloads constructor(
             }
 
             BottomTab.Theme -> {
-                val measuredHeight = panelTheme.height
-                if (measuredHeight <= 0) {
-                    return@run
-                }
+                val measuredHeight = measureBottomPanelHeight(panelTheme, maxHeight)
                 panelTheme.updateLayoutParams<FrameLayout.LayoutParams> {
-                    height = if (measuredHeight > maxHeight) {
+                    height = if (measuredHeight >= maxHeight) {
                         maxHeight
                     } else {
                         ViewGroup.LayoutParams.WRAP_CONTENT
@@ -508,46 +716,542 @@ class ReadMenu @JvmOverloads constructor(
                 }
             }
 
+            BottomTab.Toc,
             BottomTab.Page,
             BottomTab.More -> Unit
         }
+    }
+
+    private fun measuredOrLayoutHeight(view: View): Int {
+        return view.measuredHeight.takeIf { it > 0 }
+            ?: view.height.takeIf { it > 0 }
+            ?: view.layoutParams?.height?.takeIf { it > 0 }
+            ?: 0
     }
 
     private fun expandedPanelMaxHeight(): Int {
         val rootHeight = binding.vwMenuRoot.height
             .takeIf { it > 0 }
             ?: resources.displayMetrics.heightPixels
-        val bottomBarHeight = binding.bottomTabBar.height
-            .takeIf { it > 0 }
-            ?: 78.dpToPx()
+        val bottomBarHeight = bottomTabCollapsedHeight()
         val topGap = 16.dpToPx()
         val bottomPadding = binding.bottomMenu.paddingBottom
         val screenCap = (rootHeight - bottomBarHeight - bottomPadding - topGap)
             .coerceAtLeast(96.dpToPx())
         val minHeight = 180.dpToPx().coerceAtMost(screenCap)
-        val belowTitle = rootHeight - binding.titleBar.bottom - topGap - bottomBarHeight - bottomPadding
+        val belowTitle = rootHeight - binding.titleBar.bottom - topGap -
+                bottomBarHeight - bottomPadding
         return belowTitle.coerceIn(minHeight, screenCap)
     }
 
-    private fun configureBottomTab(
-        root: LinearLayout,
-        icon: AppCompatImageView,
-        label: TextView,
-        tab: BottomTab
-    ) {
-        val selected = activeBottomTab == tab
-        root.setBackgroundResource(if (selected) R.drawable.bg_read_menu_tab_selected else 0)
-        val color = if (selected) Color.WHITE else textColor
-        icon.setColorFilter(color, PorterDuff.Mode.SRC_IN)
-        label.setTextColor(color)
+    private fun tocDefaultPanelHeight(): Int {
+        return 360.dpToPx()
+            .coerceAtMost(tocFullPanelHeight())
+            .coerceAtLeast(220.dpToPx().coerceAtMost(tocFullPanelHeight()))
     }
 
-    private fun configureThemeBottomTab() = binding.run {
-        val selected = activeBottomTab == BottomTab.Theme
-        themeTabPill.setBackgroundResource(if (selected) R.drawable.bg_read_menu_tab_selected else 0)
-        val color = if (selected) Color.WHITE else textColor
-        ivTabTheme.setColorFilter(color, PorterDuff.Mode.SRC_IN)
-        tvTabTheme.setTextColor(color)
+    private fun tocFullPanelHeight(): Int {
+        val rootHeight = binding.vwMenuRoot.height
+            .takeIf { it > 0 }
+            ?: resources.displayMetrics.heightPixels
+        val bottomBarHeight = bottomTabCollapsedHeight()
+        val bottomPadding = binding.bottomMenu.paddingBottom
+        return (rootHeight - bottomBarHeight - bottomPadding - 8.dpToPx())
+            .coerceAtLeast(tocDefaultMinHeight())
+    }
+
+    private fun tocDefaultMinHeight(): Int = 220.dpToPx()
+
+    private fun bottomTabCollapsedHeight(): Int = 64.dpToPx()
+
+    private fun expandedPanelTargetHeight(tab: BottomTab): Int {
+        if (tab == BottomTab.Toc) {
+            return if (tocPanelFullscreen) {
+                tocFullPanelHeight()
+            } else {
+                tocDefaultPanelHeight()
+            }
+        }
+        val maxHeight = expandedPanelMaxHeight()
+        val panelView = selectedBottomPanelView(tab)
+        val measuredHeight = measureBottomPanelHeight(panelView, maxHeight)
+        return measuredHeight.coerceIn(120.dpToPx(), maxHeight)
+    }
+
+    private fun expandedPanelStableHeight(): Int = binding.run {
+        val maxHeight = expandedPanelMaxHeight()
+        val currentLayoutTab = activeLayoutTab
+        val currentBottomTab = activeBottomTab
+
+        activeLayoutTab = LayoutTab.Font
+        renderLayoutTabs()
+        panelToc.gone()
+        panelLayout.visible()
+        panelTheme.gone()
+        val fontHeight = measureBottomPanelHeight(panelLayout, maxHeight)
+
+        activeLayoutTab = LayoutTab.Spacing
+        renderLayoutTabs()
+        val spacingHeight = measureBottomPanelHeight(panelLayout, maxHeight)
+
+        activeLayoutTab = LayoutTab.Style
+        renderLayoutTabs()
+        val styleHeight = measureBottomPanelHeight(panelLayout, maxHeight)
+
+        panelLayout.gone()
+        panelTheme.visible()
+        val themeHeight = measureBottomPanelHeight(panelTheme, maxHeight)
+
+        panelTheme.gone()
+        panelPage.visible()
+        val pageHeight = measureBottomPanelHeight(panelPage, maxHeight)
+
+        panelPage.gone()
+        panelMore.visible()
+        val moreHeight = measureBottomPanelHeight(panelMore, maxHeight)
+        val tocHeight = tocFullPanelHeight()
+
+        activeLayoutTab = currentLayoutTab
+        renderLayoutTabs()
+        panelToc.gone(currentBottomTab != BottomTab.Toc)
+        panelLayout.gone(currentBottomTab != BottomTab.Font && currentBottomTab != BottomTab.Layout)
+        panelTheme.gone(currentBottomTab != BottomTab.Theme)
+        panelPage.gone(currentBottomTab != BottomTab.Page)
+        panelMore.gone(currentBottomTab != BottomTab.More)
+
+        maxOf(fontHeight, spacingHeight, styleHeight, themeHeight, pageHeight, moreHeight, tocHeight)
+            .coerceIn(120.dpToPx(), tocFullPanelHeight())
+    }
+
+    private fun selectedBottomPanelView(tab: BottomTab): View {
+        return when (tab) {
+            BottomTab.Toc -> binding.panelToc
+            BottomTab.Font -> binding.panelLayout
+            BottomTab.Layout -> binding.panelLayout
+            BottomTab.Theme -> binding.panelTheme
+            BottomTab.Page -> binding.panelPage
+            BottomTab.More -> binding.panelMore
+        }
+    }
+
+    private fun setBottomTabPanelHeight(height: Int) {
+        setExpandedPanelHeight(height)
+        setBottomTabBarHeight(bottomTabCollapsedHeight() + height)
+    }
+
+    private fun measureBottomPanelHeight(view: View, maxHeight: Int): Int {
+        val width = binding.bottomTabBar.width
+            .takeIf { it > 0 }
+            ?: resources.displayMetrics.widthPixels
+        val widthSpec = MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY)
+        val heightSpec = MeasureSpec.makeMeasureSpec(maxHeight, MeasureSpec.AT_MOST)
+        view.measure(widthSpec, heightSpec)
+        return view.measuredHeight
+    }
+
+    private fun setExpandedPanelHeight(height: Int) = binding.flExpandedPanel.run {
+        val targetHeight = height.coerceAtLeast(0)
+        val params = layoutParams as? FrameLayout.LayoutParams
+        if (params?.height == targetHeight) {
+            return@run
+        }
+        updateLayoutParams<FrameLayout.LayoutParams> {
+            this.height = targetHeight
+        }
+    }
+
+    private fun setBottomTabBarHeight(height: Int) = binding.bottomTabBar.run {
+        val targetHeight = height.coerceAtLeast(bottomTabCollapsedHeight())
+        val params = layoutParams as? FrameLayout.LayoutParams
+        if (params?.height == targetHeight) {
+            return@run
+        }
+        updateLayoutParams<FrameLayout.LayoutParams> {
+            this.height = targetHeight
+        }
+    }
+
+    private fun updateBottomTabGlassLayerHeight(panelHeight: Int) = binding.run {
+        val targetHeight = bottomTabCollapsedHeight() + panelHeight.coerceAtLeast(0)
+        if (bottomTabGlassLayerHeight == targetHeight) {
+            return@run
+        }
+        bottomTabGlassLayerHeight = targetHeight
+        setBottomTabGlassLayerChildHeight(bottomTabGlassView, targetHeight)
+        setBottomTabGlassLayerChildHeight(bottomTabShellOverlay, targetHeight)
+    }
+
+    private fun setBottomTabGlassLayerChildHeight(view: View, height: Int) {
+        view.updateLayoutParams<FrameLayout.LayoutParams> {
+            this.height = height
+            gravity = Gravity.BOTTOM
+        }
+    }
+
+    private fun animateBottomTabBarHeight(
+        targetHeight: Int,
+        animate: Boolean,
+        onEnd: () -> Unit
+    ) = binding.run {
+        bottomTabHeightAnimator?.cancel()
+        val startHeight = bottomTabBar.height
+            .takeIf { it > 0 }
+            ?: bottomTabCollapsedHeight()
+        if (!animate || startHeight == targetHeight) {
+            if (startHeight != targetHeight) {
+                setBottomTabBarHeight(targetHeight)
+            }
+            onEnd()
+            return@run
+        }
+        bottomTabHeightAnimator = ValueAnimator.ofInt(startHeight, targetHeight).apply {
+            duration = 220L
+            interpolator = bottomTabSlideInterpolator
+            addUpdateListener { animator ->
+                setBottomTabBarHeight(animator.animatedValue as Int)
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                private var cancelled = false
+
+                override fun onAnimationCancel(animation: Animator) {
+                    cancelled = true
+                }
+
+                override fun onAnimationEnd(animation: Animator) {
+                    if (!cancelled) {
+                        setBottomTabBarHeight(targetHeight)
+                        onEnd()
+                    }
+                    if (bottomTabHeightAnimator == this@apply) {
+                        bottomTabHeightAnimator = null
+                    }
+                }
+            })
+            start()
+        }
+    }
+
+    private fun animateBottomTabPanelHeight(
+        targetPanelHeight: Int,
+        animate: Boolean,
+        onEnd: () -> Unit
+    ) = binding.run {
+        bottomTabHeightAnimator?.cancel()
+        val startPanelHeight = flExpandedPanel.height.takeIf { it >= 0 } ?: 0
+        if (!animate || startPanelHeight == targetPanelHeight) {
+            setBottomTabPanelHeight(targetPanelHeight)
+            onEnd()
+            return@run
+        }
+        bottomTabHeightAnimator = ValueAnimator.ofInt(startPanelHeight, targetPanelHeight).apply {
+            duration = 220L
+            interpolator = bottomTabSlideInterpolator
+            addUpdateListener { animator ->
+                setBottomTabPanelHeight(animator.animatedValue as Int)
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                private var cancelled = false
+
+                override fun onAnimationCancel(animation: Animator) {
+                    cancelled = true
+                }
+
+                override fun onAnimationEnd(animation: Animator) {
+                    if (!cancelled) {
+                        setBottomTabPanelHeight(targetPanelHeight)
+                        onEnd()
+                    }
+                    if (bottomTabHeightAnimator == this@apply) {
+                        bottomTabHeightAnimator = null
+                    }
+                }
+            })
+            start()
+        }
+    }
+
+    private fun updateBottomTabIndicator() = binding.run {
+        val tab = activeBottomTab
+        if (tab == null) {
+            hideBottomTabIndicator()
+            return@run
+        }
+        if (tab == BottomTab.Toc) {
+            showBottomTabIndicator(
+                nav = readBottomPrimaryNav,
+                itemId = tab.menuItemId(),
+                animate = true,
+                autoHide = false
+            )
+            return@run
+        }
+        showBottomTabIndicator(
+            nav = readBottomInterfaceNav,
+            itemId = tab.menuItemId(),
+            animate = true,
+            autoHide = false
+        )
+    }
+
+    private fun applyBottomNavigationColors() = binding.run {
+        val colors = Selector.colorBuild()
+            .setDefaultColor(bottomTabContentColor())
+            .setSelectedColor(bottomTabSelectedContentColor())
+            .create()
+        listOf(readBottomPrimaryNav, readBottomInterfaceNav).forEach { nav ->
+            nav.itemIconTintList = colors
+            nav.itemTextColor = colors
+            nav.itemRippleColor = null
+        }
+        readBottomInterfaceBack.setColorFilter(bottomTabContentColor(), PorterDuff.Mode.SRC_IN)
+    }
+
+    private fun syncBottomNavigationSelection() = binding.run {
+        setBottomNavigationSelection(
+            readBottomPrimaryNav,
+            when {
+                activeBottomTab == BottomTab.Toc -> R.id.menu_read_toc
+                bottomTabMode == BottomTabMode.Interface -> R.id.menu_read_interface
+                else -> null
+            }
+        )
+        setBottomNavigationSelection(
+            readBottomInterfaceNav,
+            if (activeBottomTab == BottomTab.Toc) {
+                null
+            } else {
+                activeBottomTab?.menuItemId()
+            }
+        )
+    }
+
+    private fun setBottomNavigationSelection(nav: BottomNavigationView, itemId: Int?) {
+        suppressBottomNavSelection = true
+        try {
+            if (itemId == null) {
+                clearBottomNavigationSelection(nav)
+            } else {
+                nav.selectedItemId = itemId
+            }
+        } finally {
+            suppressBottomNavSelection = false
+        }
+    }
+
+    private fun clearBottomNavigationSelection(nav: BottomNavigationView) {
+        nav.menu.setGroupCheckable(0, true, false)
+        for (index in 0 until nav.menu.size()) {
+            nav.menu.getItem(index).isChecked = false
+        }
+        nav.menu.setGroupCheckable(0, true, true)
+    }
+
+    private fun flashBottomTabIndicator(nav: BottomNavigationView, itemId: Int) {
+        showBottomTabIndicator(nav, itemId, animate = true, autoHide = true)
+    }
+
+    private fun showBottomTabIndicator(
+        nav: BottomNavigationView,
+        itemId: Int,
+        animate: Boolean,
+        autoHide: Boolean
+    ) = binding.run {
+        bottomTabIndicatorContainer.removeCallbacks(hideBottomTabIndicatorRunnable)
+        bottomTabIndicatorContainer.animate().cancel()
+        bottomTabIndicatorContainer.post {
+            val itemView = findBottomNavigationItemView(nav, itemId) ?: return@post
+            val menuView = nav.getChildAt(0) as? ViewGroup ?: return@post
+            val maxWidth = 68.dpToPx()
+            val minWidth = 52.dpToPx()
+            val targetWidth = minOf(
+                maxWidth,
+                (itemView.width - 12.dpToPx()).coerceAtLeast(minWidth)
+            )
+            bottomTabIndicatorContainer.updateLayoutParams<FrameLayout.LayoutParams> {
+                width = targetWidth
+            }
+            val targetX = bottomTabNavViewport.x +
+                    nav.x +
+                    nav.translationX +
+                    menuView.x +
+                    itemView.x +
+                    (itemView.width - targetWidth) / 2f
+            val firstPlacement = bottomTabIndicatorContainer.alpha <= 0f ||
+                    !bottomTabIndicatorContainer.isVisible
+            bottomTabIndicatorContainer.visible()
+            if (!animate || firstPlacement || AppConfig.isEInkMode) {
+                bottomTabIndicatorContainer.x = targetX
+                bottomTabIndicatorContainer.alpha = 1f
+                bottomTabIndicatorContainer.scaleX = 1f
+                bottomTabIndicatorContainer.scaleY = 1f
+            } else if (abs(bottomTabIndicatorContainer.x - targetX) >= 0.5f) {
+                bottomTabIndicatorContainer.animate()
+                    .x(targetX)
+                    .alpha(1f)
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .setDuration(220L)
+                    .setInterpolator(bottomTabIndicatorInterpolator)
+                    .start()
+            }
+            if (autoHide) {
+                bottomTabIndicatorContainer.postDelayed(hideBottomTabIndicatorRunnable, 520L)
+            }
+        }
+    }
+
+    private fun hideBottomTabIndicator() = binding.run {
+        bottomTabIndicatorContainer.removeCallbacks(hideBottomTabIndicatorRunnable)
+        bottomTabIndicatorContainer.animate().cancel()
+        if (!bottomTabIndicatorContainer.isVisible) {
+            bottomTabIndicatorContainer.alpha = 0f
+            return@run
+        }
+        if (AppConfig.isEInkMode) {
+            bottomTabIndicatorContainer.alpha = 0f
+            bottomTabIndicatorContainer.invisible()
+            return@run
+        }
+        fadeBottomTabIndicator()
+    }
+
+    private fun fadeBottomTabIndicator() = binding.run {
+        bottomTabIndicatorContainer.animate().cancel()
+        bottomTabIndicatorContainer.animate()
+            .alpha(0f)
+            .scaleX(0.92f)
+            .scaleY(0.92f)
+            .setDuration(140L)
+            .setInterpolator(bottomTabPulseInterpolator)
+            .withEndAction {
+                if (activeBottomTab == null) {
+                    bottomTabIndicatorContainer.invisible()
+                }
+            }
+            .start()
+    }
+
+    private fun findBottomNavigationItemView(nav: BottomNavigationView, itemId: Int): View? {
+        val menuView = nav.getChildAt(0) as? ViewGroup ?: return null
+        for (index in 0 until menuView.childCount) {
+            val child = menuView.getChildAt(index)
+            if (child.id == itemId && child.visibility == View.VISIBLE) {
+                return child
+            }
+        }
+        return null
+    }
+
+    private fun switchBottomTabMode(
+        mode: BottomTabMode,
+        animate: Boolean = !AppConfig.isEInkMode
+    ) = binding.run {
+        val wasMode = bottomTabMode
+        bottomTabMode = mode
+        renderBottomTabState()
+        val width = bottomTabNavViewport.width.takeIf { it > 0 }
+            ?: bottomTabBar.width.takeIf { it > 0 }
+            ?: resources.displayMetrics.widthPixels
+        readBottomPrimaryNav.animate().cancel()
+        readBottomInterfaceNav.animate().cancel()
+        readBottomInterfaceBack.animate().cancel()
+        if (!animate || wasMode == mode || width <= 0) {
+            readBottomPrimaryNav.translationX = if (mode == BottomTabMode.Primary) 0f else -width.toFloat()
+            readBottomInterfaceNav.translationX =
+                if (mode == BottomTabMode.Interface) 0f else width.toFloat()
+            readBottomInterfaceBack.translationX =
+                if (mode == BottomTabMode.Interface) 0f else width.toFloat()
+            readBottomPrimaryNav.visible(mode == BottomTabMode.Primary)
+            readBottomInterfaceNav.visible(mode == BottomTabMode.Interface)
+            readBottomInterfaceBack.visible(mode == BottomTabMode.Interface)
+            return@run
+        }
+        when (mode) {
+            BottomTabMode.Primary -> {
+                readBottomPrimaryNav.visible()
+                readBottomPrimaryNav.translationX = -width.toFloat()
+                readBottomInterfaceNav.visible()
+                readBottomInterfaceNav.translationX = 0f
+                readBottomInterfaceBack.visible()
+                readBottomInterfaceBack.translationX = 0f
+                readBottomPrimaryNav.animate()
+                    .translationX(0f)
+                    .setDuration(220L)
+                    .setInterpolator(bottomTabSlideInterpolator)
+                    .start()
+                readBottomInterfaceNav.animate()
+                    .translationX(width.toFloat())
+                    .setDuration(220L)
+                    .setInterpolator(bottomTabSlideInterpolator)
+                    .withEndAction {
+                        if (bottomTabMode == BottomTabMode.Primary) {
+                            readBottomInterfaceNav.invisible()
+                        }
+                    }
+                    .start()
+                readBottomInterfaceBack.animate()
+                    .translationX(width.toFloat())
+                    .setDuration(220L)
+                    .setInterpolator(bottomTabSlideInterpolator)
+                    .withEndAction {
+                        if (bottomTabMode == BottomTabMode.Primary) {
+                            readBottomInterfaceBack.invisible()
+                        }
+                    }
+                    .start()
+            }
+
+            BottomTabMode.Interface -> {
+                readBottomPrimaryNav.visible()
+                readBottomPrimaryNav.translationX = 0f
+                readBottomInterfaceNav.visible()
+                readBottomInterfaceNav.translationX = width.toFloat()
+                readBottomInterfaceBack.visible()
+                readBottomInterfaceBack.translationX = width.toFloat()
+                readBottomPrimaryNav.animate()
+                    .translationX(-width.toFloat())
+                    .setDuration(220L)
+                    .setInterpolator(bottomTabSlideInterpolator)
+                    .withEndAction {
+                        if (bottomTabMode == BottomTabMode.Interface) {
+                            readBottomPrimaryNav.invisible()
+                        }
+                    }
+                    .start()
+                readBottomInterfaceNav.animate()
+                    .translationX(0f)
+                    .setDuration(220L)
+                    .setInterpolator(bottomTabSlideInterpolator)
+                    .start()
+                readBottomInterfaceBack.animate()
+                    .translationX(0f)
+                    .setDuration(220L)
+                    .setInterpolator(bottomTabSlideInterpolator)
+                    .start()
+            }
+        }
+    }
+
+    private fun BottomTab.menuItemId(): Int {
+        return when (this) {
+            BottomTab.Toc -> R.id.menu_read_toc
+            BottomTab.Font -> R.id.menu_read_font
+            BottomTab.Layout -> R.id.menu_read_layout
+            BottomTab.Theme -> R.id.menu_read_theme
+            BottomTab.Page -> R.id.menu_read_page
+            BottomTab.More -> R.id.menu_read_more
+        }
+    }
+
+    private fun Int.toBottomTab(): BottomTab? {
+        return when (this) {
+            R.id.menu_read_font -> BottomTab.Font
+            R.id.menu_read_layout -> BottomTab.Layout
+            R.id.menu_read_theme -> BottomTab.Theme
+            R.id.menu_read_page -> BottomTab.Page
+            R.id.menu_read_more -> BottomTab.More
+            else -> null
+        }
     }
 
     private fun tintLayoutPanel(color: Int) = binding.run {
@@ -663,7 +1367,7 @@ class ReadMenu @JvmOverloads constructor(
         renderLayoutTabs()
         panelLayoutScroll.post {
             panelLayoutScroll.smoothScrollTo(0, 0)
-            if (activeBottomTab == BottomTab.Layout) {
+            if (activeBottomTab == BottomTab.Font || activeBottomTab == BottomTab.Layout) {
                 updateExpandedPanelHeight(BottomTab.Layout)
             }
         }
@@ -976,6 +1680,194 @@ class ReadMenu @JvmOverloads constructor(
         }
     }
 
+    private fun configureBottomTabFrostedGlass() = binding.run {
+        bottomTabBar.clipToOutline = true
+        if (AppConfig.isEInkMode) {
+            val glassStyleKey = "eink:$bgColor:$textColor:${context.accentColor}"
+            if (bottomTabGlassStyleKey != glassStyleKey) {
+                bottomTabBar.backgroundTintList = null
+                bottomTabBar.foreground = null
+                bottomTabGlassView.gone()
+                bottomTabShellOverlay.gone()
+                bottomTabIndicatorContainer.background = bottomTabIndicatorBackground()
+                bottomTabBar.background = roundedRect(
+                    bgColor,
+                    28f.dpToPx(),
+                    1.dpToPx(),
+                    ColorUtils.adjustAlpha(textColor, 0.18f)
+                )
+                bottomTabGlassStyleKey = glassStyleKey
+            }
+            return@run
+        }
+
+        val glassLevel = (AppConfig.frostedGlassLevel / 100f)
+            .coerceIn(0.45f, 1f)
+        val glassStyleKey = "glass:${bottomTabUseDarkGlass()}:${context.accentColor}:${AppConfig.frostedGlassLevel}"
+        if (bottomTabGlassStyleKey != glassStyleKey) {
+            bottomTabBar.backgroundTintList = null
+            bottomTabBar.foreground = null
+            bottomTabBar.background = bottomTabGlassFallbackShell(glassLevel)
+            bottomTabGlassView.visible()
+            bottomTabShellOverlay.visible()
+            bottomTabShellOverlay.background = bottomTabGlassShell(glassLevel)
+            bottomTabIndicatorContainer.background = bottomTabIndicatorBackground()
+            bottomTabGlassStyleKey = glassStyleKey
+            bottomTabBar.post {
+                setupBottomTabFrostedGlassViews(glassLevel)
+            }
+        } else {
+            if (!bottomTabGlassView.isVisible) {
+                bottomTabGlassView.visible()
+            }
+            if (!bottomTabShellOverlay.isVisible) {
+                bottomTabShellOverlay.visible()
+            }
+            if (!boundBottomTabGlassViewIds.contains(bottomTabGlassView.id)) {
+                bottomTabBar.post {
+                    setupBottomTabFrostedGlassViews(glassLevel)
+                }
+            }
+        }
+    }
+
+    private fun setupBottomTabFrostedGlassViews(glassLevel: Float) = binding.run {
+        val target = bottomTabGlassTarget()
+        if (!target.isLaidOut || !bottomTabBar.isLaidOut) {
+            return@run
+        }
+
+        setupBottomTabFrostedGlassView(
+            liquidGlassView = bottomTabGlassView,
+            target = target,
+            cornerRadius = 28f.dpToPx(),
+            refractionHeight = (12f + glassLevel * 8f).dpToPx(),
+            refractionOffset = (34f + glassLevel * 18f).dpToPx(),
+            blurRadius = (22f + glassLevel * 30f).dpToPx(),
+            dispersion = (0.18f + glassLevel * 0.16f).coerceAtMost(0.42f),
+            tintAlpha = (0.12f + glassLevel * 0.18f).coerceAtMost(0.30f)
+        )
+    }
+
+    private fun bottomTabGlassTarget(): ViewGroup {
+        val readView = activity?.findViewById<View>(R.id.read_view)
+        return activity?.findViewById<ViewGroup>(R.id.read_content_container)
+            ?: readView?.parent as? ViewGroup
+            ?: parent as? ViewGroup
+            ?: binding.vwMenuRoot
+    }
+
+    private fun setupBottomTabFrostedGlassView(
+        liquidGlassView: LiquidGlassView,
+        target: ViewGroup,
+        cornerRadius: Float,
+        refractionHeight: Float,
+        refractionOffset: Float,
+        blurRadius: Float,
+        dispersion: Float,
+        tintAlpha: Float
+    ) {
+        if (boundBottomTabGlassViewIds.add(liquidGlassView.id)) {
+            liquidGlassView.bind(target)
+        }
+        liquidGlassView.setCornerRadius(cornerRadius)
+        liquidGlassView.setRefractionHeight(refractionHeight)
+        liquidGlassView.setRefractionOffset(refractionOffset)
+        liquidGlassView.setDispersion(dispersion)
+        liquidGlassView.setBlurRadius(blurRadius)
+        liquidGlassView.setTintAlpha(tintAlpha)
+        liquidGlassView.setTintColorRed(0.70f)
+        liquidGlassView.setTintColorGreen(0.79f)
+        liquidGlassView.setTintColorBlue(0.86f)
+        liquidGlassView.setDraggableEnabled(false)
+        liquidGlassView.setElasticEnabled(false)
+        liquidGlassView.setTouchEffectEnabled(false)
+        liquidGlassView.isClickable = false
+        liquidGlassView.isFocusable = false
+        liquidGlassView.invalidate()
+    }
+
+    private fun bottomTabGlassShell(glassLevel: Float): GradientDrawable {
+        val isDark = bottomTabUseDarkGlass()
+        val surfaceColor = if (isDark) {
+            ColorUtils.blendColors(Color.BLACK, context.primaryColor, 0.12f)
+        } else {
+            ColorUtils.blendColors(Color.WHITE, context.accentColor, 0.05f)
+        }
+        val topAlpha = if (isDark) {
+            0.20f + glassLevel * 0.16f
+        } else {
+            0.28f + glassLevel * 0.16f
+        }
+        val centerAlpha = if (isDark) {
+            0.16f + glassLevel * 0.12f
+        } else {
+            0.20f + glassLevel * 0.12f
+        }
+        val bottomAlpha = if (isDark) {
+            0.12f + glassLevel * 0.10f
+        } else {
+            0.14f + glassLevel * 0.10f
+        }
+        val strokeColor = ColorUtils.withAlpha(
+            if (isDark) Color.WHITE else Color.BLACK,
+            if (isDark) 0.18f else 0.08f
+        )
+        return GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(
+                ColorUtils.withAlpha(surfaceColor, topAlpha.coerceAtMost(0.44f)),
+                ColorUtils.withAlpha(surfaceColor, centerAlpha.coerceAtMost(0.34f)),
+                ColorUtils.withAlpha(surfaceColor, bottomAlpha.coerceAtMost(0.26f))
+            )
+        ).apply {
+            cornerRadius = 28f.dpToPx()
+            setStroke(1.dpToPx(), strokeColor)
+        }
+    }
+
+    private fun bottomTabGlassFallbackShell(glassLevel: Float): GradientDrawable {
+        val isDark = bottomTabUseDarkGlass()
+        val surfaceColor = if (isDark) {
+            ColorUtils.blendColors(Color.BLACK, context.primaryColor, 0.12f)
+        } else {
+            ColorUtils.blendColors(Color.WHITE, context.accentColor, 0.05f)
+        }
+        val alpha = if (isDark) {
+            0.20f + glassLevel * 0.16f
+        } else {
+            0.26f + glassLevel * 0.18f
+        }
+        return GradientDrawable().apply {
+            cornerRadius = 28f.dpToPx()
+            setColor(ColorUtils.withAlpha(surfaceColor, alpha.coerceAtMost(0.46f)))
+        }
+    }
+
+    private fun bottomTabIndicatorBackground(): GradientDrawable {
+        return roundedRect(context.accentColor, 18f.dpToPx())
+    }
+
+    private fun bottomTabUseDarkGlass(): Boolean {
+        return AppConfig.isNightTheme && !AppConfig.isEInkMode
+    }
+
+    private fun bottomTabContentColor(): Int {
+        return if (bottomTabUseDarkGlass()) {
+            Color.WHITE
+        } else {
+            Color.BLACK
+        }
+    }
+
+    private fun bottomTabSelectedContentColor(): Int {
+        return if (ColorUtils.isColorLight(context.accentColor)) {
+            Color.BLACK
+        } else {
+            Color.WHITE
+        }
+    }
+
     private fun openFontSelectDialog() {
         hideExpandedPanel(anim = false)
         activity?.showDialogFragment<FontSelectDialog>()
@@ -1011,6 +1903,77 @@ class ReadMenu @JvmOverloads constructor(
                 onStop(seekBar.progress)
             }
         })
+    }
+
+    private fun setupBottomNavigationEvents() = binding.run {
+        readBottomPrimaryNav.setOnItemSelectedListener { item ->
+            if (suppressBottomNavSelection) {
+                return@setOnItemSelectedListener true
+            }
+            flashBottomTabIndicator(readBottomPrimaryNav, item.itemId)
+            when (item.itemId) {
+                R.id.menu_read_toc -> {
+                    toggleBottomTab(BottomTab.Toc)
+                }
+
+                R.id.menu_read_aloud -> {
+                    runMenuOut {
+                        callBack.showReadAloudDialog()
+                    }
+                    false
+                }
+
+                R.id.menu_read_interface -> {
+                    if (activeBottomTab == BottomTab.Toc) {
+                        hideExpandedPanel(anim = false)
+                    }
+                    switchBottomTabMode(BottomTabMode.Interface)
+                    true
+                }
+
+                R.id.menu_read_settings -> {
+                    runMenuOut {
+                        callBack.showMoreSetting()
+                    }
+                    false
+                }
+
+                else -> false
+            }
+        }
+        readBottomPrimaryNav.setOnItemReselectedListener { item ->
+            if (!suppressBottomNavSelection) {
+                when (item.itemId) {
+                    R.id.menu_read_toc -> toggleBottomTab(BottomTab.Toc)
+                    R.id.menu_read_interface -> {
+                        flashBottomTabIndicator(readBottomPrimaryNav, item.itemId)
+                        switchBottomTabMode(BottomTabMode.Interface)
+                    }
+                }
+            }
+        }
+        readBottomInterfaceNav.setOnItemSelectedListener { item ->
+            if (suppressBottomNavSelection) {
+                return@setOnItemSelectedListener true
+            }
+            val tab = item.itemId.toBottomTab() ?: return@setOnItemSelectedListener false
+            toggleBottomTab(tab)
+        }
+        readBottomInterfaceNav.setOnItemReselectedListener { item ->
+            if (suppressBottomNavSelection) {
+                return@setOnItemReselectedListener
+            }
+            item.itemId.toBottomTab()?.let { tab ->
+                if (activeBottomTab == tab && flExpandedPanel.isVisible) {
+                    hideExpandedPanel(returnToPrimary = true)
+                } else {
+                    showBottomPanel(tab)
+                }
+            }
+        }
+        readBottomInterfaceBack.setOnClickListener {
+            hideExpandedPanel(returnToPrimary = true)
+        }
     }
 
     private fun bindEvent() = binding.run {
@@ -1139,13 +2102,9 @@ class ReadMenu @JvmOverloads constructor(
         tvNext.setOnClickListener { ReadBook.moveToNextChapter(true) }
 
         //目录
-        llTabBack.setOnClickListener { runMenuOut() }
+        setupBottomNavigationEvents()
 
         //朗读
-        llTabLayout.setOnClickListener { toggleBottomTab(BottomTab.Layout) }
-        llTabTheme.setOnClickListener { toggleBottomTab(BottomTab.Theme) }
-        llTabPage.setOnClickListener { toggleBottomTab(BottomTab.Page) }
-        llTabMore.setOnClickListener { toggleBottomTab(BottomTab.More) }
         layoutTabFont.setOnClickListener { showLayoutTab(LayoutTab.Font) }
         layoutTabSpacing.setOnClickListener { showLayoutTab(LayoutTab.Spacing) }
         layoutTabStyle.setOnClickListener { showLayoutTab(LayoutTab.Style) }
@@ -1386,6 +2345,57 @@ class ReadMenu @JvmOverloads constructor(
         fun skipToChapter(index: Int)
         fun onMenuShow()
         fun onMenuHide()
+    }
+
+    private class ReadMenuTocAdapter(
+        private val onChapterClick: (BookChapter) -> Unit
+    ) : RecyclerView.Adapter<ReadMenuTocAdapter.Holder>() {
+
+        private val chapters = arrayListOf<BookChapter>()
+
+        fun submit(items: List<BookChapter>) {
+            chapters.clear()
+            chapters.addAll(items)
+            notifyDataSetChanged()
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
+            val view = TextView(parent.context).apply {
+                layoutParams = RecyclerView.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    46.dpToPx()
+                )
+                gravity = Gravity.CENTER_VERTICAL
+                includeFontPadding = false
+                isSingleLine = true
+                ellipsize = TextUtils.TruncateAt.END
+                setPadding(4.dpToPx(), 0, 4.dpToPx(), 0)
+                textSize = 15f
+            }
+            return Holder(view)
+        }
+
+        override fun onBindViewHolder(holder: Holder, position: Int) {
+            val chapter = chapters[position]
+            val context = holder.title.context
+            val selected = chapter.index == ReadBook.durChapterIndex
+            holder.title.text = "${chapter.index + 1}. ${chapter.title}"
+            holder.title.setTypeface(null, if (chapter.isVolume) Typeface.BOLD else Typeface.NORMAL)
+            holder.title.setTextColor(
+                when {
+                    selected -> context.accentColor
+                    AppConfig.isNightTheme -> ColorUtils.adjustAlpha(Color.WHITE, 0.86f)
+                    else -> ColorUtils.adjustAlpha(Color.BLACK, 0.82f)
+                }
+            )
+            holder.title.setOnClickListener {
+                onChapterClick(chapter)
+            }
+        }
+
+        override fun getItemCount(): Int = chapters.size
+
+        class Holder(val title: TextView) : RecyclerView.ViewHolder(title)
     }
 
 }

@@ -11,6 +11,8 @@
     <item name="menu_1" type="id" />
     <item name="menu_rss" type="id" />
     <item name="menu_ai" type="id" />
+    <item name="menu_read_page" type="id" />
+    <item name="menu_read_more" type="id" />
 
     <item name="fast_scroller" type="id" />
 

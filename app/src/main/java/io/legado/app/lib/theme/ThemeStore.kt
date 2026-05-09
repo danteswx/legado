@@ -205,7 +205,7 @@ private constructor(private val mContext: Context) : ThemeStoreInterface {
                 ThemeUtils.resolveColor(
                     context,
                     androidx.appcompat.R.attr.colorPrimary,
-                    "#455A64".toColorInt()
+                    "#3482FF".toColorInt()
                 )
             )
         }
@@ -218,7 +218,7 @@ private constructor(private val mContext: Context) : ThemeStoreInterface {
                 ThemeUtils.resolveColor(
                     context,
                     androidx.appcompat.R.attr.colorPrimaryDark,
-                    "#37474F".toColorInt()
+                    "#1F6FE5".toColorInt()
                 )
             )
         }
@@ -231,7 +231,7 @@ private constructor(private val mContext: Context) : ThemeStoreInterface {
                 ThemeUtils.resolveColor(
                     context,
                     androidx.appcompat.R.attr.colorAccent,
-                    "#263238".toColorInt()
+                    "#0A84FF".toColorInt()
                 )
             )
         }
