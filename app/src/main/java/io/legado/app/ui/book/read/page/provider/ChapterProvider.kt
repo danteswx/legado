@@ -238,22 +238,18 @@ object ChapterProvider {
         // 字体统一处理
         val bold = Typeface.create(typeface, Typeface.BOLD)
         val normal = Typeface.create(typeface, Typeface.NORMAL)
-        val (titleFont, textFont) = when (ReadBookConfig.textBold) {
-            1 -> {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
-                    Pair(Typeface.create(typeface, 900, false), bold)
-                else
-                    Pair(bold, bold)
+        val (titleFont, textFont) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val textWeight = readTextWeight()
+            Pair(
+                Typeface.create(typeface, textWeight.coerceAtLeast(700), false),
+                Typeface.create(typeface, textWeight, false)
+            )
+        } else {
+            when (ReadBookConfig.textBold) {
+                1 -> Pair(bold, bold)
+                2 -> Pair(normal, normal)
+                else -> Pair(bold, normal)
             }
-
-            2 -> {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
-                    Pair(normal, Typeface.create(typeface, 300, false))
-                else
-                    Pair(normal, normal)
-            }
-
-            else -> Pair(bold, normal)
         }
 
         //标题
@@ -277,6 +273,15 @@ object ChapterProvider {
             cPaint.isLinearText = true
         }
         return Pair(tPaint, cPaint)
+    }
+
+    private fun readTextWeight(): Int {
+        val progress = ReadBookConfig.textWeight.coerceIn(0, 100)
+        return if (progress <= 50) {
+            300 + (progress / 50f * 100f).toInt()
+        } else {
+            400 + ((progress - 50) / 50f * 500f).toInt()
+        }.coerceIn(300, 900)
     }
 
     /**

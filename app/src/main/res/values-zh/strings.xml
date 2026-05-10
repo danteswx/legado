@@ -1775,4 +1775,19 @@
     <string name="read_menu_region_spacing">界面区域间距</string>
     <string name="read_menu_header_spacing">顶栏边距</string>
     <string name="read_menu_footer_spacing">底栏边距</string>
+    <string name="read_menu_header">页眉</string>
+    <string name="read_menu_footer">页脚</string>
+    <string name="read_menu_title_settings">正文标题</string>
+    <string name="read_menu_add_custom_font">添加字体</string>
+    <string name="read_menu_header_display">页眉显示</string>
+    <string name="read_menu_footer_display">页脚显示</string>
+    <string name="read_menu_divider_color">分隔线颜色</string>
+    <string name="read_menu_title_mode_left">靠左</string>
+    <string name="read_menu_title_mode_center">居中</string>
+    <string name="read_menu_title_mode_advanced">高级</string>
+    <string name="read_menu_title_mode_hide">隐藏</string>
+    <string name="read_menu_show_divider">分隔线</string>
+    <string name="read_menu_background_saturation">饱和度</string>
+    <string name="read_menu_whole_book">整本</string>
+    <string name="read_menu_download_chapter">下载</string>
 </resources>

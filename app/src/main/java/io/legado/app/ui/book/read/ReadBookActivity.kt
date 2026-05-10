@@ -1270,6 +1270,27 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
     }
 
+    override fun openInlineSearchResult(
+        searchResult: SearchResult,
+        results: List<SearchResult>,
+        index: Int
+    ) {
+        if (results.isEmpty()) {
+            return
+        }
+        viewModel.searchContentQuery = searchResult.query
+        viewModel.searchResultIndex = index
+        viewModel.searchResultList = results
+        binding.searchMenu.upSearchResultList(results)
+        binding.searchMenu.updateSearchResultIndex(index)
+        isShowingSearchResult = true
+        ReadBook.saveCurrentBookProgress()
+        binding.readMenu.runMenuOut {
+            skipToSearch(searchResult)
+            showActionMenu()
+        }
+    }
+
     /**
      * 绂佺敤涔︽簮
      */

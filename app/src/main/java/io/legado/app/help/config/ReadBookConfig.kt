@@ -1,5 +1,7 @@
 package io.legado.app.help.config
 
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
@@ -260,6 +262,18 @@ object ReadBookConfig {
             config.bgAlpha = value
         }
 
+    var bgBrightness: Int
+        get() = config.bgBrightness
+        set(value) {
+            config.bgBrightness = value.coerceIn(0, 100)
+        }
+
+    var bgSaturation: Int
+        get() = config.bgSaturation
+        set(value) {
+            config.bgSaturation = value.coerceIn(0, 100)
+        }
+
     var pageAnim: Int
         get() = config.curPageAnim()
         set(@PageAnim.Anim value) {
@@ -279,6 +293,17 @@ object ReadBookConfig {
         get() = config.textBold
         set(value) {
             config.textBold = value
+        }
+
+    var textWeight: Int
+        get() = when {
+            config.textWeight != 50 -> config.textWeight
+            config.textBold == 1 -> 80
+            config.textBold == 2 -> 20
+            else -> config.textWeight
+        }
+        set(value) {
+            config.textWeight = value.coerceIn(0, 100)
         }
 
     var textSize: Int
@@ -444,6 +469,7 @@ object ReadBookConfig {
         if (shareLayout) {
             exportConfig.textFont = shareConfig.textFont
             exportConfig.textBold = shareConfig.textBold
+            exportConfig.textWeight = shareConfig.textWeight
             exportConfig.textSize = shareConfig.textSize
             exportConfig.letterSpacing = shareConfig.letterSpacing
             exportConfig.lineSpacingExtra = shareConfig.lineSpacingExtra
@@ -559,6 +585,8 @@ object ReadBookConfig {
         var bgStrNight: String = "#000000",//夜间背景
         var bgStrEInk: String = "#FFFFFF",//EInk背景
         var bgAlpha: Int = 100,//背景透明度
+        var bgBrightness: Int = 50,
+        var bgSaturation: Int = 50,
         var bgType: Int = 0,//白天背景类型 0:颜色, 1:assets图片, 2其它图片
         var bgTypeNight: Int = 0,//夜间背景类型
         var bgTypeEInk: Int = 0,//EInk背景类型
@@ -578,6 +606,7 @@ object ReadBookConfig {
         private var pageAnimEInk: Int = 4,
         var textFont: String = "",//字体
         var textBold: Int = 0,//是否粗体字 0:正常, 1:粗体, 2:细体
+        var textWeight: Int = 50,
         var textSize: Int = 20,//文字大小
         var letterSpacing: Float = 0.1f,//字间距
         var lineSpacingExtra: Int = 12,//行间距
@@ -834,7 +863,33 @@ object ReadBookConfig {
             } catch (e: Exception) {
                 e.printOnDebug()
             }
-            return bgDrawable ?: appCtx.getCompatColor(R.color.background).toDrawable()
+            return applyBackgroundTone(
+                bgDrawable ?: appCtx.getCompatColor(R.color.background).toDrawable()
+            )
+        }
+
+        private fun applyBackgroundTone(drawable: Drawable): Drawable {
+            if (bgBrightness == 50 && bgSaturation == 50) {
+                return drawable
+            }
+            val saturation = (bgSaturation / 50f).coerceIn(0f, 2f)
+            val brightnessOffset = ((bgBrightness - 50) * 2.55f).coerceIn(-127.5f, 127.5f)
+            val matrix = ColorMatrix().apply {
+                setSaturation(saturation)
+                postConcat(
+                    ColorMatrix(
+                        floatArrayOf(
+                            1f, 0f, 0f, 0f, brightnessOffset,
+                            0f, 1f, 0f, 0f, brightnessOffset,
+                            0f, 0f, 1f, 0f, brightnessOffset,
+                            0f, 0f, 0f, 1f, 0f
+                        )
+                    )
+                )
+            }
+            return drawable.mutate().apply {
+                colorFilter = ColorMatrixColorFilter(matrix)
+            }
         }
 
         fun getBgPath(bgIndex: Int): String? {
@@ -867,6 +922,8 @@ object ReadBookConfig {
             "bgStrNight" to bgStrNight,
             "bgStrEInk" to bgStrEInk,
             "bgAlpha" to bgAlpha,
+            "bgBrightness" to bgBrightness,
+            "bgSaturation" to bgSaturation,
             "bgType" to bgType,
             "bgTypeNight" to bgTypeNight,
             "bgTypeEInk" to bgTypeEInk,
@@ -892,6 +949,7 @@ object ReadBookConfig {
             "pageAnimEInk" to pageAnimEInk,
             "textFont" to textFont,
             "textBold" to textBold,
+            "textWeight" to textWeight,
             "textSize" to textSize,
             "letterSpacing" to letterSpacing,
             "lineSpacingExtra" to lineSpacingExtra,

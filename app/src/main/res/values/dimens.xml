@@ -45,6 +45,7 @@
     <dimen name="main_bottom_bar_elevation">12dp</dimen>
     <dimen name="main_bottom_bar_corner_radius">24dp</dimen>
     <dimen name="main_bottom_nav_horizontal_padding">6dp</dimen>
+    <dimen name="read_bottom_nav_horizontal_padding">18dp</dimen>
     <dimen name="main_bottom_nav_icon_size">23dp</dimen>
     <dimen name="main_bottom_indicator_width">52dp</dimen>
     <dimen name="main_bottom_indicator_height">40dp</dimen>

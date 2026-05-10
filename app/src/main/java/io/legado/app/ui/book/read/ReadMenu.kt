@@ -22,10 +22,12 @@ import android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.Animation
 import android.view.animation.DecelerateInterpolator
+import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
+import androidx.appcompat.widget.AppCompatImageButton
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
@@ -41,10 +43,16 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.constant.PreferKey
 import io.legado.app.databinding.ViewReadThemeCardBinding
 import io.legado.app.databinding.ViewReadMenuBinding
+import io.legado.app.databinding.ViewReadBackgroundCardBinding
+import io.legado.app.help.book.BookHelp
+import io.legado.app.help.config.AdvancedTitleConfig
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
+import io.legado.app.help.config.ReadTipConfig
+import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.coroutine.Coroutine
+import io.legado.app.help.glide.ImageLoader
 import io.legado.app.help.source.getSourceType
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.Selector
@@ -57,7 +65,12 @@ import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.browser.WebViewActivity
 import io.legado.app.ui.font.FontSelectDialog
+import io.legado.app.ui.book.searchContent.SearchContentAdapter
+import io.legado.app.ui.book.searchContent.SearchContentViewModel
+import io.legado.app.ui.book.searchContent.SearchResult
+import io.legado.app.ui.widget.number.NumberPickerDialog
 import io.legado.app.ui.widget.seekbar.SeekBarChangeListener
+import io.legado.app.utils.ChineseUtils
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.ConstraintModify
 import io.legado.app.utils.activity
@@ -65,6 +78,7 @@ import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.gone
+import io.legado.app.utils.hexString
 import io.legado.app.utils.invisible
 import io.legado.app.utils.loadAnimation
 import io.legado.app.utils.modifyBegin
@@ -75,7 +89,10 @@ import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.visible
 import splitties.views.onClick
+import java.io.File
 import java.util.Locale
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -89,15 +106,14 @@ class ReadMenu @JvmOverloads constructor(
     var canShowMenu: Boolean = false
     private val callBack: CallBack get() = activity as CallBack
     private val binding = ViewReadMenuBinding.inflate(LayoutInflater.from(context), this, true)
-    private var confirmSkipToChapter: Boolean = false
     private var isMenuOutAnimating = false
     private enum class BottomTab {
+        Search,
         Toc,
-        Font,
         Layout,
-        Theme,
-        Page,
-        More
+        PageTurn,
+        Background,
+        Theme
     }
 
     private enum class BottomTabMode {
@@ -109,12 +125,6 @@ class ReadMenu @JvmOverloads constructor(
         Preset,
         Custom,
         Eye
-    }
-
-    private enum class LayoutTab {
-        Font,
-        Spacing,
-        Style
     }
 
     private var activeBottomTab: BottomTab? = null
@@ -130,8 +140,96 @@ class ReadMenu @JvmOverloads constructor(
     private var tocDragStartPanelHeight: Int = 0
     private val boundBottomTabGlassViewIds = hashSetOf<Int>()
     private val tocAdapter by lazy { ReadMenuTocAdapter(::openTocChapter) }
+    private val searchPanelAdapter by lazy {
+        SearchContentAdapter(context, object : SearchContentAdapter.Callback {
+            override fun openSearchResult(searchResult: SearchResult, index: Int) {
+                if (searchResult.query.isBlank()) {
+                    return
+                }
+                callBack.openInlineSearchResult(
+                    searchResult,
+                    searchPanelResults.toList(),
+                    index
+                )
+            }
+
+            override fun durChapterIndex(): Int = ReadBook.durChapterIndex
+        })
+    }
+    private val searchPanelResults = arrayListOf<SearchResult>()
+    private var searchPanelJob: Coroutine<List<SearchResult>>? = null
+    private var tocProgressWholeBook: Boolean = false
     private var activeThemeTab: ThemeTab = ThemeTab.Preset
-    private var activeLayoutTab: LayoutTab = LayoutTab.Spacing
+    private data class FontSample(
+        val binding: ViewReadThemeCardBinding,
+        val titleRes: Int,
+        val typeface: Typeface,
+        val isSelected: () -> Boolean,
+        val onClick: () -> Unit
+    )
+
+    private data class BackgroundSample(
+        val binding: ViewReadBackgroundCardBinding,
+        val assetName: String
+    )
+
+    private val fontSampleBindings by lazy {
+        listOf(
+            FontSample(
+                binding.fontCardSource,
+                R.string.read_style_font_source,
+                Typeface.SERIF,
+                { ReadBookConfig.textFont.isBlank() && AppConfig.systemTypefaces == 0 },
+                { setSystemFont(0) }
+            ),
+            FontSample(
+                binding.fontCardSans,
+                R.string.read_style_font_sans,
+                Typeface.SANS_SERIF,
+                { ReadBookConfig.textFont.isBlank() && AppConfig.systemTypefaces == 1 },
+                { setSystemFont(1) }
+            ),
+            FontSample(
+                binding.fontCardArt,
+                R.string.read_style_font_art,
+                Typeface.DEFAULT_BOLD,
+                { ReadBookConfig.textFont.isBlank() && AppConfig.systemTypefaces == 2 },
+                { setSystemFont(2) }
+            ),
+            FontSample(
+                binding.fontCardCustom,
+                R.string.read_style_font_custom,
+                Typeface.DEFAULT,
+                { ReadBookConfig.textFont.isNotBlank() },
+                { openFontSelectDialog() }
+            ),
+            FontSample(
+                binding.fontCardAddCustom,
+                R.string.read_menu_add_custom_font,
+                Typeface.DEFAULT,
+                { false },
+                { openFontSelectDialog() }
+            )
+        )
+    }
+    private val backgroundSampleBindings by lazy {
+        listOf(
+            BackgroundSample(binding.backgroundCardBeach, "午后沙滩.jpg"),
+            BackgroundSample(binding.backgroundCardNight, "宁静夜色.jpg"),
+            BackgroundSample(binding.backgroundCardGreen, "护眼漫绿.jpg"),
+            BackgroundSample(binding.backgroundCardInk, "山水墨影.jpg"),
+            BackgroundSample(binding.backgroundCardParchment, "羊皮纸4.jpg"),
+            BackgroundSample(binding.backgroundCardNewParchment, "新羊皮纸.jpg"),
+            BackgroundSample(binding.backgroundCardParchment1, "羊皮纸1.jpg"),
+            BackgroundSample(binding.backgroundCardParchment2, "羊皮纸2.jpg"),
+            BackgroundSample(binding.backgroundCardParchment3, "羊皮纸3.jpg"),
+            BackgroundSample(binding.backgroundCardFresh, "清新时光.jpg"),
+            BackgroundSample(binding.backgroundCardPalace, "深宫魅影.jpg"),
+            BackgroundSample(binding.backgroundCardCanvas, "边彩画布.jpg"),
+            BackgroundSample(binding.backgroundCardLandscape, "山水画.jpg"),
+            BackgroundSample(binding.backgroundCardBright, "明媚倾城.jpg")
+        )
+    }
     private val themePresets by lazy { ReadMenuThemePreset.defaultPresets() }
     private val themeCardBindings by lazy {
         listOf(
@@ -260,6 +358,7 @@ class ReadMenu @JvmOverloads constructor(
     private fun initView(reset: Boolean = false) = binding.run {
         initAnimation()
         setupExpandableBottomTabContainer()
+        setupSearchPanel()
         setupTocPanel()
         if (immersiveMenu) {
             val lightTextColor = ColorUtils.withAlpha(ColorUtils.lightenColor(textColor), 0.75f)
@@ -286,25 +385,41 @@ class ReadMenu @JvmOverloads constructor(
         }
         flExpandedPanel.background = null
         flExpandedPanel.elevation = 0f
-        tvPre.setTextColor(textColor)
-        tvNext.setTextColor(textColor)
+        tvPanelTocTitle.setTextColor(textColor)
+        tvPanelTocCount.setTextColor(textColor)
+        tocProgressModeToggle.setTextColor(textColor)
+        tvTocPrevChapter.setTextColor(textColor)
+        tvTocNextChapter.setTextColor(textColor)
+        tvPanelSearchTitle.setTextColor(textColor)
         tvPanelLayoutTitle.setTextColor(textColor)
+        tvPanelBackgroundTitle.setTextColor(textColor)
         tvPanelThemeTitle.setTextColor(textColor)
-        tvPanelPageTitle.setTextColor(textColor)
+        tvPanelPageTurnTitle.setTextColor(textColor)
         tvPanelMoreTitle.setTextColor(textColor)
         panelPageAnim.setTextColor(textColor)
+        panelPageAutoPage.setTextColor(textColor)
+        panelPageTouchSlop.setTextColor(textColor)
+        panelPageVolumeKey.setTextColor(textColor)
+        panelPageMouseWheel.setTextColor(textColor)
         panelMoreSearch.setTextColor(textColor)
         panelMoreAutoPage.setTextColor(textColor)
         panelMoreReplace.setTextColor(textColor)
         panelMoreSettings.setTextColor(textColor)
         tintLayoutPanel(textColor)
         tintThemePanel(textColor)
-        renderLayoutTabs()
+        tintSearchPanel(textColor)
+        tintBackgroundPanel(textColor)
+        tintPageTurnPanel(textColor)
+        renderLayoutPanel()
         renderBottomTabState()
         renderThemeTabs()
         updateLayoutControlsFromConfig()
+        updatePageTurnControls()
         updateThemeControlsFromConfig()
         updateThemePresetCards()
+        updateFontSampleCards()
+        updateBackgroundSampleCards()
+        updateBackgroundControlsFromConfig()
         vwBrightnessPosAdjust.setColorFilter(textColor, PorterDuff.Mode.SRC_IN)
         llBrightness.setOnClickListener(null)
         seekBrightness.post {
@@ -356,11 +471,9 @@ class ReadMenu @JvmOverloads constructor(
         if (brightnessAuto()) {
             binding.ivBrightnessAuto.setColorFilter(context.accentColor)
             binding.seekBrightness.isEnabled = false
-            binding.seekThemeBrightness.isEnabled = false
         } else {
             binding.ivBrightnessAuto.setColorFilter(context.buttonDisabledColor)
             binding.seekBrightness.isEnabled = true
-            binding.seekThemeBrightness.isEnabled = true
         }
         setScreenBrightness(AppConfig.readBrightness.toFloat())
     }
@@ -439,6 +552,123 @@ class ReadMenu @JvmOverloads constructor(
         bottomTabPanelAttached = true
     }
 
+    private fun setupSearchPanel() = binding.run {
+        if (rvPanelSearchResults.adapter == null) {
+            rvPanelSearchResults.layoutManager = LinearLayoutManager(context)
+            rvPanelSearchResults.adapter = searchPanelAdapter
+        }
+        etPanelSearchQuery.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                startInlineSearch(etPanelSearchQuery.text?.toString().orEmpty())
+                true
+            } else {
+                false
+            }
+        }
+        btnPanelSearchSubmit.setOnClickListener {
+            startInlineSearch(etPanelSearchQuery.text?.toString().orEmpty())
+        }
+    }
+
+    private fun startInlineSearch(rawQuery: String) = binding.run {
+        val query = rawQuery.trim()
+        if (query.isBlank()) {
+            searchPanelJob?.cancel()
+            searchPanelResults.clear()
+            searchPanelAdapter.setItems(emptyList())
+            tvPanelSearchCount.text = null
+            return@run
+        }
+        val book = ReadBook.book ?: return@run
+        searchPanelJob?.cancel()
+        tvPanelSearchCount.text = context.getString(R.string.loading)
+        searchPanelAdapter.setItems(emptyList())
+        searchPanelResults.clear()
+        searchPanelJob = Coroutine.async {
+            val contentProcessor = ContentProcessor.get(book.name, book.origin)
+            val chapters = appDb.bookChapterDao.getChapterList(book.bookUrl)
+            val results = arrayListOf<SearchResult>()
+            chapters.forEach { chapter ->
+                currentCoroutineContext().ensureActive()
+                if (!chapter.isVolume && BookHelp.hasContent(book, chapter)) {
+                    val content = BookHelp.getContent(book, chapter) ?: return@forEach
+                    currentCoroutineContext().ensureActive()
+                    val displayTitle = when (AppConfig.chineseConverterType) {
+                        1 -> ChineseUtils.t2s(chapter.title)
+                        2 -> ChineseUtils.s2t(chapter.title)
+                        else -> chapter.title
+                    }
+                    val searchableContent = contentProcessor.getContent(
+                        book = book,
+                        chapter = chapter,
+                        content = content,
+                        useReplace = SearchContentViewModel.replaceEnabled
+                    ).toString()
+                    inlineSearchPositions(searchableContent, query).forEachIndexed { index, position ->
+                        currentCoroutineContext().ensureActive()
+                        val (queryIndex, resultText) = inlineSearchResultText(
+                            searchableContent,
+                            position,
+                            query
+                        )
+                        results.add(
+                            SearchResult(
+                                resultCount = results.size,
+                                resultCountWithinChapter = index,
+                                resultText = resultText,
+                                chapterTitle = displayTitle,
+                                query = query,
+                                chapterIndex = chapter.index,
+                                queryIndexInResult = queryIndex,
+                                queryIndexInChapter = position,
+                                isRegex = SearchContentViewModel.regexReplace
+                            )
+                        )
+                    }
+                }
+            }
+            results.toList()
+        }.onSuccess { results ->
+            searchPanelResults.clear()
+            searchPanelResults.addAll(results)
+            searchPanelAdapter.setItems(results)
+            tvPanelSearchCount.text = context.getString(R.string.search_content_size) + ": ${results.size}"
+        }.onError {
+            tvPanelSearchCount.text = context.getString(R.string.search_content_size) + ": 0"
+        }
+    }
+
+    private suspend fun inlineSearchPositions(content: String, query: String): List<Int> {
+        val positions = arrayListOf<Int>()
+        if (SearchContentViewModel.regexReplace) {
+            runCatching {
+                Regex(query).findAll(content).forEach { match ->
+                    currentCoroutineContext().ensureActive()
+                    positions.add(match.range.first)
+                }
+            }
+        } else {
+            var index = content.indexOf(query)
+            while (index >= 0) {
+                currentCoroutineContext().ensureActive()
+                positions.add(index)
+                index = content.indexOf(query, index + query.length)
+            }
+        }
+        return positions
+    }
+
+    private fun inlineSearchResultText(
+        content: String,
+        queryIndexInContent: Int,
+        query: String
+    ): Pair<Int, String> {
+        val length = 20
+        val start = (queryIndexInContent - length).coerceAtLeast(0)
+        val end = (queryIndexInContent + query.length + length).coerceAtMost(content.length)
+        return queryIndexInContent - start to content.substring(start, end)
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     private fun setupTocPanel() = binding.run {
         if (rvPanelToc.adapter == null) {
@@ -454,6 +684,26 @@ class ReadMenu @JvmOverloads constructor(
                 animateTocPanelTo(if (tocPanelFullscreen) tocDefaultPanelHeight() else tocFullPanelHeight())
             }
         }
+        tocProgressModeToggle.setOnClickListener {
+            tocProgressWholeBook = !tocProgressWholeBook
+            upSeekBar()
+        }
+        tvTocPrevChapter.setOnClickListener { ReadBook.moveToPrevChapter(upContent = true, toLast = false) }
+        tvTocNextChapter.setOnClickListener { ReadBook.moveToNextChapter(true) }
+        seekTocProgress.setOnSeekBarChangeListener(object : SeekBarChangeListener {
+            override fun onStopTrackingTouch(seekBar: SeekBar) {
+                if (tocProgressWholeBook) {
+                    if (seekBar.progress == ReadBook.durChapterIndex) {
+                        return
+                    }
+                    callBack.skipToChapter(seekBar.progress)
+                } else {
+                    ReadBook.skipToPage(seekBar.progress)
+                    setSeekPage(seekBar.progress)
+                    upSeekBar()
+                }
+            }
+        })
         tocDragHandle.setOnTouchListener { _, event ->
             if (activeBottomTab != BottomTab.Toc || !flExpandedPanel.isVisible) {
                 return@setOnTouchListener false
@@ -550,7 +800,7 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     private fun showBottomPanel(tab: BottomTab) = binding.run {
-        if (tab == BottomTab.Toc) {
+        if (tab == BottomTab.Search || tab == BottomTab.Toc) {
             if (bottomTabMode != BottomTabMode.Primary) {
                 switchBottomTabMode(BottomTabMode.Primary, animate = false)
             }
@@ -562,6 +812,8 @@ class ReadMenu @JvmOverloads constructor(
                 bottomTabBar.height > bottomTabCollapsedHeight()
         activeBottomTab = tab
         when (tab) {
+            BottomTab.Search -> Unit
+
             BottomTab.Toc -> {
                 if (previousTab != BottomTab.Toc) {
                     tocPanelFullscreen = false
@@ -569,25 +821,20 @@ class ReadMenu @JvmOverloads constructor(
                 loadTocPanel()
             }
 
-            BottomTab.Font -> {
-                activeLayoutTab = LayoutTab.Font
-                renderLayoutTabs()
-            }
+            BottomTab.Layout -> Unit
 
-            BottomTab.Layout -> {
-                activeLayoutTab = LayoutTab.Spacing
-                renderLayoutTabs()
-            }
+            BottomTab.PageTurn -> updatePageTurnControls()
 
-            BottomTab.Theme,
-            BottomTab.Page,
-            BottomTab.More -> Unit
+            BottomTab.Background,
+            BottomTab.Theme -> Unit
         }
+        panelSearch.gone(tab != BottomTab.Search)
         panelToc.gone(tab != BottomTab.Toc)
-        panelLayout.gone(tab != BottomTab.Font && tab != BottomTab.Layout)
+        panelLayout.gone(tab != BottomTab.Layout)
+        panelPageTurn.gone(tab != BottomTab.PageTurn)
+        panelBackground.gone(tab != BottomTab.Background)
         panelTheme.gone(tab != BottomTab.Theme)
-        panelPage.gone(tab != BottomTab.Page)
-        panelMore.gone(tab != BottomTab.More)
+        panelMore.gone()
         updateExpandedPanelHeight(tab)
         val glassPanelHeight = expandedPanelStableHeight()
         updateBottomTabGlassLayerHeight(glassPanelHeight)
@@ -674,26 +921,21 @@ class ReadMenu @JvmOverloads constructor(
         panelTheme.updateLayoutParams<FrameLayout.LayoutParams> {
             height = ViewGroup.LayoutParams.WRAP_CONTENT
         }
-        if (tab == BottomTab.Font || tab == BottomTab.Layout || tab == BottomTab.Theme) {
+        if (tab == BottomTab.Layout || tab == BottomTab.Theme) {
             applyAdaptivePanelHeight(tab, expandedPanelMaxHeight())
         }
     }
 
     private fun applyAdaptivePanelHeight(tab: BottomTab, maxHeight: Int) = binding.run {
         when (tab) {
-            BottomTab.Font,
             BottomTab.Layout -> {
                 val measuredHeight = measureBottomPanelHeight(panelLayout, maxHeight)
                 if (measuredHeight >= maxHeight) {
                     panelLayout.updateLayoutParams<FrameLayout.LayoutParams> {
                         height = maxHeight
                     }
-                    val fixedChromeHeight = measuredOrLayoutHeight(llLayoutTabs) +
-                            measuredOrLayoutHeight(vwLayoutTabsDivider) +
-                            panelLayout.paddingTop +
-                            panelLayout.paddingBottom
                     panelLayoutScroll.updateLayoutParams<LinearLayout.LayoutParams> {
-                        height = (maxHeight - fixedChromeHeight).coerceAtLeast(96.dpToPx())
+                        height = maxHeight
                     }
                 } else {
                     panelLayout.updateLayoutParams<FrameLayout.LayoutParams> {
@@ -716,17 +958,11 @@ class ReadMenu @JvmOverloads constructor(
                 }
             }
 
+            BottomTab.Search,
             BottomTab.Toc,
-            BottomTab.Page,
-            BottomTab.More -> Unit
+            BottomTab.PageTurn,
+            BottomTab.Background -> Unit
         }
-    }
-
-    private fun measuredOrLayoutHeight(view: View): Int {
-        return view.measuredHeight.takeIf { it > 0 }
-            ?: view.height.takeIf { it > 0 }
-            ?: view.layoutParams?.height?.takeIf { it > 0 }
-            ?: 0
     }
 
     private fun expandedPanelMaxHeight(): Int {
@@ -765,6 +1001,9 @@ class ReadMenu @JvmOverloads constructor(
     private fun bottomTabCollapsedHeight(): Int = 64.dpToPx()
 
     private fun expandedPanelTargetHeight(tab: BottomTab): Int {
+        if (tab == BottomTab.Search) {
+            return tocDefaultPanelHeight()
+        }
         if (tab == BottomTab.Toc) {
             return if (tocPanelFullscreen) {
                 tocFullPanelHeight()
@@ -780,57 +1019,56 @@ class ReadMenu @JvmOverloads constructor(
 
     private fun expandedPanelStableHeight(): Int = binding.run {
         val maxHeight = expandedPanelMaxHeight()
-        val currentLayoutTab = activeLayoutTab
         val currentBottomTab = activeBottomTab
 
-        activeLayoutTab = LayoutTab.Font
-        renderLayoutTabs()
         panelToc.gone()
+        panelSearch.gone()
         panelLayout.visible()
         panelTheme.gone()
-        val fontHeight = measureBottomPanelHeight(panelLayout, maxHeight)
-
-        activeLayoutTab = LayoutTab.Spacing
-        renderLayoutTabs()
-        val spacingHeight = measureBottomPanelHeight(panelLayout, maxHeight)
-
-        activeLayoutTab = LayoutTab.Style
-        renderLayoutTabs()
-        val styleHeight = measureBottomPanelHeight(panelLayout, maxHeight)
+        val layoutHeight = measureBottomPanelHeight(panelLayout, maxHeight)
 
         panelLayout.gone()
+        panelPageTurn.visible()
+        val pageTurnHeight = measureBottomPanelHeight(panelPageTurn, maxHeight)
+        panelPageTurn.gone()
+        panelBackground.visible()
+        val backgroundHeight = measureBottomPanelHeight(panelBackground, maxHeight)
+        panelBackground.gone()
         panelTheme.visible()
         val themeHeight = measureBottomPanelHeight(panelTheme, maxHeight)
 
         panelTheme.gone()
-        panelPage.visible()
-        val pageHeight = measureBottomPanelHeight(panelPage, maxHeight)
-
-        panelPage.gone()
-        panelMore.visible()
-        val moreHeight = measureBottomPanelHeight(panelMore, maxHeight)
+        panelMore.gone()
         val tocHeight = tocFullPanelHeight()
+        val searchHeight = tocDefaultPanelHeight()
 
-        activeLayoutTab = currentLayoutTab
-        renderLayoutTabs()
+        panelSearch.gone(currentBottomTab != BottomTab.Search)
         panelToc.gone(currentBottomTab != BottomTab.Toc)
-        panelLayout.gone(currentBottomTab != BottomTab.Font && currentBottomTab != BottomTab.Layout)
+        panelLayout.gone(currentBottomTab != BottomTab.Layout)
+        panelPageTurn.gone(currentBottomTab != BottomTab.PageTurn)
+        panelBackground.gone(currentBottomTab != BottomTab.Background)
         panelTheme.gone(currentBottomTab != BottomTab.Theme)
-        panelPage.gone(currentBottomTab != BottomTab.Page)
-        panelMore.gone(currentBottomTab != BottomTab.More)
+        panelMore.gone()
 
-        maxOf(fontHeight, spacingHeight, styleHeight, themeHeight, pageHeight, moreHeight, tocHeight)
+        maxOf(
+            layoutHeight,
+            pageTurnHeight,
+            backgroundHeight,
+            themeHeight,
+            searchHeight,
+            tocHeight
+        )
             .coerceIn(120.dpToPx(), tocFullPanelHeight())
     }
 
     private fun selectedBottomPanelView(tab: BottomTab): View {
         return when (tab) {
+            BottomTab.Search -> binding.panelSearch
             BottomTab.Toc -> binding.panelToc
-            BottomTab.Font -> binding.panelLayout
             BottomTab.Layout -> binding.panelLayout
+            BottomTab.PageTurn -> binding.panelPageTurn
+            BottomTab.Background -> binding.panelBackground
             BottomTab.Theme -> binding.panelTheme
-            BottomTab.Page -> binding.panelPage
-            BottomTab.More -> binding.panelMore
         }
     }
 
@@ -1003,13 +1241,13 @@ class ReadMenu @JvmOverloads constructor(
             nav.itemTextColor = colors
             nav.itemRippleColor = null
         }
-        readBottomInterfaceBack.setColorFilter(bottomTabContentColor(), PorterDuff.Mode.SRC_IN)
     }
 
     private fun syncBottomNavigationSelection() = binding.run {
         setBottomNavigationSelection(
             readBottomPrimaryNav,
             when {
+                activeBottomTab == BottomTab.Search -> R.id.menu_read_search
                 activeBottomTab == BottomTab.Toc -> R.id.menu_read_toc
                 bottomTabMode == BottomTabMode.Interface -> R.id.menu_read_interface
                 else -> null
@@ -1154,16 +1392,12 @@ class ReadMenu @JvmOverloads constructor(
             ?: resources.displayMetrics.widthPixels
         readBottomPrimaryNav.animate().cancel()
         readBottomInterfaceNav.animate().cancel()
-        readBottomInterfaceBack.animate().cancel()
         if (!animate || wasMode == mode || width <= 0) {
             readBottomPrimaryNav.translationX = if (mode == BottomTabMode.Primary) 0f else -width.toFloat()
             readBottomInterfaceNav.translationX =
                 if (mode == BottomTabMode.Interface) 0f else width.toFloat()
-            readBottomInterfaceBack.translationX =
-                if (mode == BottomTabMode.Interface) 0f else width.toFloat()
             readBottomPrimaryNav.visible(mode == BottomTabMode.Primary)
             readBottomInterfaceNav.visible(mode == BottomTabMode.Interface)
-            readBottomInterfaceBack.visible(mode == BottomTabMode.Interface)
             return@run
         }
         when (mode) {
@@ -1172,8 +1406,6 @@ class ReadMenu @JvmOverloads constructor(
                 readBottomPrimaryNav.translationX = -width.toFloat()
                 readBottomInterfaceNav.visible()
                 readBottomInterfaceNav.translationX = 0f
-                readBottomInterfaceBack.visible()
-                readBottomInterfaceBack.translationX = 0f
                 readBottomPrimaryNav.animate()
                     .translationX(0f)
                     .setDuration(220L)
@@ -1189,16 +1421,6 @@ class ReadMenu @JvmOverloads constructor(
                         }
                     }
                     .start()
-                readBottomInterfaceBack.animate()
-                    .translationX(width.toFloat())
-                    .setDuration(220L)
-                    .setInterpolator(bottomTabSlideInterpolator)
-                    .withEndAction {
-                        if (bottomTabMode == BottomTabMode.Primary) {
-                            readBottomInterfaceBack.invisible()
-                        }
-                    }
-                    .start()
             }
 
             BottomTabMode.Interface -> {
@@ -1206,8 +1428,6 @@ class ReadMenu @JvmOverloads constructor(
                 readBottomPrimaryNav.translationX = 0f
                 readBottomInterfaceNav.visible()
                 readBottomInterfaceNav.translationX = width.toFloat()
-                readBottomInterfaceBack.visible()
-                readBottomInterfaceBack.translationX = width.toFloat()
                 readBottomPrimaryNav.animate()
                     .translationX(-width.toFloat())
                     .setDuration(220L)
@@ -1223,42 +1443,49 @@ class ReadMenu @JvmOverloads constructor(
                     .setDuration(220L)
                     .setInterpolator(bottomTabSlideInterpolator)
                     .start()
-                readBottomInterfaceBack.animate()
-                    .translationX(0f)
-                    .setDuration(220L)
-                    .setInterpolator(bottomTabSlideInterpolator)
-                    .start()
             }
         }
     }
 
     private fun BottomTab.menuItemId(): Int {
         return when (this) {
+            BottomTab.Search -> R.id.menu_read_search
             BottomTab.Toc -> R.id.menu_read_toc
-            BottomTab.Font -> R.id.menu_read_font
             BottomTab.Layout -> R.id.menu_read_layout
+            BottomTab.PageTurn -> R.id.menu_read_page_turn
+            BottomTab.Background -> R.id.menu_read_background
             BottomTab.Theme -> R.id.menu_read_theme
-            BottomTab.Page -> R.id.menu_read_page
-            BottomTab.More -> R.id.menu_read_more
         }
     }
 
     private fun Int.toBottomTab(): BottomTab? {
         return when (this) {
-            R.id.menu_read_font -> BottomTab.Font
+            R.id.menu_read_search -> BottomTab.Search
             R.id.menu_read_layout -> BottomTab.Layout
+            R.id.menu_read_page_turn -> BottomTab.PageTurn
+            R.id.menu_read_background -> BottomTab.Background
             R.id.menu_read_theme -> BottomTab.Theme
-            R.id.menu_read_page -> BottomTab.Page
-            R.id.menu_read_more -> BottomTab.More
             else -> null
         }
     }
 
     private fun tintLayoutPanel(color: Int) = binding.run {
         listOf(
+            tvLayoutFontTitle,
             tvLayoutTextSpacingTitle,
             tvLayoutPageMarginTitle,
-            tvLayoutRegionSpacingTitle,
+            tvLayoutTitleSettingsTitle,
+            tvLayoutTitleSizeLabel,
+            tvLayoutTitleTopSpacingLabel,
+            tvLayoutTitleBottomSpacingLabel,
+            tvLayoutHeaderShowLabel,
+            tvLayoutHeaderShowValue,
+            tvLayoutFooterShowLabel,
+            tvLayoutFooterShowValue,
+            tvLayoutTipColorLabel,
+            tvLayoutTipColorValue,
+            tvLayoutTipDividerColorLabel,
+            tvLayoutTipDividerColorValue,
             tvLayoutLetterSpacingLabel,
             tvLayoutLineSpacingLabel,
             tvLayoutParagraphSpacingLabel,
@@ -1266,52 +1493,93 @@ class ReadMenu @JvmOverloads constructor(
             tvLayoutPaddingBottomLabel,
             tvLayoutPaddingLeftLabel,
             tvLayoutPaddingRightLabel,
-            tvLayoutHeaderSpacingLabel,
-            tvLayoutFooterSpacingLabel,
+            tvLayoutHeaderTitle,
+            tvLayoutHeaderLineToggle,
+            tvLayoutTitleSizeValue,
+            tvLayoutTitleTopSpacingValue,
+            tvLayoutTitleBottomSpacingValue,
+            tvLayoutHeaderPaddingTopValue,
+            tvLayoutHeaderPaddingBottomValue,
+            tvLayoutFooterTitle,
+            tvLayoutFooterLineToggle,
+            tvLayoutFooterPaddingTopValue,
+            tvLayoutFooterPaddingBottomValue,
             tvLayoutLetterSpacingValue,
             tvLayoutLineSpacingValue,
             tvLayoutParagraphSpacingValue,
             tvLayoutPaddingTopValue,
             tvLayoutPaddingBottomValue,
             tvLayoutPaddingLeftValue,
-            tvLayoutPaddingRightValue,
-            tvLayoutHeaderSpacingValue,
-            tvLayoutFooterSpacingValue
+            tvLayoutPaddingRightValue
         ).forEach { it.setTextColor(color) }
         listOf(
             ivLayoutPaddingTop,
             ivLayoutPaddingBottom,
             ivLayoutPaddingLeft,
             ivLayoutPaddingRight,
-            ivLayoutHeaderSpacing,
-            ivLayoutFooterSpacing
+            ivLayoutHeaderTitle,
+            ivLayoutFooterTitle
         ).forEach { it.setColorFilter(color, PorterDuff.Mode.SRC_IN) }
+        listOf(
+            tvLayoutTitleModeLeft,
+            tvLayoutTitleModeCenter,
+            tvLayoutTitleModeAdvanced,
+            tvLayoutTitleModeHide
+        ).forEach { it.setTextColor(color) }
+    }
+
+    private fun tintPageTurnPanel(color: Int) = binding.run {
+        listOf(
+            tvPanelPageTurnTitle,
+            panelPageAnim,
+            panelPageAutoPage,
+            panelPageTouchSlop,
+            panelPageVolumeKey,
+            panelPageMouseWheel
+        ).forEach { it.setTextColor(color) }
     }
 
     private fun tintThemePanel(color: Int) = binding.run {
         listOf(
-            tvThemeBrightnessLabel,
-            tvThemeContrastLabel,
-            tvThemeTextureLabel,
-            tvThemeFontLabel,
             tvThemeFontWeightLabel,
             tvThemeTextSizeLabel,
             tvThemeFontWeightBig,
             tvThemeTextSizeSmall,
             tvThemeTextSizeBig,
-            tvThemeBrightnessValue,
-            tvThemeContrastValue,
             tvThemeFontWeightValue,
             tvThemeTextSizeValue
         ).forEach { it.setTextColor(color) }
         listOf(
-            ivThemeBrightnessLow,
-            ivThemeBrightnessHigh,
-            ivThemeContrastLow,
-            ivThemeContrastHigh,
             ivThemeFontWeightLow
         ).forEach { it.setColorFilter(color, PorterDuff.Mode.SRC_IN) }
-        themeTonePanel.background = roundedRect(
+    }
+
+    private fun tintSearchPanel(color: Int) = binding.run {
+        listOf(
+            tvPanelSearchTitle,
+            tvPanelSearchCount,
+            etPanelSearchQuery
+        ).forEach { it.setTextColor(color) }
+        btnPanelSearchSubmit.setColorFilter(color, PorterDuff.Mode.SRC_IN)
+        searchInputPanel.background = roundedRect(
+            ColorUtils.adjustAlpha(color, 0.06f),
+            16f.dpToPx(),
+            1.dpToPx(),
+            ColorUtils.adjustAlpha(color, 0.14f)
+        )
+    }
+
+    private fun tintBackgroundPanel(color: Int) = binding.run {
+        listOf(
+            tvPanelBackgroundTitle,
+            tvBackgroundBrightnessLabel,
+            tvBackgroundSaturationLabel,
+            tvBackgroundAlphaLabel,
+            tvBackgroundBrightnessValue,
+            tvBackgroundSaturationValue,
+            tvBackgroundAlphaValue
+        ).forEach { it.setTextColor(color) }
+        backgroundTonePanel.background = roundedRect(
             ColorUtils.adjustAlpha(color, 0.06f),
             14f.dpToPx(),
             1.dpToPx(),
@@ -1325,31 +1593,13 @@ class ReadMenu @JvmOverloads constructor(
         configureThemeTopTab(llThemeTabEye, activeThemeTab == ThemeTab.Eye)
     }
 
-    private fun renderLayoutTabs() = binding.run {
-        panelLayoutFont.gone(activeLayoutTab != LayoutTab.Font)
-        panelLayoutSpacing.gone(activeLayoutTab != LayoutTab.Spacing)
-        panelLayoutStyle.gone(activeLayoutTab != LayoutTab.Style)
-        configureLayoutTopTab(
-            tvLayoutTabFont,
-            vwLayoutTabFontIndicator,
-            activeLayoutTab == LayoutTab.Font
+    private fun renderLayoutPanel() = binding.run {
+        tvPanelLayoutTitle.setText(
+            R.string.compose_type
         )
-        configureLayoutTopTab(
-            tvLayoutTabSpacing,
-            vwLayoutTabSpacingIndicator,
-            activeLayoutTab == LayoutTab.Spacing
-        )
-        configureLayoutTopTab(
-            tvLayoutTabStyle,
-            vwLayoutTabStyleIndicator,
-            activeLayoutTab == LayoutTab.Style
-        )
-    }
-
-    private fun configureLayoutTopTab(tab: TextView, indicator: android.view.View, selected: Boolean) {
-        tab.setTextColor(if (selected) context.accentColor else textColor)
-        indicator.background = roundedRect(context.accentColor, 1.5f.dpToPx())
-        indicator.isVisible = selected
+        panelLayoutFont.visible()
+        panelLayoutSpacing.visible()
+        panelLayoutStyle.visible()
     }
 
     private fun configureThemeTopTab(tab: TextView, selected: Boolean) {
@@ -1360,17 +1610,6 @@ class ReadMenu @JvmOverloads constructor(
             if (selected) context.accentColor else ColorUtils.adjustAlpha(textColor, 0.12f)
         )
         tab.setTextColor(if (selected) Color.WHITE else textColor)
-    }
-
-    private fun showLayoutTab(tab: LayoutTab) = binding.run {
-        activeLayoutTab = tab
-        renderLayoutTabs()
-        panelLayoutScroll.post {
-            panelLayoutScroll.smoothScrollTo(0, 0)
-            if (activeBottomTab == BottomTab.Font || activeBottomTab == BottomTab.Layout) {
-                updateExpandedPanelHeight(BottomTab.Layout)
-            }
-        }
     }
 
     private fun updateLayoutControlsFromConfig() = binding.run {
@@ -1406,15 +1645,32 @@ class ReadMenu @JvmOverloads constructor(
         seekLayoutPaddingRight.progress = paddingRightProgress
         updateLayoutIntValue(tvLayoutPaddingRightValue, paddingRightProgress)
 
-        val headerProgress = maxOf(ReadBookConfig.headerPaddingTop, ReadBookConfig.headerPaddingBottom)
-            .coerceIn(0, seekLayoutHeaderSpacing.max)
-        seekLayoutHeaderSpacing.progress = headerProgress
-        updateLayoutIntValue(tvLayoutHeaderSpacingValue, headerProgress)
+        seekLayoutTitleSize.progress = ReadBookConfig.titleSize.coerceIn(0, seekLayoutTitleSize.max)
+        updateLayoutIntValue(tvLayoutTitleSizeValue, seekLayoutTitleSize.progress)
+        seekLayoutTitleTopSpacing.progress = ReadBookConfig.titleTopSpacing
+            .coerceIn(0, seekLayoutTitleTopSpacing.max)
+        updateLayoutIntValue(tvLayoutTitleTopSpacingValue, seekLayoutTitleTopSpacing.progress)
+        seekLayoutTitleBottomSpacing.progress = ReadBookConfig.titleBottomSpacing
+            .coerceIn(0, seekLayoutTitleBottomSpacing.max)
+        updateLayoutIntValue(tvLayoutTitleBottomSpacingValue, seekLayoutTitleBottomSpacing.progress)
+        updateTitleModeButtons()
 
-        val footerProgress = maxOf(ReadBookConfig.footerPaddingTop, ReadBookConfig.footerPaddingBottom)
-            .coerceIn(0, seekLayoutFooterSpacing.max)
-        seekLayoutFooterSpacing.progress = footerProgress
-        updateLayoutIntValue(tvLayoutFooterSpacingValue, footerProgress)
+        seekLayoutHeaderPaddingTop.progress = ReadBookConfig.headerPaddingTop
+            .coerceIn(0, seekLayoutHeaderPaddingTop.max)
+        updateLayoutIntValue(tvLayoutHeaderPaddingTopValue, seekLayoutHeaderPaddingTop.progress)
+        seekLayoutHeaderPaddingBottom.progress = ReadBookConfig.headerPaddingBottom
+            .coerceIn(0, seekLayoutHeaderPaddingBottom.max)
+        updateLayoutIntValue(tvLayoutHeaderPaddingBottomValue, seekLayoutHeaderPaddingBottom.progress)
+        configureOptionButton(tvLayoutHeaderLineToggle, ReadBookConfig.showHeaderLine)
+
+        seekLayoutFooterPaddingTop.progress = ReadBookConfig.footerPaddingTop
+            .coerceIn(0, seekLayoutFooterPaddingTop.max)
+        updateLayoutIntValue(tvLayoutFooterPaddingTopValue, seekLayoutFooterPaddingTop.progress)
+        seekLayoutFooterPaddingBottom.progress = ReadBookConfig.footerPaddingBottom
+            .coerceIn(0, seekLayoutFooterPaddingBottom.max)
+        updateLayoutIntValue(tvLayoutFooterPaddingBottomValue, seekLayoutFooterPaddingBottom.progress)
+        configureOptionButton(tvLayoutFooterLineToggle, ReadBookConfig.showFooterLine)
+        updateTipSettingValues()
     }
 
     private fun updateLayoutDecimalValue(view: TextView, progress: Int) {
@@ -1425,28 +1681,49 @@ class ReadMenu @JvmOverloads constructor(
         view.text = progress.toString()
     }
 
-    private fun updateThemeControlsFromConfig() = binding.run {
-        val brightnessProgress = (AppConfig.readBrightness / 255f * 100f)
-            .roundToInt()
-            .coerceIn(0, 100)
-        seekThemeBrightness.progress = brightnessProgress
-        updateThemeBrightnessValue(brightnessProgress)
-        seekThemeBrightness.isEnabled = !brightnessAuto()
-
-        seekThemeContrast.progress = 50
-        updateThemeContrastValue(50)
-
-        seekThemeFontWeight.progress = when (ReadBookConfig.textBold) {
-            1 -> 80
-            2 -> 20
-            else -> 50
+    private fun updateTitleModeButtons() = binding.run {
+        listOf(
+            tvLayoutTitleModeLeft to (ReadBookConfig.titleMode == 0),
+            tvLayoutTitleModeCenter to (ReadBookConfig.titleMode == 1),
+            tvLayoutTitleModeAdvanced to (ReadBookConfig.titleMode == AdvancedTitleConfig.TITLE_MODE_ADVANCED),
+            tvLayoutTitleModeHide to (ReadBookConfig.titleMode == 2)
+        ).forEach { (view, selected) ->
+            configureOptionButton(view, selected)
         }
+    }
+
+    private fun updateTipSettingValues() = binding.run {
+        tvLayoutHeaderShowValue.text =
+            ReadTipConfig.getHeaderModes(context)[ReadTipConfig.headerMode].orEmpty()
+        tvLayoutFooterShowValue.text =
+            ReadTipConfig.getFooterModes(context)[ReadTipConfig.footerMode].orEmpty()
+        tvLayoutTipColorValue.text = if (ReadTipConfig.tipColor == 0) {
+            ReadTipConfig.tipColorNames.firstOrNull().orEmpty()
+        } else {
+            "#${ReadTipConfig.tipColor.hexString}"
+        }
+        tvLayoutTipDividerColorValue.text = when (ReadTipConfig.tipDividerColor) {
+            -1, 0 -> ReadTipConfig.tipDividerColorNames
+                .getOrElse(ReadTipConfig.tipDividerColor + 1) { "" }
+            else -> "#${ReadTipConfig.tipDividerColor.hexString}"
+        }
+    }
+
+    private fun updatePageTurnControls() = binding.run {
+        configureOptionButton(panelPageAnim, false)
+        configureOptionButton(panelPageAutoPage, false)
+        configureOptionButton(panelPageTouchSlop, AppConfig.pageTouchSlop > 0)
+        configureOptionButton(panelPageVolumeKey, AppConfig.volumeKeyPage)
+        configureOptionButton(panelPageMouseWheel, AppConfig.mouseWheelPage)
+    }
+
+    private fun updateThemeControlsFromConfig() = binding.run {
+        seekThemeFontWeight.progress = ReadBookConfig.textWeight.coerceIn(0, seekThemeFontWeight.max)
         updateThemeFontWeightValue(seekThemeFontWeight.progress)
 
         seekThemeTextSize.progress = (ReadBookConfig.textSize - 5)
             .coerceIn(0, seekThemeTextSize.max)
         updateThemeTextSizeValue(seekThemeTextSize.progress)
-        updateTextureButtons()
         updateFontButtons()
     }
 
@@ -1497,42 +1774,6 @@ class ReadMenu @JvmOverloads constructor(
         }
     }
 
-    private fun applyTextContrast(progress: Int) {
-        val textColor = ReadMenuThemePreset.contrastTextColor(
-            baseTextColor = ReadBookConfig.durConfig.curTextColor(),
-            backgroundColor = currentPageBackgroundColor(),
-            progress = progress
-        )
-        ReadBookConfig.durConfig.setCurTextColor(textColor)
-        ReadBookConfig.save()
-        postEvent(EventBus.UP_CONFIG, arrayListOf(2, 6, 9, 11))
-        if (AppConfig.readBarStyleFollowPage) {
-            postEvent(EventBus.UPDATE_READ_ACTION_BAR, true)
-        }
-        upColorConfig()
-        initView(true)
-        binding.seekThemeContrast.progress = progress
-        updateThemeContrastValue(progress)
-    }
-
-    private fun currentPageBackgroundColor(): Int {
-        return if (ReadBookConfig.durConfig.curBgType() == 0) {
-            kotlin.runCatching {
-                Color.parseColor(ReadBookConfig.durConfig.curBgStr())
-            }.getOrDefault(bgColor)
-        } else {
-            bgColor
-        }
-    }
-
-    private fun updateThemeBrightnessValue(progress: Int) {
-        binding.tvThemeBrightnessValue.text = "${progress.coerceIn(0, 100)}%"
-    }
-
-    private fun updateThemeContrastValue(progress: Int) {
-        binding.tvThemeContrastValue.text = "${progress.coerceIn(0, 100)}%"
-    }
-
     private fun updateThemeFontWeightValue(progress: Int) {
         val resId = when {
             progress >= 67 -> R.string.read_style_weight_bold
@@ -1546,25 +1787,6 @@ class ReadMenu @JvmOverloads constructor(
         binding.tvThemeTextSizeValue.text = (progress + 5).toString()
     }
 
-    private fun themeBrightnessToConfig(progress: Int): Int {
-        return (progress.coerceIn(0, 100) / 100f * 255f).roundToInt().coerceIn(1, 255)
-    }
-
-    private fun setTextureStrength(alpha: Int) {
-        ReadBookConfig.bgAlpha = alpha.coerceIn(0, 100)
-        ReadBookConfig.save()
-        updateTextureButtons()
-        postEvent(EventBus.UP_CONFIG, arrayListOf(3))
-    }
-
-    private fun updateTextureButtons() = binding.run {
-        val alpha = ReadBookConfig.bgAlpha
-        configureOptionButton(textureNone, alpha <= 17)
-        configureOptionButton(textureWeak, alpha in 18..50)
-        configureOptionButton(textureMedium, alpha in 51..82)
-        configureOptionButton(textureStrong, alpha >= 83)
-    }
-
     private fun setSystemFont(systemTypeface: Int) {
         ReadBookConfig.textFont = ""
         AppConfig.systemTypefaces = systemTypeface
@@ -1574,26 +1796,108 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     private fun updateFontButtons() = binding.run {
-        val hasCustomFont = ReadBookConfig.textFont.isNotBlank()
-        configureOptionButton(fontOptionSource, !hasCustomFont && AppConfig.systemTypefaces == 0)
-        configureOptionButton(fontOptionSans, !hasCustomFont && AppConfig.systemTypefaces == 1)
-        configureOptionButton(fontOptionArt, !hasCustomFont && AppConfig.systemTypefaces == 2)
-        configureOptionButton(fontOptionCustom, hasCustomFont)
+        updateFontSampleCards()
+    }
+
+    private fun updateFontSampleCards() {
+        fontSampleBindings.forEach { sample ->
+            bindFontSampleCard(sample, sample.isSelected())
+        }
+    }
+
+    private fun bindFontSampleCard(sample: FontSample, selected: Boolean) {
+        val card = sample.binding
+        card.themeCardPreview.background = roundedRect(
+            ColorUtils.adjustAlpha(textColor, if (selected) 0.18f else 0.06f),
+            12f.dpToPx(),
+            if (selected) 2.dpToPx() else 1.dpToPx(),
+            if (selected) context.accentColor else ColorUtils.adjustAlpha(textColor, 0.14f)
+        )
+        if (sample.titleRes == R.string.read_menu_add_custom_font) {
+            card.tvThemeCardTitle.text = "+"
+            card.tvThemeCardBody.setText(R.string.read_style_font_custom)
+        } else {
+            card.tvThemeCardTitle.text = context.getString(R.string.chapter_list)
+            card.tvThemeCardBody.text = "夜色微凉，星光洒落..."
+        }
+        card.tvThemeCardLabel.setText(sample.titleRes)
+        card.tvThemeCardTitle.typeface = sample.typeface
+        card.tvThemeCardBody.typeface = sample.typeface
+        card.tvThemeCardTitle.setTextColor(textColor)
+        card.tvThemeCardBody.setTextColor(ColorUtils.adjustAlpha(textColor, 0.72f))
+        card.tvThemeCardLabel.setTextColor(if (selected) context.accentColor else textColor)
+        card.ivThemeCardCheck.background = roundedRect(context.accentColor, 13f.dpToPx())
+        card.ivThemeCardCheck.isVisible = selected
+    }
+
+    private fun updateBackgroundSampleCards() {
+        val currentBgType = ReadBookConfig.durConfig.curBgType()
+        val currentBg = ReadBookConfig.durConfig.curBgStr()
+        backgroundSampleBindings.forEach { sample ->
+            bindBackgroundSampleCard(
+                sample,
+                currentBgType == 1 && currentBg.equals(sample.assetName, ignoreCase = true)
+            )
+        }
+    }
+
+    private fun bindBackgroundSampleCard(sample: BackgroundSample, selected: Boolean) {
+        val card = sample.binding
+        kotlin.runCatching {
+            ImageLoader.load(
+                context,
+                context.assets.open("bg${File.separator}${sample.assetName}").readBytes()
+            ).centerCrop().into(card.ivBackgroundCardImage)
+        }
+        card.backgroundCardPreview.background = roundedRect(
+            ColorUtils.adjustAlpha(textColor, if (selected) 0.16f else 0.06f),
+            12f.dpToPx(),
+            if (selected) 2.dpToPx() else 1.dpToPx(),
+            if (selected) context.accentColor else ColorUtils.adjustAlpha(textColor, 0.14f)
+        )
+        card.backgroundCardScrim.setBackgroundColor(
+            ColorUtils.adjustAlpha(Color.BLACK, if (selected) 0.10f else 0.20f)
+        )
+        card.tvBackgroundCardLabel.text = sample.assetName.substringBeforeLast(".")
+        card.tvBackgroundCardLabel.setTextColor(if (selected) context.accentColor else textColor)
+        card.ivBackgroundCardCheck.background = roundedRect(context.accentColor, 13f.dpToPx())
+        card.ivBackgroundCardCheck.isVisible = selected
+        card.root.setOnClickListener {
+            ReadBookConfig.durConfig.setCurBg(1, sample.assetName)
+            ReadBookConfig.save()
+            postEvent(EventBus.UP_CONFIG, arrayListOf(1, 3, 5, 6, 9, 11))
+            if (AppConfig.readBarStyleFollowPage) {
+                postEvent(EventBus.UPDATE_READ_ACTION_BAR, true)
+            }
+            updateBackgroundSampleCards()
+        }
+    }
+
+    private fun updateBackgroundControlsFromConfig() = binding.run {
+        seekBackgroundBrightness.progress = ReadBookConfig.bgBrightness
+            .coerceIn(0, seekBackgroundBrightness.max)
+        updatePercentValue(tvBackgroundBrightnessValue, seekBackgroundBrightness.progress)
+        seekBackgroundSaturation.progress = ReadBookConfig.bgSaturation
+            .coerceIn(0, seekBackgroundSaturation.max)
+        updatePercentValue(tvBackgroundSaturationValue, seekBackgroundSaturation.progress)
+        seekBackgroundAlpha.progress = ReadBookConfig.bgAlpha.coerceIn(0, seekBackgroundAlpha.max)
+        updatePercentValue(tvBackgroundAlphaValue, seekBackgroundAlpha.progress)
+    }
+
+    private fun updatePercentValue(view: TextView, progress: Int) {
+        view.text = "${progress.coerceIn(0, 100)}%"
     }
 
     private fun setFontWeight(progress: Int) = binding.run {
+        val value = progress.coerceIn(0, seekThemeFontWeight.max)
+        ReadBookConfig.textWeight = value
         ReadBookConfig.textBold = when {
-            progress >= 67 -> 1
-            progress <= 33 -> 2
+            value >= 67 -> 1
+            value <= 33 -> 2
             else -> 0
         }
-        val snapped = when (ReadBookConfig.textBold) {
-            1 -> 80
-            2 -> 20
-            else -> 50
-        }
-        seekThemeFontWeight.progress = snapped
-        updateThemeFontWeightValue(snapped)
+        seekThemeFontWeight.progress = value
+        updateThemeFontWeightValue(value)
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(8, 9, 6))
     }
@@ -1637,22 +1941,82 @@ class ReadMenu @JvmOverloads constructor(
         postEvent(EventBus.UP_CONFIG, arrayListOf(10, 5))
     }
 
-    private fun setLayoutHeaderSpacing(progress: Int) = binding.run {
-        val value = progress.coerceIn(0, seekLayoutHeaderSpacing.max)
-        ReadBookConfig.headerPaddingTop = value
-        ReadBookConfig.headerPaddingBottom = value
-        updateLayoutIntValue(tvLayoutHeaderSpacingValue, value)
+    private fun setLayoutTitleSize(progress: Int) = binding.run {
+        val value = progress.coerceIn(0, seekLayoutTitleSize.max)
+        ReadBookConfig.titleSize = value
+        updateLayoutIntValue(tvLayoutTitleSizeValue, value)
+        ReadBookConfig.save()
+        postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
+    }
+
+    private fun setLayoutTitleTopSpacing(progress: Int) = binding.run {
+        val value = progress.coerceIn(0, seekLayoutTitleTopSpacing.max)
+        ReadBookConfig.titleTopSpacing = value
+        updateLayoutIntValue(tvLayoutTitleTopSpacingValue, value)
+        ReadBookConfig.save()
+        postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
+    }
+
+    private fun setLayoutTitleBottomSpacing(progress: Int) = binding.run {
+        val value = progress.coerceIn(0, seekLayoutTitleBottomSpacing.max)
+        ReadBookConfig.titleBottomSpacing = value
+        updateLayoutIntValue(tvLayoutTitleBottomSpacingValue, value)
+        ReadBookConfig.save()
+        postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
+    }
+
+    private fun setLayoutTitleMode(mode: Int) {
+        ReadBookConfig.titleMode = mode
+        ReadBookConfig.save()
+        updateTitleModeButtons()
+        postEvent(EventBus.UP_CONFIG, arrayListOf(5))
+    }
+
+    private fun setLayoutTipPadding(progress: Int, seekBar: SeekBar, valueView: TextView, setter: (Int) -> Unit) {
+        val value = progress.coerceIn(0, seekBar.max)
+        setter(value)
+        updateLayoutIntValue(valueView, value)
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(2))
     }
 
-    private fun setLayoutFooterSpacing(progress: Int) = binding.run {
-        val value = progress.coerceIn(0, seekLayoutFooterSpacing.max)
-        ReadBookConfig.footerPaddingTop = value
-        ReadBookConfig.footerPaddingBottom = value
-        updateLayoutIntValue(tvLayoutFooterSpacingValue, value)
+    private fun cycleHeaderDisplay() {
+        val modes = ReadTipConfig.getHeaderModes(context).keys.toList()
+        val next = modes.nextAfter(ReadTipConfig.headerMode)
+        ReadTipConfig.headerMode = next
         ReadBookConfig.save()
+        updateTipSettingValues()
         postEvent(EventBus.UP_CONFIG, arrayListOf(2))
+    }
+
+    private fun cycleFooterDisplay() {
+        val modes = ReadTipConfig.getFooterModes(context).keys.toList()
+        val next = modes.nextAfter(ReadTipConfig.footerMode)
+        ReadTipConfig.footerMode = next
+        ReadBookConfig.save()
+        updateTipSettingValues()
+        postEvent(EventBus.UP_CONFIG, arrayListOf(2))
+    }
+
+    private fun List<Int>.nextAfter(current: Int): Int {
+        if (isEmpty()) return current
+        val index = indexOf(current).takeIf { it >= 0 } ?: 0
+        return get((index + 1) % size)
+    }
+
+    private fun bindBackgroundSeek(
+        seekBar: SeekBar,
+        valueView: TextView,
+        onStop: (Int) -> Unit
+    ) {
+        seekBar.setOnSeekBarChangeListener(object : SeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                updatePercentValue(valueView, progress)
+                if (fromUser) onStop(progress)
+            }
+
+            override fun onStopTrackingTouch(seekBar: SeekBar) = Unit
+        })
     }
 
     private fun configureOptionButton(view: TextView, selected: Boolean) {
@@ -1692,9 +2056,7 @@ class ReadMenu @JvmOverloads constructor(
                 bottomTabIndicatorContainer.background = bottomTabIndicatorBackground()
                 bottomTabBar.background = roundedRect(
                     bgColor,
-                    28f.dpToPx(),
-                    1.dpToPx(),
-                    ColorUtils.adjustAlpha(textColor, 0.18f)
+                    28f.dpToPx()
                 )
                 bottomTabGlassStyleKey = glassStyleKey
             }
@@ -1736,6 +2098,7 @@ class ReadMenu @JvmOverloads constructor(
         if (!target.isLaidOut || !bottomTabBar.isLaidOut) {
             return@run
         }
+        val tintColor = bottomTabGlassTintColor()
 
         setupBottomTabFrostedGlassView(
             liquidGlassView = bottomTabGlassView,
@@ -1745,7 +2108,8 @@ class ReadMenu @JvmOverloads constructor(
             refractionOffset = (34f + glassLevel * 18f).dpToPx(),
             blurRadius = (22f + glassLevel * 30f).dpToPx(),
             dispersion = (0.18f + glassLevel * 0.16f).coerceAtMost(0.42f),
-            tintAlpha = (0.12f + glassLevel * 0.18f).coerceAtMost(0.30f)
+            tintAlpha = bottomTabGlassTintAlpha(glassLevel),
+            tintColor = tintColor
         )
     }
 
@@ -1765,7 +2129,8 @@ class ReadMenu @JvmOverloads constructor(
         refractionOffset: Float,
         blurRadius: Float,
         dispersion: Float,
-        tintAlpha: Float
+        tintAlpha: Float,
+        tintColor: FloatArray
     ) {
         if (boundBottomTabGlassViewIds.add(liquidGlassView.id)) {
             liquidGlassView.bind(target)
@@ -1776,9 +2141,9 @@ class ReadMenu @JvmOverloads constructor(
         liquidGlassView.setDispersion(dispersion)
         liquidGlassView.setBlurRadius(blurRadius)
         liquidGlassView.setTintAlpha(tintAlpha)
-        liquidGlassView.setTintColorRed(0.70f)
-        liquidGlassView.setTintColorGreen(0.79f)
-        liquidGlassView.setTintColorBlue(0.86f)
+        liquidGlassView.setTintColorRed(tintColor[0])
+        liquidGlassView.setTintColorGreen(tintColor[1])
+        liquidGlassView.setTintColorBlue(tintColor[2])
         liquidGlassView.setDraggableEnabled(false)
         liquidGlassView.setElasticEnabled(false)
         liquidGlassView.setTouchEffectEnabled(false)
@@ -1790,57 +2155,72 @@ class ReadMenu @JvmOverloads constructor(
     private fun bottomTabGlassShell(glassLevel: Float): GradientDrawable {
         val isDark = bottomTabUseDarkGlass()
         val surfaceColor = if (isDark) {
-            ColorUtils.blendColors(Color.BLACK, context.primaryColor, 0.12f)
+            bottomTabDarkGlassSurfaceColor()
         } else {
             ColorUtils.blendColors(Color.WHITE, context.accentColor, 0.05f)
         }
         val topAlpha = if (isDark) {
-            0.20f + glassLevel * 0.16f
+            0.52f + glassLevel * 0.18f
         } else {
             0.28f + glassLevel * 0.16f
         }
         val centerAlpha = if (isDark) {
-            0.16f + glassLevel * 0.12f
+            0.44f + glassLevel * 0.16f
         } else {
             0.20f + glassLevel * 0.12f
         }
         val bottomAlpha = if (isDark) {
-            0.12f + glassLevel * 0.10f
+            0.34f + glassLevel * 0.14f
         } else {
             0.14f + glassLevel * 0.10f
         }
-        val strokeColor = ColorUtils.withAlpha(
-            if (isDark) Color.WHITE else Color.BLACK,
-            if (isDark) 0.18f else 0.08f
-        )
         return GradientDrawable(
             GradientDrawable.Orientation.TOP_BOTTOM,
             intArrayOf(
-                ColorUtils.withAlpha(surfaceColor, topAlpha.coerceAtMost(0.44f)),
-                ColorUtils.withAlpha(surfaceColor, centerAlpha.coerceAtMost(0.34f)),
-                ColorUtils.withAlpha(surfaceColor, bottomAlpha.coerceAtMost(0.26f))
+                ColorUtils.withAlpha(surfaceColor, topAlpha.coerceAtMost(if (isDark) 0.70f else 0.44f)),
+                ColorUtils.withAlpha(surfaceColor, centerAlpha.coerceAtMost(if (isDark) 0.60f else 0.34f)),
+                ColorUtils.withAlpha(surfaceColor, bottomAlpha.coerceAtMost(if (isDark) 0.50f else 0.26f))
             )
         ).apply {
             cornerRadius = 28f.dpToPx()
-            setStroke(1.dpToPx(), strokeColor)
         }
     }
 
     private fun bottomTabGlassFallbackShell(glassLevel: Float): GradientDrawable {
         val isDark = bottomTabUseDarkGlass()
         val surfaceColor = if (isDark) {
-            ColorUtils.blendColors(Color.BLACK, context.primaryColor, 0.12f)
+            bottomTabDarkGlassSurfaceColor()
         } else {
             ColorUtils.blendColors(Color.WHITE, context.accentColor, 0.05f)
         }
         val alpha = if (isDark) {
-            0.20f + glassLevel * 0.16f
+            0.58f + glassLevel * 0.16f
         } else {
             0.26f + glassLevel * 0.18f
         }
         return GradientDrawable().apply {
             cornerRadius = 28f.dpToPx()
-            setColor(ColorUtils.withAlpha(surfaceColor, alpha.coerceAtMost(0.46f)))
+            setColor(ColorUtils.withAlpha(surfaceColor, alpha.coerceAtMost(if (isDark) 0.74f else 0.46f)))
+        }
+    }
+
+    private fun bottomTabDarkGlassSurfaceColor(): Int {
+        return Color.rgb(8, 10, 14)
+    }
+
+    private fun bottomTabGlassTintAlpha(glassLevel: Float): Float {
+        return if (bottomTabUseDarkGlass()) {
+            (0.22f + glassLevel * 0.22f).coerceAtMost(0.44f)
+        } else {
+            (0.12f + glassLevel * 0.18f).coerceAtMost(0.30f)
+        }
+    }
+
+    private fun bottomTabGlassTintColor(): FloatArray {
+        return if (bottomTabUseDarkGlass()) {
+            floatArrayOf(0.08f, 0.10f, 0.14f)
+        } else {
+            floatArrayOf(0.70f, 0.79f, 0.86f)
         }
     }
 
@@ -1881,11 +2261,10 @@ class ReadMenu @JvmOverloads constructor(
         seekBar.setOnSeekBarChangeListener(object : SeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
                 updateLayoutDecimalValue(valueView, progress)
+                if (fromUser) onStop(progress)
             }
 
-            override fun onStopTrackingTouch(seekBar: SeekBar) {
-                onStop(seekBar.progress)
-            }
+            override fun onStopTrackingTouch(seekBar: SeekBar) = Unit
         })
     }
 
@@ -1897,11 +2276,10 @@ class ReadMenu @JvmOverloads constructor(
         seekBar.setOnSeekBarChangeListener(object : SeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
                 updateLayoutIntValue(valueView, progress)
+                if (fromUser) onStop(progress)
             }
 
-            override fun onStopTrackingTouch(seekBar: SeekBar) {
-                onStop(seekBar.progress)
-            }
+            override fun onStopTrackingTouch(seekBar: SeekBar) = Unit
         })
     }
 
@@ -1912,6 +2290,10 @@ class ReadMenu @JvmOverloads constructor(
             }
             flashBottomTabIndicator(readBottomPrimaryNav, item.itemId)
             when (item.itemId) {
+                R.id.menu_read_search -> {
+                    toggleBottomTab(BottomTab.Search)
+                }
+
                 R.id.menu_read_toc -> {
                     toggleBottomTab(BottomTab.Toc)
                 }
@@ -1944,6 +2326,7 @@ class ReadMenu @JvmOverloads constructor(
         readBottomPrimaryNav.setOnItemReselectedListener { item ->
             if (!suppressBottomNavSelection) {
                 when (item.itemId) {
+                    R.id.menu_read_search -> toggleBottomTab(BottomTab.Search)
                     R.id.menu_read_toc -> toggleBottomTab(BottomTab.Toc)
                     R.id.menu_read_interface -> {
                         flashBottomTabIndicator(readBottomPrimaryNav, item.itemId)
@@ -1956,11 +2339,19 @@ class ReadMenu @JvmOverloads constructor(
             if (suppressBottomNavSelection) {
                 return@setOnItemSelectedListener true
             }
+            if (item.itemId == R.id.menu_read_interface_back) {
+                hideExpandedPanel(returnToPrimary = true)
+                return@setOnItemSelectedListener false
+            }
             val tab = item.itemId.toBottomTab() ?: return@setOnItemSelectedListener false
             toggleBottomTab(tab)
         }
         readBottomInterfaceNav.setOnItemReselectedListener { item ->
             if (suppressBottomNavSelection) {
+                return@setOnItemReselectedListener
+            }
+            if (item.itemId == R.id.menu_read_interface_back) {
+                hideExpandedPanel(returnToPrimary = true)
                 return@setOnItemReselectedListener
             }
             item.itemId.toBottomTab()?.let { tab ->
@@ -1970,9 +2361,6 @@ class ReadMenu @JvmOverloads constructor(
                     showBottomPanel(tab)
                 }
             }
-        }
-        readBottomInterfaceBack.setOnClickListener {
-            hideExpandedPanel(returnToPrimary = true)
         }
     }
 
@@ -2053,61 +2441,10 @@ class ReadMenu @JvmOverloads constructor(
             AppConfig.brightnessVwPos = !AppConfig.brightnessVwPos
             upBrightnessVwPos()
         }
-        //阅读进度
-        seekReadPage.setOnSeekBarChangeListener(object : SeekBarChangeListener {
-
-            override fun onStartTrackingTouch(seekBar: SeekBar) {
-                binding.vwMenuBg.setOnClickListener(null)
-            }
-
-            override fun onStopTrackingTouch(seekBar: SeekBar) {
-                binding.vwMenuBg.setOnClickListener { handleBackgroundDismiss() }
-                when (AppConfig.progressBarBehavior) {
-                    "page" -> ReadBook.skipToPage(seekBar.progress)
-                    "chapter" -> {
-                        if (confirmSkipToChapter) {
-                            callBack.skipToChapter(seekBar.progress)
-                        } else {
-                            context.alert("章节跳转确认", "确定要跳转章节吗？") {
-                                yesButton {
-                                    confirmSkipToChapter = true
-                                    callBack.skipToChapter(seekBar.progress)
-                                }
-                                noButton {
-                                    upSeekBar()
-                                }
-                                onCancelled {
-                                    upSeekBar()
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-        })
-
-        //搜索
-
-        //自动翻页
-
-        //替换
-
-        //夜间模式
-
-        //上一章
-        tvPre.setOnClickListener { ReadBook.moveToPrevChapter(upContent = true, toLast = false) }
-
-        //下一章
-        tvNext.setOnClickListener { ReadBook.moveToNextChapter(true) }
-
         //目录
         setupBottomNavigationEvents()
 
         //朗读
-        layoutTabFont.setOnClickListener { showLayoutTab(LayoutTab.Font) }
-        layoutTabSpacing.setOnClickListener { showLayoutTab(LayoutTab.Spacing) }
-        layoutTabStyle.setOnClickListener { showLayoutTab(LayoutTab.Style) }
         panelPageAnim.setOnClickListener {
             runMenuOut {
                 activity?.let { owner ->
@@ -2119,10 +2456,33 @@ class ReadMenu @JvmOverloads constructor(
                 }
             }
         }
-        panelMoreSearch.setOnClickListener {
+        panelPageAutoPage.setOnClickListener {
             runMenuOut {
-                callBack.openSearchActivity(null)
+                callBack.autoPage()
             }
+        }
+        panelPageTouchSlop.setOnClickListener {
+            NumberPickerDialog(context)
+                .setTitle(context.getString(R.string.page_touch_slop_dialog_title))
+                .setMaxValue(9999)
+                .setMinValue(0)
+                .setValue(AppConfig.pageTouchSlop)
+                .show {
+                    AppConfig.pageTouchSlop = it
+                    postEvent(EventBus.UP_CONFIG, arrayListOf(4))
+                    updatePageTurnControls()
+                }
+        }
+        panelPageVolumeKey.setOnClickListener {
+            context.putPrefBoolean(PreferKey.volumeKeyPage, !AppConfig.volumeKeyPage)
+            updatePageTurnControls()
+        }
+        panelPageMouseWheel.setOnClickListener {
+            context.putPrefBoolean(PreferKey.mouseWheelPage, !AppConfig.mouseWheelPage)
+            updatePageTurnControls()
+        }
+        panelMoreSearch.setOnClickListener {
+            showBottomPanel(BottomTab.Search)
         }
         panelMoreAutoPage.setOnClickListener {
             runMenuOut {
@@ -2151,45 +2511,16 @@ class ReadMenu @JvmOverloads constructor(
         llThemeTabCustom.setOnClickListener {
             activeThemeTab = ThemeTab.Custom
             renderThemeTabs()
-            panelTheme.post { panelTheme.smoothScrollTo(0, themeTonePanel.top) }
+            panelTheme.post { panelTheme.smoothScrollTo(0, hsvThemePresets.top) }
         }
         llThemeTabEye.setOnClickListener {
             activeThemeTab = ThemeTab.Eye
             renderThemeTabs()
             themePresets.firstOrNull { it.key == "eye_green" }?.let(::applyThemePreset)
         }
-        seekThemeBrightness.setOnSeekBarChangeListener(object : SeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-                updateThemeBrightnessValue(progress)
-                if (fromUser) {
-                    setScreenBrightness(themeBrightnessToConfig(progress).toFloat())
-                }
-            }
-
-            override fun onStopTrackingTouch(seekBar: SeekBar) {
-                val brightness = themeBrightnessToConfig(seekBar.progress)
-                AppConfig.readBrightness = brightness
-                seekBrightness.progress = brightness
-                setScreenBrightness(brightness.toFloat())
-            }
-        })
-        seekThemeContrast.setOnSeekBarChangeListener(object : SeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-                updateThemeContrastValue(progress)
-            }
-
-            override fun onStopTrackingTouch(seekBar: SeekBar) {
-                applyTextContrast(seekBar.progress)
-            }
-        })
-        textureNone.setOnClickListener { setTextureStrength(0) }
-        textureWeak.setOnClickListener { setTextureStrength(35) }
-        textureMedium.setOnClickListener { setTextureStrength(65) }
-        textureStrong.setOnClickListener { setTextureStrength(100) }
-        fontOptionSource.setOnClickListener { setSystemFont(0) }
-        fontOptionSans.setOnClickListener { setSystemFont(1) }
-        fontOptionArt.setOnClickListener { setSystemFont(2) }
-        fontOptionCustom.setOnClickListener { openFontSelectDialog() }
+        fontSampleBindings.forEach { sample ->
+            sample.binding.root.setOnClickListener { sample.onClick() }
+        }
         bindLayoutDecimalSeek(
             seekLayoutLetterSpacing,
             tvLayoutLetterSpacingValue,
@@ -2225,33 +2556,87 @@ class ReadMenu @JvmOverloads constructor(
                 ReadBookConfig.paddingRight = value
             }
         }
+        bindLayoutIntSeek(seekLayoutTitleSize, tvLayoutTitleSizeValue, ::setLayoutTitleSize)
         bindLayoutIntSeek(
-            seekLayoutHeaderSpacing,
-            tvLayoutHeaderSpacingValue,
-            ::setLayoutHeaderSpacing
+            seekLayoutTitleTopSpacing,
+            tvLayoutTitleTopSpacingValue,
+            ::setLayoutTitleTopSpacing
         )
         bindLayoutIntSeek(
-            seekLayoutFooterSpacing,
-            tvLayoutFooterSpacingValue,
-            ::setLayoutFooterSpacing
+            seekLayoutTitleBottomSpacing,
+            tvLayoutTitleBottomSpacingValue,
+            ::setLayoutTitleBottomSpacing
         )
+        tvLayoutTitleModeLeft.setOnClickListener { setLayoutTitleMode(0) }
+        tvLayoutTitleModeCenter.setOnClickListener { setLayoutTitleMode(1) }
+        tvLayoutTitleModeAdvanced.setOnClickListener {
+            setLayoutTitleMode(AdvancedTitleConfig.TITLE_MODE_ADVANCED)
+        }
+        tvLayoutTitleModeHide.setOnClickListener { setLayoutTitleMode(2) }
+        bindLayoutIntSeek(seekLayoutHeaderPaddingTop, tvLayoutHeaderPaddingTopValue) {
+            setLayoutTipPadding(it, seekLayoutHeaderPaddingTop, tvLayoutHeaderPaddingTopValue) { value ->
+                ReadBookConfig.headerPaddingTop = value
+            }
+        }
+        bindLayoutIntSeek(seekLayoutHeaderPaddingBottom, tvLayoutHeaderPaddingBottomValue) {
+            setLayoutTipPadding(it, seekLayoutHeaderPaddingBottom, tvLayoutHeaderPaddingBottomValue) { value ->
+                ReadBookConfig.headerPaddingBottom = value
+            }
+        }
+        bindLayoutIntSeek(seekLayoutFooterPaddingTop, tvLayoutFooterPaddingTopValue) {
+            setLayoutTipPadding(it, seekLayoutFooterPaddingTop, tvLayoutFooterPaddingTopValue) { value ->
+                ReadBookConfig.footerPaddingTop = value
+            }
+        }
+        bindLayoutIntSeek(seekLayoutFooterPaddingBottom, tvLayoutFooterPaddingBottomValue) {
+            setLayoutTipPadding(it, seekLayoutFooterPaddingBottom, tvLayoutFooterPaddingBottomValue) { value ->
+                ReadBookConfig.footerPaddingBottom = value
+            }
+        }
+        tvLayoutHeaderLineToggle.setOnClickListener {
+            ReadBookConfig.showHeaderLine = !ReadBookConfig.showHeaderLine
+            ReadBookConfig.save()
+            configureOptionButton(tvLayoutHeaderLineToggle, ReadBookConfig.showHeaderLine)
+            postEvent(EventBus.UP_CONFIG, arrayListOf(2))
+        }
+        tvLayoutFooterLineToggle.setOnClickListener {
+            ReadBookConfig.showFooterLine = !ReadBookConfig.showFooterLine
+            ReadBookConfig.save()
+            configureOptionButton(tvLayoutFooterLineToggle, ReadBookConfig.showFooterLine)
+            postEvent(EventBus.UP_CONFIG, arrayListOf(2))
+        }
+        llLayoutTipHeaderShow.setOnClickListener { cycleHeaderDisplay() }
+        llLayoutTipFooterShow.setOnClickListener { cycleFooterDisplay() }
+        bindBackgroundSeek(seekBackgroundBrightness, tvBackgroundBrightnessValue) {
+            ReadBookConfig.bgBrightness = it.coerceIn(0, 100)
+            ReadBookConfig.save()
+            postEvent(EventBus.UP_CONFIG, arrayListOf(1, 3))
+        }
+        bindBackgroundSeek(seekBackgroundSaturation, tvBackgroundSaturationValue) {
+            ReadBookConfig.bgSaturation = it.coerceIn(0, 100)
+            ReadBookConfig.save()
+            postEvent(EventBus.UP_CONFIG, arrayListOf(1, 3))
+        }
+        bindBackgroundSeek(seekBackgroundAlpha, tvBackgroundAlphaValue) {
+            ReadBookConfig.bgAlpha = it.coerceIn(0, 100)
+            ReadBookConfig.save()
+            postEvent(EventBus.UP_CONFIG, arrayListOf(3))
+        }
         seekThemeFontWeight.setOnSeekBarChangeListener(object : SeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
                 updateThemeFontWeightValue(progress)
+                if (fromUser) setFontWeight(progress)
             }
 
-            override fun onStopTrackingTouch(seekBar: SeekBar) {
-                setFontWeight(seekBar.progress)
-            }
+            override fun onStopTrackingTouch(seekBar: SeekBar) = Unit
         })
         seekThemeTextSize.setOnSeekBarChangeListener(object : SeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
                 updateThemeTextSizeValue(progress)
+                if (fromUser) setTextSize(progress)
             }
 
-            override fun onStopTrackingTouch(seekBar: SeekBar) {
-                setTextSize(seekBar.progress)
-            }
+            override fun onStopTrackingTouch(seekBar: SeekBar) = Unit
         })
     }
 
@@ -2272,8 +2657,8 @@ class ReadMenu @JvmOverloads constructor(
                 binding.tvChapterUrl.gone()
             }
             upSeekBar()
-            binding.tvPre.isEnabled = ReadBook.durChapterIndex != 0
-            binding.tvNext.isEnabled = ReadBook.durChapterIndex != ReadBook.simulatedChapterSize - 1
+            binding.tvTocPrevChapter.isEnabled = ReadBook.durChapterIndex != 0
+            binding.tvTocNextChapter.isEnabled = ReadBook.durChapterIndex != ReadBook.simulatedChapterSize - 1
         } ?: let {
             binding.tvChapterName.gone()
             binding.tvChapterUrl.gone()
@@ -2281,8 +2666,14 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     fun upSeekBar() {
-        binding.seekReadPage.apply {
-            when (AppConfig.progressBarBehavior) {
+        binding.seekTocProgress.apply {
+            val behavior = if (tocProgressWholeBook) "chapter" else AppConfig.progressBarBehavior
+            binding.tocProgressModeToggle.text = if (behavior == "chapter") {
+                context.getString(R.string.read_menu_whole_book)
+            } else {
+                context.getString(R.string.chapter)
+            }
+            when (behavior) {
                 "page" -> {
                     ReadBook.curTextChapter?.let {
                         max = it.pageSize.minus(1)
@@ -2299,18 +2690,23 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     fun setSeekPage(seek: Int) {
-        binding.seekReadPage.progress = seek
+        binding.seekTocProgress.progress = seek
     }
 
     fun setAutoPage(autoPage: Boolean) = binding.run {
         if (autoPage) {
             panelMoreAutoPage.text = context.getString(R.string.auto_next_page_stop)
             panelMoreAutoPage.contentDescription = context.getString(R.string.auto_next_page_stop)
+            panelPageAutoPage.text = context.getString(R.string.auto_next_page_stop)
+            panelPageAutoPage.contentDescription = context.getString(R.string.auto_next_page_stop)
         } else {
             panelMoreAutoPage.text = context.getString(R.string.auto_next_page)
             panelMoreAutoPage.contentDescription = context.getString(R.string.auto_next_page)
+            panelPageAutoPage.text = context.getString(R.string.auto_next_page)
+            panelPageAutoPage.contentDescription = context.getString(R.string.auto_next_page)
         }
         panelMoreAutoPage.setTextColor(textColor)
+        configureOptionButton(panelPageAutoPage, autoPage)
     }
 
     private fun upBrightnessVwPos() {
@@ -2332,6 +2728,7 @@ class ReadMenu @JvmOverloads constructor(
         fun openReplaceRule()
         fun openChapterList()
         fun openSearchActivity(searchWord: String?)
+        fun openInlineSearchResult(searchResult: SearchResult, results: List<SearchResult>, index: Int)
         fun openSourceEditActivity()
         fun openBookInfoActivity()
         fun showMoreSetting()
@@ -2360,26 +2757,71 @@ class ReadMenu @JvmOverloads constructor(
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
-            val view = TextView(parent.context).apply {
+            val context = parent.context
+            val row = LinearLayout(context).apply {
                 layoutParams = RecyclerView.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
-                    46.dpToPx()
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                minimumHeight = 54.dpToPx()
+                gravity = Gravity.CENTER_VERTICAL
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(4.dpToPx(), 6.dpToPx(), 4.dpToPx(), 6.dpToPx())
+            }
+            val textColumn = LinearLayout(context).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    1f
+                )
+                orientation = LinearLayout.VERTICAL
+            }
+            val title = TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
                 )
                 gravity = Gravity.CENTER_VERTICAL
                 includeFontPadding = false
                 isSingleLine = true
                 ellipsize = TextUtils.TruncateAt.END
-                setPadding(4.dpToPx(), 0, 4.dpToPx(), 0)
                 textSize = 15f
             }
-            return Holder(view)
+            val meta = TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = 4.dpToPx()
+                }
+                includeFontPadding = false
+                isSingleLine = true
+                ellipsize = TextUtils.TruncateAt.END
+                textSize = 12f
+            }
+            val download = AppCompatImageButton(context).apply {
+                layoutParams = LinearLayout.LayoutParams(42.dpToPx(), 42.dpToPx()).apply {
+                    marginStart = 8.dpToPx()
+                }
+                background = null
+                setImageResource(R.drawable.ic_lucide_download)
+                contentDescription = context.getString(R.string.read_menu_download_chapter)
+                scaleType = android.widget.ImageView.ScaleType.CENTER
+            }
+            textColumn.addView(title)
+            textColumn.addView(meta)
+            row.addView(textColumn)
+            row.addView(download)
+            return Holder(row, title, meta, download)
         }
 
         override fun onBindViewHolder(holder: Holder, position: Int) {
             val chapter = chapters[position]
             val context = holder.title.context
             val selected = chapter.index == ReadBook.durChapterIndex
-            holder.title.text = "${chapter.index + 1}. ${chapter.title}"
+            val book = ReadBook.book
+            val downloaded = book != null && BookHelp.hasContent(book, chapter)
+            holder.title.text = chapter.title
             holder.title.setTypeface(null, if (chapter.isVolume) Typeface.BOLD else Typeface.NORMAL)
             holder.title.setTextColor(
                 when {
@@ -2388,14 +2830,51 @@ class ReadMenu @JvmOverloads constructor(
                     else -> ColorUtils.adjustAlpha(Color.BLACK, 0.82f)
                 }
             )
-            holder.title.setOnClickListener {
+            holder.meta.text = buildTocMeta(chapter, downloaded)
+            holder.meta.setTextColor(
+                when {
+                    selected -> ColorUtils.adjustAlpha(context.accentColor, 0.72f)
+                    AppConfig.isNightTheme -> ColorUtils.adjustAlpha(Color.WHITE, 0.52f)
+                    else -> ColorUtils.adjustAlpha(Color.BLACK, 0.48f)
+                }
+            )
+            holder.download.isVisible = !chapter.isVolume && !downloaded
+            holder.download.setColorFilter(
+                if (selected) context.accentColor else holder.title.currentTextColor,
+                PorterDuff.Mode.SRC_IN
+            )
+            holder.download.setOnClickListener {
+                ReadBook.loadContent(chapter.index, upContent = false) {
+                    holder.itemView.post {
+                        val adapterPosition = holder.bindingAdapterPosition
+                        if (adapterPosition != RecyclerView.NO_POSITION) {
+                            notifyItemChanged(adapterPosition)
+                        }
+                    }
+                }
+            }
+            holder.itemView.setOnClickListener {
                 onChapterClick(chapter)
             }
         }
 
         override fun getItemCount(): Int = chapters.size
 
-        class Holder(val title: TextView) : RecyclerView.ViewHolder(title)
+        private fun buildTocMeta(chapter: BookChapter, downloaded: Boolean): String {
+            val parts = arrayListOf<String>()
+            chapter.tag?.takeIf { it.isNotBlank() }?.let(parts::add)
+            if (downloaded) {
+                chapter.wordCount?.takeIf { it.isNotBlank() }?.let(parts::add)
+            }
+            return parts.joinToString("  ")
+        }
+
+        class Holder(
+            itemView: View,
+            val title: TextView,
+            val meta: TextView,
+            val download: AppCompatImageButton
+        ) : RecyclerView.ViewHolder(itemView)
     }
 
 }

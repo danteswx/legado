@@ -1881,4 +1881,19 @@ Selected text or question:
     <string name="read_menu_region_spacing">Interface spacing</string>
     <string name="read_menu_header_spacing">Header margin</string>
     <string name="read_menu_footer_spacing">Footer margin</string>
+    <string name="read_menu_header">Header</string>
+    <string name="read_menu_footer">Footer</string>
+    <string name="read_menu_title_settings">Title</string>
+    <string name="read_menu_add_custom_font">Add font</string>
+    <string name="read_menu_header_display">Header display</string>
+    <string name="read_menu_footer_display">Footer display</string>
+    <string name="read_menu_divider_color">Divider color</string>
+    <string name="read_menu_title_mode_left">Left</string>
+    <string name="read_menu_title_mode_center">Center</string>
+    <string name="read_menu_title_mode_advanced">Advanced</string>
+    <string name="read_menu_title_mode_hide">Hide</string>
+    <string name="read_menu_show_divider">Divider</string>
+    <string name="read_menu_background_saturation">Saturation</string>
+    <string name="read_menu_whole_book">Book</string>
+    <string name="read_menu_download_chapter">Download</string>
 </resources>
