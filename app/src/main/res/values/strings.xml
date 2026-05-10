@@ -1881,8 +1881,10 @@ Selected text or question:
     <string name="read_menu_texture_strong">Strong</string>
     <string name="read_menu_layout_spacing">Spacing</string>
     <string name="read_menu_layout_style">Style</string>
+    <string name="read_menu_text_style">Text</string>
     <string name="read_menu_text_spacing">Text spacing</string>
     <string name="read_menu_page_margin">Page margin</string>
+    <string name="read_menu_layout_title">Layout</string>
     <string name="read_menu_region_spacing">Interface spacing</string>
     <string name="read_menu_header_spacing">Header margin</string>
     <string name="read_menu_footer_spacing">Footer margin</string>
@@ -1892,6 +1894,15 @@ Selected text or question:
     <string name="read_menu_add_custom_font">Add font</string>
     <string name="read_menu_header_display">Header display</string>
     <string name="read_menu_footer_display">Footer display</string>
+    <string name="read_menu_display_auto">Auto</string>
+    <string name="read_menu_display_always">Always show</string>
+    <string name="read_menu_header_auto_summary">Automatically show or hide the header while reading to keep the page clean.</string>
+    <string name="read_menu_header_show_summary">Always show header information at the top of the page.</string>
+    <string name="read_menu_header_hide_summary">Hide header information and reserve more space for body text.</string>
+    <string name="read_menu_footer_auto_summary">Automatically show or hide the footer while reading to keep the page clean.</string>
+    <string name="read_menu_footer_show_summary">Always show footer information at the bottom of the page.</string>
+    <string name="read_menu_footer_hide_summary">Hide footer information and reserve more space for body text.</string>
+    <string name="read_menu_divider">Divider</string>
     <string name="read_menu_divider_color">Divider color</string>
     <string name="read_menu_title_mode_left">Left</string>
     <string name="read_menu_title_mode_center">Center</string>

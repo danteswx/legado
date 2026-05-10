@@ -1775,8 +1775,10 @@
     <string name="read_menu_texture_strong">强</string>
     <string name="read_menu_layout_spacing">间距</string>
     <string name="read_menu_layout_style">版式</string>
+    <string name="read_menu_text_style">文字</string>
     <string name="read_menu_text_spacing">文字间距</string>
     <string name="read_menu_page_margin">页面边距</string>
+    <string name="read_menu_layout_title">布局</string>
     <string name="read_menu_region_spacing">界面区域间距</string>
     <string name="read_menu_header_spacing">顶栏边距</string>
     <string name="read_menu_footer_spacing">底栏边距</string>
@@ -1786,6 +1788,15 @@
     <string name="read_menu_add_custom_font">添加字体</string>
     <string name="read_menu_header_display">页眉显示</string>
     <string name="read_menu_footer_display">页脚显示</string>
+    <string name="read_menu_display_auto">自动</string>
+    <string name="read_menu_display_always">始终显示</string>
+    <string name="read_menu_header_auto_summary">在阅读时自动显示或隐藏页眉，保持阅读体验。</string>
+    <string name="read_menu_header_show_summary">始终在页面顶部显示页眉信息，适合需要参考页眉的场景。</string>
+    <string name="read_menu_header_hide_summary">隐藏页眉信息，为正文保留更多阅读空间。</string>
+    <string name="read_menu_footer_auto_summary">在阅读时自动显示或隐藏页脚，保持阅读体验。</string>
+    <string name="read_menu_footer_show_summary">始终在页面底部显示页脚信息，便于查看进度和状态。</string>
+    <string name="read_menu_footer_hide_summary">隐藏页脚信息，为正文保留更多阅读空间。</string>
+    <string name="read_menu_divider">分隔线</string>
     <string name="read_menu_divider_color">分隔线颜色</string>
     <string name="read_menu_title_mode_left">靠左</string>
     <string name="read_menu_title_mode_center">居中</string>

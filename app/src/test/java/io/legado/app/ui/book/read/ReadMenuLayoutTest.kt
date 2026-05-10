@@ -11,6 +11,17 @@ import javax.xml.parsers.DocumentBuilderFactory
 class ReadMenuLayoutTest {
 
     @Test
+    fun debugBuildUsesWanjuanBranding() {
+        val zhDebugStrings = repoFile("app/src/debug/res/values-zh/strings.xml").readText()
+        val defaultDebugStrings = repoFile("app/src/debug/res/values/strings.xml").readText()
+
+        assertTrue(zhDebugStrings.contains("<string name=\"app_name\">万卷·D</string>"))
+        assertTrue(zhDebugStrings.contains("<string name=\"receiving_shared_label\">万卷·D·搜索</string>"))
+        assertTrue(defaultDebugStrings.contains("<string name=\"app_name\">Wanjuan·D</string>"))
+        assertTrue(defaultDebugStrings.contains("<string name=\"receiving_shared_label\">Wanjuan·D·search</string>"))
+    }
+
+    @Test
     fun primaryReadBottomMenuUsesOptionAOrder() {
         val menu = parseXml(repoFile("app/src/main/res/menu/read_bottom_primary.xml"))
         val items = menu.childElements("item")
@@ -189,20 +200,44 @@ class ReadMenuLayoutTest {
         assertFalse(layoutXml.contains("tv_layout_region_spacing_title"))
         assertFalse(layoutXml.contains("seek_layout_header_spacing"))
         assertFalse(layoutXml.contains("seek_layout_footer_spacing"))
+        assertFalse(layoutXml.contains("ll_layout_tip_header_show"))
+        assertFalse(layoutXml.contains("ll_layout_tip_footer_show"))
+        assertEquals("@string/read_menu_layout_title", layout.elementById("tv_layout_page_margin_title").androidAttr("text"))
         listOf(
             "iv_layout_header_title",
             "iv_layout_footer_title",
-            "seek_layout_title_size",
             "seek_layout_title_top_spacing",
-            "seek_layout_title_bottom_spacing",
-            "tv_layout_title_mode_left",
-            "tv_layout_header_show_value",
-            "tv_layout_footer_show_value",
-            "tv_layout_tip_color_value",
-            "tv_layout_tip_divider_color_value"
+            "seek_layout_title_bottom_spacing"
         ).forEach { id ->
             assertTrue(layout.elementById(id).hasAncestor(layoutPanel))
         }
+        assertTrue(layout.elementById("layout_text_style_entry").hasAncestor(layoutPanel))
+        assertFalse(layout.elementById("seek_theme_text_size").hasAncestor(layoutPanel))
+        assertFalse(layout.elementById("seek_theme_font_weight").hasAncestor(layoutPanel))
+        assertFalse(layout.elementById("seek_layout_letter_spacing").hasAncestor(layoutPanel))
+        assertFalse(layout.elementById("seek_layout_line_spacing").hasAncestor(layoutPanel))
+        assertFalse(layout.elementById("seek_layout_paragraph_spacing").hasAncestor(layoutPanel))
+        assertFalse(layout.elementById("tv_layout_tip_color_value").hasAncestor(layoutPanel))
+        assertFalse(layout.elementById("tv_layout_tip_divider_color_value").hasAncestor(layoutPanel))
+        assertFalse(layout.elementById("tv_layout_header_show_value").hasAncestor(layoutPanel))
+        assertFalse(layout.elementById("tv_layout_footer_show_value").hasAncestor(layoutPanel))
+        assertFalse(layout.elementById("tv_layout_header_line_toggle").hasAncestor(layoutPanel))
+        assertFalse(layout.elementById("tv_layout_footer_line_toggle").hasAncestor(layoutPanel))
+        assertTrue(layout.elementById("tv_layout_header_show_value")
+            .hasAncestor(layout.elementById("layout_margin_adjust_preview_host")))
+        assertEquals("44dp", layout.elementById("tv_layout_header_title").androidAttr("minWidth"))
+        assertEquals("wrap_content", layout.elementById("tv_layout_header_show_value").androidAttr("layout_width"))
+        assertTrue(layout.elementById("tv_layout_header_line_toggle")
+            .hasAncestor(layout.elementById("layout_margin_adjust_preview_host")))
+        assertEquals("86dp", layout.elementById("tv_layout_header_line_toggle").androidAttr("layout_width"))
+        assertTrue(layout.elementById("tv_layout_footer_show_value")
+            .hasAncestor(layout.elementById("layout_margin_adjust_preview_host")))
+        assertEquals("44dp", layout.elementById("tv_layout_footer_title").androidAttr("minWidth"))
+        assertEquals("wrap_content", layout.elementById("tv_layout_footer_show_value").androidAttr("layout_width"))
+        assertTrue(layout.elementById("tv_layout_footer_line_toggle")
+            .hasAncestor(layout.elementById("layout_margin_adjust_preview_host")))
+        assertEquals("86dp", layout.elementById("tv_layout_footer_line_toggle").androidAttr("layout_width"))
+        assertTrue(readMenu.contains("read_menu_display_auto"))
         assertTrue(readMenu.contains("ReadTipConfig.headerMode"))
         assertTrue(readMenu.contains("ReadBookConfig.titleSize"))
     }
@@ -273,6 +308,33 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun bottomTabSelectedLabelStaysWhiteOnAccentIndicator() {
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val colorBlock = readMenu.substringAfter("private fun applyBottomNavigationColors()")
+            .substringBefore("private fun syncBottomNavigationSelection()")
+
+        assertTrue(readMenu.contains("private fun bottomTabSelectedLabelColor(): Int = Color.WHITE"))
+        assertTrue(colorBlock.contains("val iconColors = Selector.colorBuild()"))
+        assertTrue(colorBlock.contains("val textColors = Selector.colorBuild()"))
+        assertTrue(colorBlock.contains(".setPressedColor(Color.WHITE)"))
+        assertTrue(colorBlock.contains(".setSelectedColor(bottomTabSelectedLabelColor())"))
+        assertTrue(colorBlock.contains(".setCheckedColor(bottomTabSelectedLabelColor())"))
+        assertTrue(colorBlock.contains("nav.itemIconTintList = iconColors"))
+        assertTrue(colorBlock.contains("nav.itemTextColor = textColors"))
+        assertFalse(colorBlock.contains("nav.itemTextColor = colors"))
+    }
+
+    @Test
+    fun bottomTabSelectedIconStaysWhiteOnAccentIndicator() {
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+
+        assertTrue(readMenu.contains("private fun bottomTabSelectedContentColor(): Int = Color.WHITE"))
+        assertTrue(readMenu.substringAfter("val iconColors = Selector.colorBuild()")
+            .substringBefore("val textColors = Selector.colorBuild()")
+            .contains(".setCheckedColor(bottomTabSelectedContentColor())"))
+    }
+
+    @Test
     fun expandedPanelIsDockedToBottomTabBar() {
         val layout = readMenuLayout()
         val expandedPanel = layout.elementById("fl_expanded_panel")
@@ -328,17 +390,24 @@ class ReadMenuLayoutTest {
         val layout = readMenuLayout()
         val layoutPanel = layout.elementById("panel_layout")
         val themePanel = layout.elementById("panel_theme")
+        val previewHost = layout.elementById("layout_margin_adjust_preview_host")
         val fontControls = listOf(
             "font_card_source",
             "font_card_sans",
             "font_card_art",
-            "font_card_custom",
+            "font_card_custom"
+        ).map { id -> layout.elementById(id) }
+        val textStyleControls = listOf(
             "seek_theme_font_weight",
             "seek_theme_text_size"
         ).map { id -> layout.elementById(id) }
 
         fontControls.forEach { control ->
             assertTrue(control.hasAncestor(layoutPanel))
+            assertFalse(control.hasAncestor(themePanel))
+        }
+        textStyleControls.forEach { control ->
+            assertTrue(control.hasAncestor(previewHost))
             assertFalse(control.hasAncestor(themePanel))
         }
     }
@@ -351,14 +420,12 @@ class ReadMenuLayoutTest {
         val spacingPanel = layout.elementById("panel_layout_spacing")
         val fontPanel = layout.elementById("panel_layout_font")
         val stylePanel = layout.elementById("panel_layout_style")
-        val expectedControls = listOf(
-            "seek_layout_letter_spacing",
-            "seek_layout_line_spacing",
-            "seek_layout_paragraph_spacing",
-            "seek_layout_padding_top",
-            "seek_layout_padding_bottom",
-            "seek_layout_padding_left",
-            "seek_layout_padding_right"
+        val marginEntries = listOf(
+            "layout_text_style_entry",
+            "layout_margin_entry_body",
+            "layout_margin_entry_title",
+            "layout_margin_entry_header",
+            "layout_margin_entry_footer"
         ).map { id -> layout.elementById(id) }
 
         assertTrue(spacingPanel.hasAncestor(layoutPanel))
@@ -368,10 +435,155 @@ class ReadMenuLayoutTest {
         assertTrue(stylePanel.hasAncestor(layoutPanel))
         assertTrue(stylePanel.hasAncestor(layoutScroll))
         assertEquals("", stylePanel.androidAttr("visibility"))
-        expectedControls.forEach { control ->
-            assertTrue(control.hasAncestor(spacingPanel))
-            assertEquals("40dp", control.androidAttr("layout_height"))
+        marginEntries.forEach { entry ->
+            assertTrue(entry.hasAncestor(spacingPanel))
+            assertEquals("44dp", entry.androidAttr("layout_height"))
         }
+        assertEquals("14sp", layout.elementById("tv_layout_text_style_entry").androidAttr("textSize"))
+        assertEquals("13sp", layout.elementById("tv_layout_text_style_entry_value").androidAttr("textSize"))
+    }
+
+    @Test
+    fun layoutPanelUsesCompactMarginEntriesAndImmersiveMarginOverlay() {
+        val layout = readMenuLayout()
+        val spacingPanel = layout.elementById("panel_layout_spacing")
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val overlay = layout.elementById("layout_margin_adjust_overlay")
+        val overlayPanel = layout.elementById("layout_margin_adjust_panel")
+        val previewHost = layout.elementById("layout_margin_adjust_preview_host")
+        val previewFrame = layout.elementById("layout_margin_adjust_preview")
+
+        assertFalse(previewHost.hasAncestor(spacingPanel))
+        assertEquals("gone", overlay.androidAttr("visibility"))
+        assertEquals("match_parent", overlay.androidAttr("layout_width"))
+        assertEquals("match_parent", overlay.androidAttr("layout_height"))
+        assertEquals("androidx.constraintlayout.widget.ConstraintLayout", previewHost.tagName)
+        assertTrue(overlayPanel.hasAncestor(overlay))
+        assertTrue(previewHost.hasAncestor(overlayPanel))
+        assertEquals("io.legado.app.ui.book.read.ReadMarginPreviewView", previewFrame.tagName)
+        assertEquals("142dp", previewFrame.androidAttr("layout_width"))
+        assertEquals("142dp", previewFrame.androidAttr("layout_height"))
+
+        listOf(
+            "layout_margin_entry_body",
+            "layout_margin_entry_title",
+            "layout_margin_entry_header",
+            "layout_margin_entry_footer"
+        ).forEach { id ->
+            assertTrue(layout.elementById(id).hasAncestor(spacingPanel))
+        }
+
+        listOf(
+            "seek_layout_padding_top",
+            "seek_layout_padding_bottom",
+            "seek_layout_padding_left",
+            "seek_layout_padding_right",
+            "seek_layout_title_top_spacing",
+            "seek_layout_title_bottom_spacing"
+        ).forEach { id ->
+            assertEquals("gone", layout.elementById(id).androidAttr("visibility"))
+        }
+
+        listOf(
+            "seek_theme_text_size",
+            "seek_theme_font_weight",
+            "seek_layout_letter_spacing",
+            "seek_layout_line_spacing",
+            "seek_layout_paragraph_spacing",
+            "tv_layout_tip_color_value",
+            "tv_layout_tip_divider_color_value",
+            "tv_layout_header_show_value",
+            "tv_layout_footer_show_value",
+            "tv_layout_header_line_toggle",
+            "tv_layout_footer_line_toggle"
+        ).forEach { id ->
+            assertTrue(layout.elementById(id).hasAncestor(previewHost))
+        }
+
+        mapOf(
+            "layout_margin_spinbox_top" to "End_toStartOf",
+            "layout_margin_spinbox_left" to "End_toStartOf",
+            "layout_margin_spinbox_bottom" to "Start_toEndOf",
+            "layout_margin_spinbox_right" to "Start_toEndOf"
+        ).forEach { (id, constraint) ->
+            val spinbox = layout.elementById(id)
+            assertTrue(spinbox.hasAncestor(previewHost))
+            assertEquals("@id/layout_margin_adjust_preview", spinbox.appAttr("layout_constraint$constraint"))
+            assertEquals("@id/layout_margin_adjust_preview", spinbox.appAttr("layout_constraintTop_toTopOf"))
+            assertEquals("@id/layout_margin_adjust_preview", spinbox.appAttr("layout_constraintBottom_toBottomOf"))
+        }
+
+        assertTrue(layout.elementById("ll_layout_margin_title_mode").hasAncestor(previewHost))
+        assertTrue(layout.elementById("layout_margin_title_size").hasAncestor(previewHost))
+        assertTrue(layout.elementById("seek_layout_title_size").hasAncestor(previewHost))
+        assertTrue(layout.elementById("layout_text_style_controls").hasAncestor(previewHost))
+        assertEquals("@id/layout_margin_adjust_preview_host", layout.elementById("layout_text_style_controls")
+            .appAttr("layout_constraintTop_toTopOf"))
+        assertTrue(layout.elementById("layout_text_typography_section").hasAncestor(layout.elementById("layout_text_style_controls")))
+        assertTrue(layout.elementById("layout_text_spacing_section").hasAncestor(layout.elementById("layout_text_style_controls")))
+        assertTrue(layout.elementById("layout_text_color_section").hasAncestor(layout.elementById("layout_text_style_controls")))
+        assertEquals("58dp", layout.elementById("layout_text_size_row").androidAttr("layout_height"))
+        assertEquals("58dp", layout.elementById("layout_text_weight_row").androidAttr("layout_height"))
+        assertTrue(layout.elementById("vw_layout_tip_color_swatch").hasAncestor(layout.elementById("ll_layout_tip_color")))
+        assertTrue(layout.elementById("layout_tip_header_controls").hasAncestor(previewHost))
+        assertTrue(layout.elementById("layout_tip_footer_controls").hasAncestor(previewHost))
+        assertTrue(layout.elementById("ll_layout_tip_divider_color").hasAncestor(previewHost))
+        assertEquals("LinearLayout", layout.elementById("layout_tip_controls").tagName)
+        assertEquals("", layout.elementById("layout_tip_controls").androidAttr("scrollbars"))
+        assertEquals("", layout.elementById("layout_tip_controls")
+            .appAttr("layout_constraintTop_toTopOf"))
+        assertEquals("@id/layout_margin_adjust_preview", layout.elementById("layout_tip_controls")
+            .appAttr("layout_constraintTop_toBottomOf"))
+        assertTrue(layout.elementById("layout_header_display_auto_card").hasAncestor(layout.elementById("layout_tip_header_controls")))
+        assertTrue(layout.elementById("layout_header_display_show_card").hasAncestor(layout.elementById("layout_tip_header_controls")))
+        assertTrue(layout.elementByTag("layout_header_display_hide_card").hasAncestor(layout.elementById("layout_tip_header_controls")))
+        assertTrue(layout.elementByTag("layout_footer_display_auto_card").hasAncestor(layout.elementById("layout_tip_footer_controls")))
+        assertTrue(layout.elementById("layout_footer_display_show_card").hasAncestor(layout.elementById("layout_tip_footer_controls")))
+        assertTrue(layout.elementById("layout_footer_display_hide_card").hasAncestor(layout.elementById("layout_tip_footer_controls")))
+        assertEquals("52dp", layout.elementById("layout_header_display_auto_card").androidAttr("layout_height"))
+        assertEquals("52dp", layout.elementByTag("layout_header_display_hide_card").androidAttr("layout_height"))
+        assertEquals("52dp", layout.elementByTag("layout_footer_display_auto_card").androidAttr("layout_height"))
+        assertEquals("52dp", layout.elementById("layout_footer_display_show_card").androidAttr("layout_height"))
+        assertTrue(layout.elementById("vw_header_display_auto_radio").hasAncestor(layout.elementById("layout_header_display_auto_card")))
+        assertTrue(layout.elementByTag("vw_header_display_hide_radio").hasAncestor(layout.elementByTag("layout_header_display_hide_card")))
+        assertTrue(layout.elementByTag("vw_footer_display_auto_radio").hasAncestor(layout.elementByTag("layout_footer_display_auto_card")))
+        assertTrue(layout.elementById("vw_footer_display_hide_radio").hasAncestor(layout.elementById("layout_footer_display_hide_card")))
+        assertEquals("gone", layout.elementById("vw_header_display_auto_radio").androidAttr("visibility"))
+        assertEquals("gone", layout.elementByTag("vw_footer_display_auto_radio").androidAttr("visibility"))
+        assertTrue(repoFile("app/src/main/res/layout/view_read_menu.xml").readText()
+            .contains("android:tag=\"read_menu_tip_preview\""))
+        assertFalse(repoFile("app/src/main/res/layout/view_read_menu.xml").readText()
+            .contains("android:text=\"@string/read_menu_footer_show_summary\"\n                                    android:textSize=\"12sp\"\n                                    android:visibility=\"gone\""))
+        assertTrue(layout.elementById("vw_layout_tip_divider_color_swatch").hasAncestor(layout.elementById("ll_layout_tip_divider_color")))
+        assertEquals("@drawable/ic_arrow_right", layout.elementById("iv_layout_tip_divider_color_arrow").androidAttr("src"))
+        assertEquals("gone", layout.elementByTag("layout_tip_padding_section").androidAttr("visibility"))
+        assertTrue(layout.elementById("layout_tip_header_padding_controls").hasAncestor(previewHost))
+        assertTrue(layout.elementById("layout_tip_footer_padding_controls").hasAncestor(previewHost))
+        assertTrue(layout.elementById("seek_layout_header_padding_top").hasAncestor(layout.elementById("layout_tip_header_padding_controls")))
+        assertTrue(layout.elementById("seek_layout_footer_padding_bottom").hasAncestor(layout.elementById("layout_tip_footer_padding_controls")))
+        assertEquals(
+            "@id/layout_margin_spinbox_bottom",
+            layout.elementById("layout_margin_title_size")
+                .appAttr("layout_constraintTop_toBottomOf")
+        )
+        assertTrue(readMenu.contains("layoutMarginAdjustPreview.setMode"))
+        assertTrue(readMenu.contains("layoutMarginAdjustPreview.setTitleSize"))
+        assertTrue(readMenu.contains("layoutMarginAdjustPreview.setTitleMode"))
+        assertTrue(readMenu.contains("LayoutMarginAdjustMode.Text"))
+        assertTrue(readMenu.contains("ReadMarginPreviewView.Mode.Text"))
+        assertTrue(readMenu.contains("layoutMarginAdjustPreview.visible(!showTextStyleMode)"))
+        assertTrue(readMenu.contains("val showVerticalSpinboxes = !showTextStyleMode"))
+        assertTrue(readMenu.contains("layoutMarginSpinboxTop.visible(showVerticalSpinboxes)"))
+        assertTrue(readMenu.contains("ReadMarginPreviewView.Mode.Title"))
+        assertTrue(readMenu.contains("ReadMarginPreviewView.Mode.Header"))
+        assertTrue(readMenu.contains("ReadMarginPreviewView.Mode.Footer"))
+        assertTrue(readMenu.contains("updateLayoutMarginPreview"))
+        assertTrue(readMenu.contains("showLayoutMarginAdjustOverlay"))
+        assertTrue(readMenu.contains("hideLayoutMarginAdjustOverlay"))
+        assertTrue(readMenu.contains("setHeaderDisplayMode(2)"))
+        assertTrue(readMenu.contains("setFooterDisplayMode(2)"))
+        assertTrue(readMenu.contains("tintDescendantText(card, if (selected) Color.WHITE else textColor)"))
+        assertTrue(readMenu.contains("context.accentColor"))
     }
 
     @Test
@@ -509,6 +721,20 @@ class ReadMenuLayoutTest {
         error("Element with id $id not found")
     }
 
+    private fun Element.elementByTag(tag: String): Element {
+        if (androidAttr("tag") == tag) {
+            return this
+        }
+        val children = childNodes
+        for (index in 0 until children.length) {
+            val child = children.item(index)
+            if (child is Element) {
+                runCatching { return child.elementByTag(tag) }
+            }
+        }
+        error("Element with tag $tag not found")
+    }
+
     private fun Element.elementByName(name: String): Element? {
         val children = childNodes
         for (index in 0 until children.length) {
@@ -554,7 +780,11 @@ class ReadMenuLayoutTest {
     private fun Element.androidAttr(name: String): String =
         getAttributeNS(ANDROID_NAMESPACE, name)
 
+    private fun Element.appAttr(name: String): String =
+        getAttributeNS(APP_NAMESPACE, name)
+
     private companion object {
         const val ANDROID_NAMESPACE = "http://schemas.android.com/apk/res/android"
+        const val APP_NAMESPACE = "http://schemas.android.com/apk/res-auto"
     }
 }

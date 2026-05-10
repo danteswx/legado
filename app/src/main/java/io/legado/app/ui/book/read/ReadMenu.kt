@@ -34,6 +34,7 @@ import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.jaredrummler.android.colorpicker.ColorPickerDialog
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.qmdeve.liquidglass.widget.LiquidGlassView
 import io.legado.app.R
@@ -55,6 +56,7 @@ import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.glide.ImageLoader
 import io.legado.app.help.source.getSourceType
 import io.legado.app.lib.dialogs.alert
+import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.Selector
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.bottomBackground
@@ -65,6 +67,8 @@ import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.browser.WebViewActivity
 import io.legado.app.ui.font.FontSelectDialog
+import io.legado.app.ui.book.read.config.BgTextConfigDialog.Companion.TEXT_COLOR
+import io.legado.app.ui.book.read.config.TipConfigDialog.Companion.TIP_DIVIDER_COLOR
 import io.legado.app.ui.book.searchContent.SearchContentAdapter
 import io.legado.app.ui.book.searchContent.SearchContentViewModel
 import io.legado.app.ui.book.searchContent.SearchResult
@@ -77,6 +81,7 @@ import io.legado.app.utils.activity
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getPrefBoolean
+import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.gone
 import io.legado.app.utils.hexString
 import io.legado.app.utils.invisible
@@ -127,8 +132,24 @@ class ReadMenu @JvmOverloads constructor(
         Eye
     }
 
+    private enum class LayoutMarginAdjustMode {
+        Body,
+        Text,
+        Title,
+        Header,
+        Footer
+    }
+
+    private enum class LayoutMarginSide {
+        Top,
+        Bottom,
+        Left,
+        Right
+    }
+
     private var activeBottomTab: BottomTab? = null
     private var bottomTabMode: BottomTabMode = BottomTabMode.Primary
+    private var activeLayoutMarginAdjustMode: LayoutMarginAdjustMode = LayoutMarginAdjustMode.Body
     private var suppressBottomNavSelection: Boolean = false
     private var bottomTabPanelAttached: Boolean = false
     private var bottomTabHeightAnimator: ValueAnimator? = null
@@ -334,6 +355,7 @@ class ReadMenu @JvmOverloads constructor(
             this@ReadMenu.invisible()
             binding.titleBar.invisible()
             binding.bottomMenu.invisible()
+            binding.layoutMarginAdjustOverlay.gone()
             binding.flExpandedPanel.gone()
             binding.flExpandedPanel.alpha = 0f
             setBottomTabBarHeight(bottomTabCollapsedHeight())
@@ -501,6 +523,7 @@ class ReadMenu @JvmOverloads constructor(
         this.visible()
         binding.titleBar.visible()
         binding.bottomMenu.visible()
+        binding.layoutMarginAdjustOverlay.gone()
         switchBottomTabMode(BottomTabMode.Primary, animate = false)
         hideExpandedPanel(anim = false)
         if (anim) {
@@ -1233,13 +1256,21 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     private fun applyBottomNavigationColors() = binding.run {
-        val colors = Selector.colorBuild()
+        val iconColors = Selector.colorBuild()
             .setDefaultColor(bottomTabContentColor())
+            .setPressedColor(Color.WHITE)
             .setSelectedColor(bottomTabSelectedContentColor())
+            .setCheckedColor(bottomTabSelectedContentColor())
+            .create()
+        val textColors = Selector.colorBuild()
+            .setDefaultColor(bottomTabContentColor())
+            .setPressedColor(Color.WHITE)
+            .setSelectedColor(bottomTabSelectedLabelColor())
+            .setCheckedColor(bottomTabSelectedLabelColor())
             .create()
         listOf(readBottomPrimaryNav, readBottomInterfaceNav).forEach { nav ->
-            nav.itemIconTintList = colors
-            nav.itemTextColor = colors
+            nav.itemIconTintList = iconColors
+            nav.itemTextColor = textColors
             nav.itemRippleColor = null
         }
     }
@@ -1479,9 +1510,7 @@ class ReadMenu @JvmOverloads constructor(
             tvLayoutTitleSizeLabel,
             tvLayoutTitleTopSpacingLabel,
             tvLayoutTitleBottomSpacingLabel,
-            tvLayoutHeaderShowLabel,
             tvLayoutHeaderShowValue,
-            tvLayoutFooterShowLabel,
             tvLayoutFooterShowValue,
             tvLayoutTipColorLabel,
             tvLayoutTipColorValue,
@@ -1494,6 +1523,15 @@ class ReadMenu @JvmOverloads constructor(
             tvLayoutPaddingBottomLabel,
             tvLayoutPaddingLeftLabel,
             tvLayoutPaddingRightLabel,
+            tvLayoutMarginAdjustTitle,
+            tvLayoutTextStyleEntry,
+            tvLayoutTextStyleEntryValue,
+            tvLayoutBodyMarginEntry,
+            tvLayoutBodyMarginEntryValue,
+            tvLayoutTitleMarginEntry,
+            tvLayoutTitleMarginEntryValue,
+            tvLayoutHeaderMarginEntryValue,
+            tvLayoutFooterMarginEntryValue,
             tvLayoutHeaderTitle,
             tvLayoutHeaderLineToggle,
             tvLayoutTitleSizeValue,
@@ -1514,18 +1552,55 @@ class ReadMenu @JvmOverloads constructor(
             tvLayoutPaddingRightValue
         ).forEach { it.setTextColor(color) }
         listOf(
-            ivLayoutPaddingTop,
-            ivLayoutPaddingBottom,
-            ivLayoutPaddingLeft,
-            ivLayoutPaddingRight,
             ivLayoutHeaderTitle,
-            ivLayoutFooterTitle
+            ivLayoutFooterTitle,
+            ivLayoutTextStyleEntry,
+            ivLayoutBodyMarginEntry,
+            ivLayoutTitleMarginEntry,
+            ivLayoutTipDividerColorArrow
         ).forEach { it.setColorFilter(color, PorterDuff.Mode.SRC_IN) }
+        tintDescendantText(layoutTipControls, color)
+        tintDescendantText(layoutTextStyleControls, color)
+        listOf(
+            btnLayoutMarginAdjustClose,
+            btnLayoutPaddingTopIncrease,
+            btnLayoutPaddingTopDecrease,
+            btnLayoutPaddingBottomIncrease,
+            btnLayoutPaddingBottomDecrease,
+            btnLayoutPaddingLeftIncrease,
+            btnLayoutPaddingLeftDecrease,
+            btnLayoutPaddingRightIncrease,
+            btnLayoutPaddingRightDecrease
+        ).forEach { it.setColorFilter(color, PorterDuff.Mode.SRC_IN) }
+        listOf(
+            layoutMarginSpinboxTopField,
+            layoutMarginSpinboxBottomField,
+            layoutMarginSpinboxLeftField,
+            layoutMarginSpinboxRightField
+        ).forEach {
+            it.background = roundedRect(
+                ColorUtils.adjustAlpha(color, 0.04f),
+                10f.dpToPx(),
+                1.dpToPx(),
+                ColorUtils.adjustAlpha(context.accentColor, 0.24f)
+            )
+        }
+        layoutMarginAdjustPreview.setAccentColor(context.accentColor)
+        layoutMarginAdjustPanel.background = roundedRect(
+            ColorUtils.adjustAlpha(bgColor, 0.92f),
+            18f.dpToPx(),
+            1.dpToPx(),
+            ColorUtils.adjustAlpha(context.accentColor, 0.16f)
+        )
         listOf(
             tvLayoutTitleModeLeft,
             tvLayoutTitleModeCenter,
             tvLayoutTitleModeAdvanced,
-            tvLayoutTitleModeHide
+            tvLayoutTitleModeHide,
+            tvLayoutMarginTitleModeLeft,
+            tvLayoutMarginTitleModeCenter,
+            tvLayoutMarginTitleModeAdvanced,
+            tvLayoutMarginTitleModeHide
         ).forEach { it.setTextColor(color) }
     }
 
@@ -1541,19 +1616,24 @@ class ReadMenu @JvmOverloads constructor(
         ).forEach { it.setTextColor(color) }
     }
 
+    private fun tintDescendantText(view: View, color: Int) {
+        if (view is TextView) {
+            view.setTextColor(color)
+        }
+        if (view is ViewGroup) {
+            for (index in 0 until view.childCount) {
+                tintDescendantText(view.getChildAt(index), color)
+            }
+        }
+    }
+
     private fun tintThemePanel(color: Int) = binding.run {
         listOf(
             tvThemeFontWeightLabel,
             tvThemeTextSizeLabel,
-            tvThemeFontWeightBig,
-            tvThemeTextSizeSmall,
-            tvThemeTextSizeBig,
             tvThemeFontWeightValue,
             tvThemeTextSizeValue
         ).forEach { it.setTextColor(color) }
-        listOf(
-            ivThemeFontWeightLow
-        ).forEach { it.setColorFilter(color, PorterDuff.Mode.SRC_IN) }
     }
 
     private fun tintSearchPanel(color: Int) = binding.run {
@@ -1646,6 +1726,8 @@ class ReadMenu @JvmOverloads constructor(
         val paddingRightProgress = ReadBookConfig.paddingRight.coerceIn(0, seekLayoutPaddingRight.max)
         seekLayoutPaddingRight.progress = paddingRightProgress
         updateLayoutIntValue(tvLayoutPaddingRightValue, paddingRightProgress)
+        updateLayoutMarginEntryValues()
+        updateLayoutMarginPreview()
 
         seekLayoutTitleSize.progress = ReadBookConfig.titleSize.coerceIn(0, seekLayoutTitleSize.max)
         updateLayoutIntValue(tvLayoutTitleSizeValue, seekLayoutTitleSize.progress)
@@ -1673,6 +1755,9 @@ class ReadMenu @JvmOverloads constructor(
         updateLayoutIntValue(tvLayoutFooterPaddingBottomValue, seekLayoutFooterPaddingBottom.progress)
         configureOptionButton(tvLayoutFooterLineToggle, ReadBookConfig.showFooterLine)
         updateTipSettingValues()
+        updateLayoutTextStyleEntryValue()
+        updateLayoutMarginEntryValues()
+        updateLayoutMarginPreview()
     }
 
     private fun updateLayoutDecimalValue(view: TextView, progress: Int) {
@@ -1683,31 +1768,260 @@ class ReadMenu @JvmOverloads constructor(
         view.text = progress.toString()
     }
 
+    private fun updateLayoutMarginPreview() = binding.run {
+        val margins = currentLayoutMarginValues()
+        val showHorizontal = activeLayoutMarginAdjustMode == LayoutMarginAdjustMode.Body
+        val showTextStyleMode = activeLayoutMarginAdjustMode == LayoutMarginAdjustMode.Text
+        val showTitleMode = activeLayoutMarginAdjustMode == LayoutMarginAdjustMode.Title
+        val showHeaderMode = activeLayoutMarginAdjustMode == LayoutMarginAdjustMode.Header
+        val showFooterMode = activeLayoutMarginAdjustMode == LayoutMarginAdjustMode.Footer
+        val showTipMode = showHeaderMode || showFooterMode
+        val showVerticalSpinboxes = !showTextStyleMode
+
+        layoutMarginAdjustPreview.setAccentColor(context.accentColor)
+        layoutMarginAdjustPreview.setMode(
+            when (activeLayoutMarginAdjustMode) {
+                LayoutMarginAdjustMode.Body -> ReadMarginPreviewView.Mode.Body
+                LayoutMarginAdjustMode.Text -> ReadMarginPreviewView.Mode.Text
+                LayoutMarginAdjustMode.Title -> ReadMarginPreviewView.Mode.Title
+                LayoutMarginAdjustMode.Header -> ReadMarginPreviewView.Mode.Header
+                LayoutMarginAdjustMode.Footer -> ReadMarginPreviewView.Mode.Footer
+            }
+        )
+        layoutMarginAdjustPreview.setTitleSize(seekLayoutTitleSize.progress)
+        layoutMarginAdjustPreview.setTitleMode(ReadBookConfig.titleMode)
+        layoutMarginAdjustPreview.setMargins(
+            margins.top,
+            margins.bottom,
+            margins.left,
+            margins.right
+        )
+        updateLayoutIntValue(tvLayoutPaddingTopValue, margins.top)
+        updateLayoutIntValue(tvLayoutPaddingBottomValue, margins.bottom)
+        updateLayoutIntValue(tvLayoutPaddingLeftValue, margins.left)
+        updateLayoutIntValue(tvLayoutPaddingRightValue, margins.right)
+        layoutMarginAdjustPreview.visible(!showTextStyleMode)
+        layoutMarginSpinboxTop.visible(showVerticalSpinboxes)
+        layoutMarginSpinboxBottom.visible(showVerticalSpinboxes)
+        layoutMarginSpinboxLeft.visible(showHorizontal)
+        layoutMarginSpinboxRight.visible(showHorizontal)
+        layoutTextStyleControls.visible(showTextStyleMode)
+        layoutMarginTitleSize.visible(showTitleMode)
+        llLayoutMarginTitleMode.visible(showTitleMode)
+        layoutTipControls.visible(showTipMode)
+        layoutTipHeaderControls.visible(showHeaderMode)
+        layoutTipFooterControls.visible(showFooterMode)
+        layoutTipHeaderPaddingControls.visible(showHeaderMode)
+        layoutTipFooterPaddingControls.visible(showFooterMode)
+    }
+
+    private fun updateLayoutMarginEntryValues() = binding.run {
+        tvLayoutBodyMarginEntryValue.text = listOf(
+            ReadBookConfig.paddingTop,
+            ReadBookConfig.paddingBottom,
+            ReadBookConfig.paddingLeft,
+            ReadBookConfig.paddingRight
+        ).joinToString(" / ")
+        tvLayoutTitleMarginEntryValue.text =
+            "${ReadBookConfig.titleTopSpacing} / ${ReadBookConfig.titleBottomSpacing}"
+        tvLayoutHeaderMarginEntryValue.text =
+            "${ReadBookConfig.headerPaddingTop} / ${ReadBookConfig.headerPaddingBottom}"
+        tvLayoutFooterMarginEntryValue.text =
+            "${ReadBookConfig.footerPaddingTop} / ${ReadBookConfig.footerPaddingBottom}"
+    }
+
+    private fun updateLayoutTextStyleEntryValue() = binding.run {
+        tvLayoutTextStyleEntryValue.text = "${ReadBookConfig.textSize} / ${ReadBookConfig.textWeight}"
+    }
+
+    private data class LayoutMargins(
+        val top: Int,
+        val bottom: Int,
+        val left: Int,
+        val right: Int
+    )
+
+    private fun currentLayoutMarginValues(): LayoutMargins = binding.run {
+        when (activeLayoutMarginAdjustMode) {
+            LayoutMarginAdjustMode.Body -> LayoutMargins(
+                seekLayoutPaddingTop.progress,
+                seekLayoutPaddingBottom.progress,
+                seekLayoutPaddingLeft.progress,
+                seekLayoutPaddingRight.progress
+            )
+
+            LayoutMarginAdjustMode.Text -> LayoutMargins(
+                0,
+                0,
+                0,
+                0
+            )
+
+            LayoutMarginAdjustMode.Title -> LayoutMargins(
+                seekLayoutTitleTopSpacing.progress,
+                seekLayoutTitleBottomSpacing.progress,
+                0,
+                0
+            )
+
+            LayoutMarginAdjustMode.Header -> LayoutMargins(
+                seekLayoutHeaderPaddingTop.progress,
+                seekLayoutHeaderPaddingBottom.progress,
+                0,
+                0
+            )
+
+            LayoutMarginAdjustMode.Footer -> LayoutMargins(
+                seekLayoutFooterPaddingTop.progress,
+                seekLayoutFooterPaddingBottom.progress,
+                0,
+                0
+            )
+        }
+    }
+
+    private fun showLayoutMarginAdjustOverlay(mode: LayoutMarginAdjustMode) = binding.run {
+        activeLayoutMarginAdjustMode = mode
+        tvLayoutMarginAdjustTitle.setText(
+            when (mode) {
+                LayoutMarginAdjustMode.Body -> R.string.main_body
+                LayoutMarginAdjustMode.Text -> R.string.read_menu_text_style
+                LayoutMarginAdjustMode.Title -> R.string.body_title
+                LayoutMarginAdjustMode.Header -> R.string.read_menu_header
+                LayoutMarginAdjustMode.Footer -> R.string.read_menu_footer
+            }
+        )
+        updateLayoutControlsFromConfig()
+        hideExpandedPanel(anim = false)
+        bottomMenu.gone()
+        layoutMarginAdjustOverlay.visible()
+        layoutMarginAdjustOverlay.bringToFront()
+    }
+
+    private fun hideLayoutMarginAdjustOverlay() = binding.run {
+        layoutMarginAdjustOverlay.gone()
+        bottomMenu.visible()
+        switchBottomTabMode(BottomTabMode.Interface, animate = false)
+        showBottomPanel(BottomTab.Layout)
+    }
+
     private fun updateTitleModeButtons() = binding.run {
         listOf(
             tvLayoutTitleModeLeft to (ReadBookConfig.titleMode == 0),
             tvLayoutTitleModeCenter to (ReadBookConfig.titleMode == 1),
             tvLayoutTitleModeAdvanced to (ReadBookConfig.titleMode == AdvancedTitleConfig.TITLE_MODE_ADVANCED),
-            tvLayoutTitleModeHide to (ReadBookConfig.titleMode == 2)
+            tvLayoutTitleModeHide to (ReadBookConfig.titleMode == 2),
+            tvLayoutMarginTitleModeLeft to (ReadBookConfig.titleMode == 0),
+            tvLayoutMarginTitleModeCenter to (ReadBookConfig.titleMode == 1),
+            tvLayoutMarginTitleModeAdvanced to (ReadBookConfig.titleMode == AdvancedTitleConfig.TITLE_MODE_ADVANCED),
+            tvLayoutMarginTitleModeHide to (ReadBookConfig.titleMode == 2)
         ).forEach { (view, selected) ->
             configureOptionButton(view, selected)
         }
     }
 
     private fun updateTipSettingValues() = binding.run {
-        tvLayoutHeaderShowValue.text =
-            ReadTipConfig.getHeaderModes(context)[ReadTipConfig.headerMode].orEmpty()
-        tvLayoutFooterShowValue.text =
-            ReadTipConfig.getFooterModes(context)[ReadTipConfig.footerMode].orEmpty()
-        tvLayoutTipColorValue.text = if (ReadTipConfig.tipColor == 0) {
-            ReadTipConfig.tipColorNames.firstOrNull().orEmpty()
-        } else {
-            "#${ReadTipConfig.tipColor.hexString}"
-        }
+        tvLayoutHeaderShowValue.setText(R.string.read_menu_display_auto)
+        tvLayoutFooterShowValue.setText(R.string.show)
+        val currentTextColor = ReadBookConfig.durConfig.curTextColor()
+        tvLayoutTipColorValue.text = "#${currentTextColor.hexString}"
+        vwLayoutTipColorSwatch.background = roundedRect(
+            currentTextColor,
+            12f.dpToPx(),
+            1.dpToPx(),
+            ColorUtils.adjustAlpha(textColor, 0.18f)
+        )
         tvLayoutTipDividerColorValue.text = when (ReadTipConfig.tipDividerColor) {
             -1, 0 -> ReadTipConfig.tipDividerColorNames
                 .getOrElse(ReadTipConfig.tipDividerColor + 1) { "" }
             else -> "#${ReadTipConfig.tipDividerColor.hexString}"
+        }
+        vwLayoutTipDividerColorSwatch.background = roundedRect(
+            effectiveTipDividerColor(),
+            13f.dpToPx(),
+            1.dpToPx(),
+            ColorUtils.adjustAlpha(textColor, 0.18f)
+        )
+        renderTipDisplayCards()
+        renderTipDividerControls()
+    }
+
+    private fun renderTipDisplayCards() = binding.run {
+        val headerHideCard = taggedView("layout_header_display_hide_card")
+        val headerHideRadio = taggedView("vw_header_display_hide_radio")
+        val footerAutoCard = taggedView("layout_footer_display_auto_card")
+        val footerAutoRadio = taggedView("vw_footer_display_auto_radio")
+        configureTipOptionCard(
+            layoutHeaderDisplayAutoCard,
+            vwHeaderDisplayAutoRadio,
+            ReadTipConfig.headerMode == 0
+        )
+        configureTipOptionCard(
+            layoutHeaderDisplayShowCard,
+            vwHeaderDisplayShowRadio,
+            ReadTipConfig.headerMode == 1
+        )
+        configureTipOptionCard(
+            headerHideCard,
+            headerHideRadio,
+            ReadTipConfig.headerMode == 2
+        )
+        configureTipOptionCard(
+            footerAutoCard,
+            footerAutoRadio,
+            ReadTipConfig.footerMode == 2
+        )
+        configureTipOptionCard(
+            layoutFooterDisplayShowCard,
+            vwFooterDisplayShowRadio,
+            ReadTipConfig.footerMode == 0
+        )
+        configureTipOptionCard(
+            layoutFooterDisplayHideCard,
+            vwFooterDisplayHideRadio,
+            ReadTipConfig.footerMode == 1
+        )
+    }
+
+    private fun taggedView(tag: String): View =
+        binding.root.findViewWithTag(tag)
+
+    private fun renderTipDividerControls() = binding.run {
+        val showHeaderMode = activeLayoutMarginAdjustMode == LayoutMarginAdjustMode.Header
+        val showFooterMode = activeLayoutMarginAdjustMode == LayoutMarginAdjustMode.Footer
+        tvLayoutHeaderLineToggle.visible(showHeaderMode)
+        tvLayoutHeaderLineHide.visible(showHeaderMode)
+        tvLayoutFooterLineToggle.visible(showFooterMode)
+        tvLayoutFooterLineHide.visible(showFooterMode)
+        configureOptionButton(tvLayoutHeaderLineToggle, ReadBookConfig.showHeaderLine)
+        configureOptionButton(tvLayoutHeaderLineHide, !ReadBookConfig.showHeaderLine)
+        configureOptionButton(tvLayoutFooterLineToggle, ReadBookConfig.showFooterLine)
+        configureOptionButton(tvLayoutFooterLineHide, !ReadBookConfig.showFooterLine)
+    }
+
+    private fun configureTipOptionCard(card: View, radio: View, selected: Boolean) {
+        card.background = roundedRect(
+            if (selected) context.accentColor else ColorUtils.adjustAlpha(textColor, 0.06f),
+            12f.dpToPx(),
+            1.dpToPx(),
+            if (selected) context.accentColor else ColorUtils.adjustAlpha(textColor, 0.14f)
+        )
+        tintDescendantText(card, if (selected) Color.WHITE else textColor)
+        radio.background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(if (selected) context.accentColor else Color.TRANSPARENT)
+            setStroke(
+                1.dpToPx(),
+                if (selected) context.accentColor else ColorUtils.adjustAlpha(textColor, 0.45f)
+            )
+        }
+    }
+
+    private fun effectiveTipDividerColor(): Int {
+        return when (ReadTipConfig.tipDividerColor) {
+            -1 -> context.getCompatColor(R.color.divider)
+            0 -> ReadBookConfig.textColor
+            else -> ReadTipConfig.tipDividerColor
         }
     }
 
@@ -1901,6 +2215,8 @@ class ReadMenu @JvmOverloads constructor(
         }
         seekThemeFontWeight.progress = value
         updateThemeFontWeightValue(value)
+        updateLayoutTextStyleEntryValue()
+        updateLayoutMarginPreview()
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(8, 9, 6))
     }
@@ -1908,6 +2224,8 @@ class ReadMenu @JvmOverloads constructor(
     private fun setTextSize(progress: Int) {
         ReadBookConfig.textSize = progress + 5
         updateThemeTextSizeValue(progress)
+        updateLayoutTextStyleEntryValue()
+        updateLayoutMarginPreview()
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
     }
@@ -1916,6 +2234,8 @@ class ReadMenu @JvmOverloads constructor(
         val value = progress.coerceIn(0, seekLayoutLetterSpacing.max)
         ReadBookConfig.letterSpacing = value / 10f
         updateLayoutDecimalValue(tvLayoutLetterSpacingValue, value)
+        updateLayoutTextStyleEntryValue()
+        updateLayoutMarginPreview()
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
     }
@@ -1924,6 +2244,8 @@ class ReadMenu @JvmOverloads constructor(
         val value = progress.coerceIn(0, seekLayoutLineSpacing.max)
         ReadBookConfig.lineSpacingExtra = value
         updateLayoutDecimalValue(tvLayoutLineSpacingValue, value)
+        updateLayoutTextStyleEntryValue()
+        updateLayoutMarginPreview()
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
     }
@@ -1932,6 +2254,8 @@ class ReadMenu @JvmOverloads constructor(
         val value = progress.coerceIn(0, seekLayoutParagraphSpacing.max)
         ReadBookConfig.paragraphSpacing = value
         updateLayoutDecimalValue(tvLayoutParagraphSpacingValue, value)
+        updateLayoutTextStyleEntryValue()
+        updateLayoutMarginPreview()
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
     }
@@ -1939,7 +2263,12 @@ class ReadMenu @JvmOverloads constructor(
     private fun setLayoutBodyPadding(progress: Int, seekBar: SeekBar, valueView: TextView, setter: (Int) -> Unit) {
         val value = progress.coerceIn(0, seekBar.max)
         setter(value)
+        if (seekBar.progress != value) {
+            seekBar.progress = value
+        }
         updateLayoutIntValue(valueView, value)
+        updateLayoutMarginEntryValues()
+        updateLayoutMarginPreview()
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(10, 5))
     }
@@ -1947,7 +2276,11 @@ class ReadMenu @JvmOverloads constructor(
     private fun setLayoutTitleSize(progress: Int) = binding.run {
         val value = progress.coerceIn(0, seekLayoutTitleSize.max)
         ReadBookConfig.titleSize = value
+        if (seekLayoutTitleSize.progress != value) {
+            seekLayoutTitleSize.progress = value
+        }
         updateLayoutIntValue(tvLayoutTitleSizeValue, value)
+        updateLayoutMarginPreview()
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
     }
@@ -1955,7 +2288,12 @@ class ReadMenu @JvmOverloads constructor(
     private fun setLayoutTitleTopSpacing(progress: Int) = binding.run {
         val value = progress.coerceIn(0, seekLayoutTitleTopSpacing.max)
         ReadBookConfig.titleTopSpacing = value
+        if (seekLayoutTitleTopSpacing.progress != value) {
+            seekLayoutTitleTopSpacing.progress = value
+        }
         updateLayoutIntValue(tvLayoutTitleTopSpacingValue, value)
+        updateLayoutMarginEntryValues()
+        updateLayoutMarginPreview()
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
     }
@@ -1963,7 +2301,12 @@ class ReadMenu @JvmOverloads constructor(
     private fun setLayoutTitleBottomSpacing(progress: Int) = binding.run {
         val value = progress.coerceIn(0, seekLayoutTitleBottomSpacing.max)
         ReadBookConfig.titleBottomSpacing = value
+        if (seekLayoutTitleBottomSpacing.progress != value) {
+            seekLayoutTitleBottomSpacing.progress = value
+        }
         updateLayoutIntValue(tvLayoutTitleBottomSpacingValue, value)
+        updateLayoutMarginEntryValues()
+        updateLayoutMarginPreview()
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
     }
@@ -1972,39 +2315,49 @@ class ReadMenu @JvmOverloads constructor(
         ReadBookConfig.titleMode = mode
         ReadBookConfig.save()
         updateTitleModeButtons()
+        updateLayoutMarginPreview()
         postEvent(EventBus.UP_CONFIG, arrayListOf(5))
     }
 
     private fun setLayoutTipPadding(progress: Int, seekBar: SeekBar, valueView: TextView, setter: (Int) -> Unit) {
         val value = progress.coerceIn(0, seekBar.max)
         setter(value)
+        if (seekBar.progress != value) {
+            seekBar.progress = value
+        }
         updateLayoutIntValue(valueView, value)
+        updateLayoutMarginEntryValues()
+        updateLayoutMarginPreview()
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(2))
     }
 
-    private fun cycleHeaderDisplay() {
-        val modes = ReadTipConfig.getHeaderModes(context).keys.toList()
-        val next = modes.nextAfter(ReadTipConfig.headerMode)
-        ReadTipConfig.headerMode = next
-        ReadBookConfig.save()
-        updateTipSettingValues()
-        postEvent(EventBus.UP_CONFIG, arrayListOf(2))
-    }
-
-    private fun cycleFooterDisplay() {
-        val modes = ReadTipConfig.getFooterModes(context).keys.toList()
-        val next = modes.nextAfter(ReadTipConfig.footerMode)
-        ReadTipConfig.footerMode = next
+    private fun setHeaderDisplayMode(mode: Int) {
+        ReadTipConfig.headerMode = mode
         ReadBookConfig.save()
         updateTipSettingValues()
         postEvent(EventBus.UP_CONFIG, arrayListOf(2))
     }
 
-    private fun List<Int>.nextAfter(current: Int): Int {
-        if (isEmpty()) return current
-        val index = indexOf(current).takeIf { it >= 0 } ?: 0
-        return get((index + 1) % size)
+    private fun setFooterDisplayMode(mode: Int) {
+        ReadTipConfig.footerMode = mode
+        ReadBookConfig.save()
+        updateTipSettingValues()
+        postEvent(EventBus.UP_CONFIG, arrayListOf(2))
+    }
+
+    private fun setHeaderDividerVisible(visible: Boolean) {
+        ReadBookConfig.showHeaderLine = visible
+        ReadBookConfig.save()
+        updateTipSettingValues()
+        postEvent(EventBus.UP_CONFIG, arrayListOf(2))
+    }
+
+    private fun setFooterDividerVisible(visible: Boolean) {
+        ReadBookConfig.showFooterLine = visible
+        ReadBookConfig.save()
+        updateTipSettingValues()
+        postEvent(EventBus.UP_CONFIG, arrayListOf(2))
     }
 
     private fun bindBackgroundSeek(
@@ -2243,13 +2596,9 @@ class ReadMenu @JvmOverloads constructor(
         }
     }
 
-    private fun bottomTabSelectedContentColor(): Int {
-        return if (ColorUtils.isColorLight(context.accentColor)) {
-            Color.BLACK
-        } else {
-            Color.WHITE
-        }
-    }
+    private fun bottomTabSelectedContentColor(): Int = Color.WHITE
+
+    private fun bottomTabSelectedLabelColor(): Int = Color.WHITE
 
     private fun openFontSelectDialog() {
         hideExpandedPanel(anim = false)
@@ -2284,6 +2633,103 @@ class ReadMenu @JvmOverloads constructor(
 
             override fun onStopTrackingTouch(seekBar: SeekBar) = Unit
         })
+    }
+
+    private fun bindLayoutMarginSpinbox(
+        increaseButton: View,
+        decreaseButton: View,
+        side: LayoutMarginSide
+    ) {
+        increaseButton.setOnClickListener {
+            adjustLayoutMargin(side, 1)
+        }
+        decreaseButton.setOnClickListener {
+            adjustLayoutMargin(side, -1)
+        }
+    }
+
+    private fun adjustLayoutMargin(side: LayoutMarginSide, delta: Int) {
+        val margins = currentLayoutMarginValues()
+        val current = when (side) {
+            LayoutMarginSide.Top -> margins.top
+            LayoutMarginSide.Bottom -> margins.bottom
+            LayoutMarginSide.Left -> margins.left
+            LayoutMarginSide.Right -> margins.right
+        }
+        setLayoutMarginValue(side, current + delta)
+    }
+
+    private fun setLayoutMarginValue(side: LayoutMarginSide, progress: Int) = binding.run {
+        when (activeLayoutMarginAdjustMode) {
+            LayoutMarginAdjustMode.Body -> when (side) {
+                LayoutMarginSide.Top -> setLayoutBodyPadding(
+                    progress,
+                    seekLayoutPaddingTop,
+                    tvLayoutPaddingTopValue
+                ) { ReadBookConfig.paddingTop = it }
+
+                LayoutMarginSide.Bottom -> setLayoutBodyPadding(
+                    progress,
+                    seekLayoutPaddingBottom,
+                    tvLayoutPaddingBottomValue
+                ) { ReadBookConfig.paddingBottom = it }
+
+                LayoutMarginSide.Left -> setLayoutBodyPadding(
+                    progress,
+                    seekLayoutPaddingLeft,
+                    tvLayoutPaddingLeftValue
+                ) { ReadBookConfig.paddingLeft = it }
+
+                LayoutMarginSide.Right -> setLayoutBodyPadding(
+                    progress,
+                    seekLayoutPaddingRight,
+                    tvLayoutPaddingRightValue
+                ) { ReadBookConfig.paddingRight = it }
+            }
+
+            LayoutMarginAdjustMode.Text -> Unit
+
+            LayoutMarginAdjustMode.Title -> when (side) {
+                LayoutMarginSide.Top -> setLayoutTitleTopSpacing(progress)
+                LayoutMarginSide.Bottom -> setLayoutTitleBottomSpacing(progress)
+                LayoutMarginSide.Left,
+                LayoutMarginSide.Right -> Unit
+            }
+
+            LayoutMarginAdjustMode.Header -> when (side) {
+                LayoutMarginSide.Top -> setLayoutTipPadding(
+                    progress,
+                    seekLayoutHeaderPaddingTop,
+                    tvLayoutHeaderPaddingTopValue
+                ) { ReadBookConfig.headerPaddingTop = it }
+
+                LayoutMarginSide.Bottom -> setLayoutTipPadding(
+                    progress,
+                    seekLayoutHeaderPaddingBottom,
+                    tvLayoutHeaderPaddingBottomValue
+                ) { ReadBookConfig.headerPaddingBottom = it }
+
+                LayoutMarginSide.Left,
+                LayoutMarginSide.Right -> Unit
+            }
+
+            LayoutMarginAdjustMode.Footer -> when (side) {
+                LayoutMarginSide.Top -> setLayoutTipPadding(
+                    progress,
+                    seekLayoutFooterPaddingTop,
+                    tvLayoutFooterPaddingTopValue
+                ) { ReadBookConfig.footerPaddingTop = it }
+
+                LayoutMarginSide.Bottom -> setLayoutTipPadding(
+                    progress,
+                    seekLayoutFooterPaddingBottom,
+                    tvLayoutFooterPaddingBottomValue
+                ) { ReadBookConfig.footerPaddingBottom = it }
+
+                LayoutMarginSide.Left,
+                LayoutMarginSide.Right -> Unit
+            }
+        }
     }
 
     private fun setupBottomNavigationEvents() = binding.run {
@@ -2539,6 +2985,24 @@ class ReadMenu @JvmOverloads constructor(
         fontSampleBindings.forEach { sample ->
             sample.binding.root.setOnClickListener { sample.onClick() }
         }
+        layoutTextStyleEntry.setOnClickListener {
+            showLayoutMarginAdjustOverlay(LayoutMarginAdjustMode.Text)
+        }
+        layoutMarginEntryBody.setOnClickListener {
+            showLayoutMarginAdjustOverlay(LayoutMarginAdjustMode.Body)
+        }
+        layoutMarginEntryTitle.setOnClickListener {
+            showLayoutMarginAdjustOverlay(LayoutMarginAdjustMode.Title)
+        }
+        layoutMarginEntryHeader.setOnClickListener {
+            showLayoutMarginAdjustOverlay(LayoutMarginAdjustMode.Header)
+        }
+        layoutMarginEntryFooter.setOnClickListener {
+            showLayoutMarginAdjustOverlay(LayoutMarginAdjustMode.Footer)
+        }
+        btnLayoutMarginAdjustClose.setOnClickListener {
+            hideLayoutMarginAdjustOverlay()
+        }
         bindLayoutDecimalSeek(
             seekLayoutLetterSpacing,
             tvLayoutLetterSpacingValue,
@@ -2559,21 +3023,41 @@ class ReadMenu @JvmOverloads constructor(
                 ReadBookConfig.paddingTop = value
             }
         }
+        bindLayoutMarginSpinbox(
+            btnLayoutPaddingTopIncrease,
+            btnLayoutPaddingTopDecrease,
+            LayoutMarginSide.Top
+        )
         bindLayoutIntSeek(seekLayoutPaddingBottom, tvLayoutPaddingBottomValue) {
             setLayoutBodyPadding(it, seekLayoutPaddingBottom, tvLayoutPaddingBottomValue) { value ->
                 ReadBookConfig.paddingBottom = value
             }
         }
+        bindLayoutMarginSpinbox(
+            btnLayoutPaddingBottomIncrease,
+            btnLayoutPaddingBottomDecrease,
+            LayoutMarginSide.Bottom
+        )
         bindLayoutIntSeek(seekLayoutPaddingLeft, tvLayoutPaddingLeftValue) {
             setLayoutBodyPadding(it, seekLayoutPaddingLeft, tvLayoutPaddingLeftValue) { value ->
                 ReadBookConfig.paddingLeft = value
             }
         }
+        bindLayoutMarginSpinbox(
+            btnLayoutPaddingLeftIncrease,
+            btnLayoutPaddingLeftDecrease,
+            LayoutMarginSide.Left
+        )
         bindLayoutIntSeek(seekLayoutPaddingRight, tvLayoutPaddingRightValue) {
             setLayoutBodyPadding(it, seekLayoutPaddingRight, tvLayoutPaddingRightValue) { value ->
                 ReadBookConfig.paddingRight = value
             }
         }
+        bindLayoutMarginSpinbox(
+            btnLayoutPaddingRightIncrease,
+            btnLayoutPaddingRightDecrease,
+            LayoutMarginSide.Right
+        )
         bindLayoutIntSeek(seekLayoutTitleSize, tvLayoutTitleSizeValue, ::setLayoutTitleSize)
         bindLayoutIntSeek(
             seekLayoutTitleTopSpacing,
@@ -2591,6 +3075,12 @@ class ReadMenu @JvmOverloads constructor(
             setLayoutTitleMode(AdvancedTitleConfig.TITLE_MODE_ADVANCED)
         }
         tvLayoutTitleModeHide.setOnClickListener { setLayoutTitleMode(2) }
+        tvLayoutMarginTitleModeLeft.setOnClickListener { setLayoutTitleMode(0) }
+        tvLayoutMarginTitleModeCenter.setOnClickListener { setLayoutTitleMode(1) }
+        tvLayoutMarginTitleModeAdvanced.setOnClickListener {
+            setLayoutTitleMode(AdvancedTitleConfig.TITLE_MODE_ADVANCED)
+        }
+        tvLayoutMarginTitleModeHide.setOnClickListener { setLayoutTitleMode(2) }
         bindLayoutIntSeek(seekLayoutHeaderPaddingTop, tvLayoutHeaderPaddingTopValue) {
             setLayoutTipPadding(it, seekLayoutHeaderPaddingTop, tvLayoutHeaderPaddingTopValue) { value ->
                 ReadBookConfig.headerPaddingTop = value
@@ -2611,20 +3101,43 @@ class ReadMenu @JvmOverloads constructor(
                 ReadBookConfig.footerPaddingBottom = value
             }
         }
-        tvLayoutHeaderLineToggle.setOnClickListener {
-            ReadBookConfig.showHeaderLine = !ReadBookConfig.showHeaderLine
-            ReadBookConfig.save()
-            configureOptionButton(tvLayoutHeaderLineToggle, ReadBookConfig.showHeaderLine)
-            postEvent(EventBus.UP_CONFIG, arrayListOf(2))
+        layoutHeaderDisplayAutoCard.setOnClickListener { setHeaderDisplayMode(0) }
+        layoutHeaderDisplayShowCard.setOnClickListener { setHeaderDisplayMode(1) }
+        taggedView("layout_header_display_hide_card").setOnClickListener { setHeaderDisplayMode(2) }
+        taggedView("layout_footer_display_auto_card").setOnClickListener { setFooterDisplayMode(2) }
+        layoutFooterDisplayShowCard.setOnClickListener { setFooterDisplayMode(0) }
+        layoutFooterDisplayHideCard.setOnClickListener { setFooterDisplayMode(1) }
+        tvLayoutHeaderLineToggle.setOnClickListener { setHeaderDividerVisible(true) }
+        tvLayoutHeaderLineHide.setOnClickListener { setHeaderDividerVisible(false) }
+        tvLayoutFooterLineToggle.setOnClickListener { setFooterDividerVisible(true) }
+        tvLayoutFooterLineHide.setOnClickListener { setFooterDividerVisible(false) }
+        llLayoutTipColor.setOnClickListener {
+            ColorPickerDialog.newBuilder()
+                .setColor(ReadBookConfig.durConfig.curTextColor())
+                .setShowAlphaSlider(false)
+                .setDialogType(ColorPickerDialog.TYPE_CUSTOM)
+                .setDialogId(TEXT_COLOR)
+                .show(activity)
         }
-        tvLayoutFooterLineToggle.setOnClickListener {
-            ReadBookConfig.showFooterLine = !ReadBookConfig.showFooterLine
-            ReadBookConfig.save()
-            configureOptionButton(tvLayoutFooterLineToggle, ReadBookConfig.showFooterLine)
-            postEvent(EventBus.UP_CONFIG, arrayListOf(2))
+        llLayoutTipDividerColor.setOnClickListener {
+            context.selector(items = ReadTipConfig.tipDividerColorNames) { _, i ->
+                when (i) {
+                    0, 1 -> {
+                        ReadTipConfig.tipDividerColor = i - 1
+                        ReadBookConfig.save()
+                        updateTipSettingValues()
+                        postEvent(EventBus.UP_CONFIG, arrayListOf(2))
+                    }
+
+                    2 -> ColorPickerDialog.newBuilder()
+                        .setColor(effectiveTipDividerColor())
+                        .setShowAlphaSlider(false)
+                        .setDialogType(ColorPickerDialog.TYPE_CUSTOM)
+                        .setDialogId(TIP_DIVIDER_COLOR)
+                        .show(activity)
+                }
+            }
         }
-        llLayoutTipHeaderShow.setOnClickListener { cycleHeaderDisplay() }
-        llLayoutTipFooterShow.setOnClickListener { cycleFooterDisplay() }
         bindBackgroundSeek(seekBackgroundBrightness, tvBackgroundBrightnessValue) {
             ReadBookConfig.bgBrightness = it.coerceIn(0, 100)
             ReadBookConfig.save()

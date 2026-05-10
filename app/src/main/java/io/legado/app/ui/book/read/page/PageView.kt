@@ -228,6 +228,7 @@ class PageView(context: Context) : FrameLayout(context) {
         } else {
             when (ReadTipConfig.footerMode) {
                 1 -> true
+                2 -> !ReadBookConfig.hideStatusBar
                 else -> false
             }
         }
