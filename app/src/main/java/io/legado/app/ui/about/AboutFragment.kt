@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import androidx.annotation.StringRes
+import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import io.legado.app.R
@@ -13,7 +14,10 @@ import io.legado.app.constant.AppLog
 import io.legado.app.help.CrashHandler
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
+import io.legado.app.help.update.AppUpdate
+import io.legado.app.help.update.AppUpdateGitHub
 import io.legado.app.ui.widget.dialog.TextDialog
+import io.legado.app.ui.widget.dialog.WaitDialog
 import io.legado.app.utils.FileDoc
 import io.legado.app.utils.compress.ZipUtils
 import io.legado.app.utils.createFileIfNotExist
@@ -35,6 +39,10 @@ import java.io.File
 
 class AboutFragment : PreferenceFragmentCompat() {
 
+    private val waitDialog by lazy {
+        WaitDialog(requireContext())
+    }
+
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         addPreferencesFromResource(R.xml.about)
         findPreference<Preference>("update_log")?.summary =
@@ -49,7 +57,8 @@ class AboutFragment : PreferenceFragmentCompat() {
     override fun onPreferenceTreeClick(preference: Preference): Boolean {
         when (preference.key) {
             "contributors" -> openUrl(R.string.contributors_url)
-            "update_log" -> showMdFile(getString(R.string.update_log), "updateLog.md")
+            "update_log" -> showUpdateLog()
+            "check_update" -> checkUpdate()
             "mail" -> requireContext().sendMail(getString(R.string.email))
             "license" -> showMdFile(getString(R.string.license), "LICENSE.md")
             "disclaimer" -> showMdFile(getString(R.string.disclaimer), "disclaimer.md")
@@ -73,6 +82,39 @@ class AboutFragment : PreferenceFragmentCompat() {
     private fun showMdFile(title: String, fileName: String) {
         val mdText = String(requireContext().assets.open(fileName).readBytes())
         showDialogFragment(TextDialog(title, mdText, TextDialog.Mode.MD))
+    }
+
+    /**
+     * 显示更新日志
+     */
+    private fun showUpdateLog() {
+        waitDialog.show()
+        AppUpdateGitHub.getChangeLog(lifecycleScope)
+            .onSuccess { changeLog ->
+                showDialogFragment(
+                    TextDialog(getString(R.string.update_log), changeLog, TextDialog.Mode.MD)
+                )
+            }.onError {
+                appCtx.toastOnUi("从 GitHub 获取失败，显示本地日志")
+                showMdFile(getString(R.string.update_log), "updateLog.md")
+            }.onFinally {
+                waitDialog.dismiss()
+            }
+    }
+
+    /**
+     * 检测更新
+     */
+    private fun checkUpdate() {
+        waitDialog.show()
+        AppUpdate.gitHubUpdate.check(lifecycleScope)
+            .onSuccess {
+                showDialogFragment(UpdateDialog(it))
+            }.onError {
+                appCtx.toastOnUi("${getString(R.string.check_update)}\n${it.localizedMessage}")
+            }.onFinally {
+                waitDialog.dismiss()
+            }
     }
 
     /**

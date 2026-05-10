@@ -100,6 +100,26 @@ class ForkSyncFeatureTest {
         assertTrue(repoFile("app/src/main/res/layout/widget_read_rank.xml").exists())
     }
 
+    @Test
+    fun aboutPageChecksUpdatesAgainstMaintainerGithubReleases() {
+        val aboutXml = repoFile("app/src/main/res/xml/about.xml").readText()
+        val aboutFragment = repoFile("app/src/main/java/io/legado/app/ui/about/AboutFragment.kt").readText()
+        val appUpdateGitHub = repoFile("app/src/main/java/io/legado/app/help/update/AppUpdateGitHub.kt").readText()
+        val buildGradle = repoFile("app/build.gradle").readText()
+        val strings = repoFile("app/src/main/res/values/strings.xml").readText()
+        val nonTranslat = repoFile("app/src/main/res/values/non_translat.xml").readText()
+
+        assertTrue(aboutXml.contains("android:key=\"check_update\""))
+        assertTrue(aboutFragment.contains("\"update_log\" -> showUpdateLog()"))
+        assertTrue(aboutFragment.contains("\"check_update\" -> checkUpdate()"))
+        assertTrue(aboutFragment.contains("AppUpdateGitHub"))
+        assertTrue(appUpdateGitHub.contains("getChangeLog"))
+        assertTrue(appUpdateGitHub.contains("BuildConfig.GITHUB_REPO"))
+        assertTrue(buildGradle.contains("'Nowaterisenough/legado'"))
+        assertTrue(strings.contains("https://github.com/Nowaterisenough/legado/releases"))
+        assertTrue(nonTranslat.contains("https://github.com/Nowaterisenough/legado/graphs/contributors"))
+    }
+
     private fun repoFile(relativePath: String): File {
         return generateSequence(File("").absoluteFile) { it.parentFile }
             .map { File(it, relativePath) }

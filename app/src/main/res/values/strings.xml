@@ -56,6 +56,7 @@
     <string name="recent_reading">Recent reading</string>
     <string name="last_read">Last reading</string>
     <string name="update_log">What\'s new</string>
+    <string name="check_update">Check for Updates</string>
     <string name="bookshelf_empty">The bookshelf is still empty. Search for books or add them from discovery!</string>
     <string name="action_search">Search</string>
     <string name="action_download">Download</string>
@@ -104,7 +105,7 @@
         \u3000\u3000 This is an open source reading software newly developed by Kotlin, welcome to join us.
     </string>
     <string name="app_share_description">
-        阅读R download link：\n https://github.com/refgd/legado/releases
+        阅读R download link：\n https://github.com/Nowaterisenough/legado/releases
     </string>
     <string name="version_name">Version %s</string>
     <string name="pt_background_verification">Background-verification</string>
@@ -1579,9 +1580,9 @@
     <string name="history">历史记录</string>
     <string name="app_name_sigma">阅读R</string>
     <string name="about_description_sigma">\u3000\u3000阅读R 基于 Legado 持续定制，专注阅读体验、书源工具与 AI 辅助能力。</string>
-    <string name="contributors_summary_sigma">当前维护仓库：refgd/legado，详情请在 GitHub 中查看</string>
+    <string name="contributors_summary_sigma">当前维护仓库：Nowaterisenough/legado，详情请在 GitHub 中查看</string>
     <string name="app_share_description_sigma">
-        阅读R 下载地址：\nhttps://github.com/refgd/legado/releases
+        阅读R 下载地址：\nhttps://github.com/Nowaterisenough/legado/releases
     </string>
     <string name="sure_cache_book">是否确认开始缓存？</string>
     <string name="non_printable_set">不可视字符设定</string>

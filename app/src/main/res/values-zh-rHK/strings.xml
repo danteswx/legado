@@ -47,6 +47,7 @@
     <string name="recent_reading">最近閲讀</string>
     <string name="last_read">最後閲讀</string>
     <string name="update_log">更新日誌</string>
+    <string name="check_update">檢查更新</string>
     <string name="bookshelf_empty">書架還空著，先去搜索書籍或從發現裏添加吧！</string>
     <string name="action_search">搜尋</string>
     <string name="action_download">下載</string>
@@ -94,7 +95,7 @@
         \u3000\u3000這是一款使用 Kotlin 全新開發的開源的閲讀應用程式，歡迎你的加入。
     </string>
     <string name="app_share_description">
-        閲讀3.0下載地址：\nhttps://github.com/refgd/legado/releases
+        閲讀3.0下載地址：\nhttps://github.com/Nowaterisenough/legado/releases
     </string>
     <string name="version_name">Version %s</string>
     <string name="pt_background_verification">後臺校驗書源</string>
