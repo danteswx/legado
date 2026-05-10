@@ -573,14 +573,21 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             }
 
             R.id.menu_enable_auto_page -> {
-                item.isChecked = !item.isChecked
-                val menuMangaAutoPageSpeed = mMenu?.findItem(R.id.menu_manga_auto_page_speed)
-                mScrollTimer.isEnabledPage = item.isChecked
-                menuMangaAutoPageSpeed?.isVisible = item.isChecked
-                enableAutoScrollPage = item.isChecked
-                enableAutoScroll = false
-                mScrollTimer.isEnabled = false
-                mMenu?.findItem(R.id.menu_enable_auto_scroll)?.isChecked = false
+                if (enableAutoScrollPage) {
+                    setAutoPageEnabled(false)
+                } else {
+                    showNumberPickerDialog(
+                        1, getString(R.string.setting_manga_auto_page_speed),
+                        mangaAutoPageSpeed
+                    ) {
+                        updateBookMangaReadConfig {
+                            mangaAutoPageSpeed = it
+                        }
+                        mScrollTimer.setSpeed(it)
+                        setAutoPageEnabled(true)
+                        binding.mangaMenu.runMenuOut()
+                    }
+                }
             }
 
             R.id.menu_manga_auto_page_speed -> {
@@ -596,6 +603,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                     if (enableAutoScrollPage) {
                         mScrollTimer.isEnabledPage = true
                     }
+                    binding.mangaMenu.runMenuOut()
                 }
             }
 
@@ -621,17 +629,20 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             }
 
             R.id.menu_enable_auto_scroll -> {
-                item.isChecked = !item.isChecked
-                mScrollTimer.isEnabled = item.isChecked
-                mMenu?.findItem(R.id.menu_enable_auto_page)?.isChecked = false
-                enableAutoScroll = item.isChecked
-                enableAutoScrollPage = false
-                mScrollTimer.isEnabledPage = false
-                mMenu?.findItem(R.id.menu_manga_auto_page_speed)?.isVisible = item.isChecked
                 if (enableAutoScroll) {
-                    mPagerSnapHelper.attachToRecyclerView(null)
-                } else if (mangaHorizontalScroll) {
-                    mPagerSnapHelper.attachToRecyclerView(binding.recyclerView)
+                    setAutoScrollEnabled(false)
+                } else {
+                    showNumberPickerDialog(
+                        1, getString(R.string.setting_manga_auto_page_speed),
+                        mangaAutoPageSpeed
+                    ) {
+                        updateBookMangaReadConfig {
+                            mangaAutoPageSpeed = it
+                        }
+                        mScrollTimer.setSpeed(it)
+                        setAutoScrollEnabled(true)
+                        binding.mangaMenu.runMenuOut()
+                    }
                 }
             }
 
@@ -642,12 +653,13 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             }
 
             R.id.menu_epaper_manga -> {
-                item.isChecked = !item.isChecked
-                AppConfig.enableMangaEInk = item.isChecked
-                mMenu?.findItem(R.id.menu_gray_manga)?.isChecked = false
-                AppConfig.enableMangaGray = false
-                mMenu?.findItem(R.id.menu_epaper_manga_setting)?.isVisible = item.isChecked
-                mAdapter.enableMangaEInk(item.isChecked, AppConfig.mangaEInkThreshold)
+                if (AppConfig.enableMangaEInk) {
+                    AppConfig.enableMangaEInk = false
+                    mAdapter.enableMangaEInk(false, AppConfig.mangaEInkThreshold)
+                    mMenu?.let { upMenu(it) }
+                } else {
+                    showDialogFragment(MangaEpaperDialog(enableOnConfirm = true))
+                }
             }
 
             R.id.menu_epaper_manga_setting -> {
@@ -741,6 +753,27 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             mPagerSnapHelper.attachToRecyclerView(null)
             mLayoutManager.orientation = LinearLayoutManager.VERTICAL
         }
+    }
+
+    private fun setAutoPageEnabled(enable: Boolean) {
+        enableAutoScrollPage = enable
+        enableAutoScroll = false
+        mScrollTimer.isEnabledPage = enable
+        mScrollTimer.isEnabled = false
+        mMenu?.let { upMenu(it) }
+    }
+
+    private fun setAutoScrollEnabled(enable: Boolean) {
+        enableAutoScroll = enable
+        enableAutoScrollPage = false
+        mScrollTimer.isEnabled = enable
+        mScrollTimer.isEnabledPage = false
+        if (enable) {
+            mPagerSnapHelper.attachToRecyclerView(null)
+        } else if (mangaHorizontalScroll) {
+            mPagerSnapHelper.attachToRecyclerView(binding.recyclerView)
+        }
+        mMenu?.let { upMenu(it) }
     }
 
     @SuppressLint("StringFormatMatches")
@@ -925,7 +958,28 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         return super.onKeyDown(keyCode, event)
     }
 
-    override fun updateEepaper(value: Int) {
-        mAdapter.updateThreshold(value)
+    override fun previewEpaper(enable: Boolean, value: Int) {
+        if (enable) {
+            mAdapter.enableMangaEInk(true, value)
+        } else {
+            mAdapter.enableMangaEInk(false, value)
+        }
+    }
+
+    override fun restoreEpaper(enable: Boolean, value: Int) {
+        mAdapter.enableMangaEInk(enable, value)
+    }
+
+    override fun enableEpaper(value: Int) {
+        AppConfig.enableMangaEInk = true
+        AppConfig.enableMangaGray = false
+        mAdapter.enableMangaEInk(true, value)
+        mMenu?.let { upMenu(it) }
+        binding.mangaMenu.runMenuOut()
+    }
+
+    override fun onEpaperSettingConfirmed() {
+        mMenu?.let { upMenu(it) }
+        binding.mangaMenu.runMenuOut()
     }
 }

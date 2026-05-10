@@ -16,6 +16,7 @@ import android.view.textclassifier.TextClassifier
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.LinearLayout
 import androidx.activity.addCallback
 import androidx.activity.viewModels
 import androidx.annotation.OptIn
@@ -90,6 +91,7 @@ import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setHtml
 import io.legado.app.utils.setMarkdown
 import io.legado.app.utils.setTintMutate
+import io.legado.app.utils.statusBarHeight
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.toastOnUi
@@ -112,6 +114,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
 
     companion object {
         const val EXTRA_PREPARE_BOOK_INFO = "prepareBookInfo"
+        private const val COLLAPSED_PANEL_HEIGHT_DP = 50
     }
 
     override val binding by viewBinding(ActivityVideoPlayerBinding::inflate)
@@ -156,6 +159,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     }
     private var isNew = true
     private var isFullScreen = false
+    private var isBottomPanelExpanded = false
     private var preparedVideoStarted = false
     private var detailTabIndex = 0
     private var orientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
@@ -198,10 +202,11 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
 
     @OptIn(UnstableApi::class)
     override fun onActivityCreated(savedInstanceState: Bundle?) {
-        binding.bottomPanel.applyNavigationBarMargin(withInitialMargin = true)
+        binding.bottomPanelContainer.applyNavigationBarMargin(withInitialMargin = true)
         playerView.enlargeImageRes = R.drawable.ic_fullscreen
         isNew = intent.getBooleanExtra("isNew", true)
         setupPlayerView()
+        setupBottomPanel()
         setupDetailTabs()
         if (isNew) {
             intent.getStringExtra("videoUrl")?.let {
@@ -242,6 +247,10 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                 toggleFullScreen()
                 return@addCallback
             }
+            if (isBottomPanelExpanded) {
+                setBottomPanelExpanded(false)
+                return@addCallback
+            }
             finish()
         }
     }
@@ -251,10 +260,11 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         binding.root.setBackgroundColor(backgroundColor)
         val book = VideoPlay.book
         if (book == null) {
-            binding.bottomPanel.invisible()
+            binding.bottomPanelContainer.invisible()
             return
         }
-        binding.bottomPanel.visible()
+        binding.bottomPanelContainer.visible()
+        setBottomPanelExpanded(isBottomPanelExpanded)
         showBook(book)
         if (VideoPlay.episodes.isNullOrEmpty()) {
             binding.chapters.gone()
@@ -269,6 +279,91 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
             showVolumes(VideoPlay.volumes)
         }
         selectVideoDetailTab(detailTabIndex)
+        updateCollapsedEpisodeText()
+    }
+
+    private fun setupBottomPanel() {
+        binding.collapsedStatusBarSpacer.layoutParams =
+            binding.collapsedStatusBarSpacer.layoutParams.apply {
+                height = statusBarHeight
+            }
+        setBottomPanelExpanded(false)
+        binding.bottomPanelCollapsedBar.setOnClickListener {
+            setBottomPanelExpanded(true)
+        }
+        binding.btnCollapsedFloatWindow.setOnClickListener {
+            startFloatingWindow()
+        }
+        binding.btnExpandBottomPanelCollapse.setOnClickListener {
+            setBottomPanelExpanded(false)
+        }
+        binding.titleBar.toolbar.setOnClickListener {
+            setBottomPanelExpanded(false)
+        }
+    }
+
+    private fun setBottomPanelExpanded(expanded: Boolean) {
+        isBottomPanelExpanded = expanded
+        binding.titleBar.visibility = if (expanded) View.VISIBLE else View.GONE
+        binding.collapsedStatusBarSpacer.visibility = if (expanded) View.GONE else View.VISIBLE
+        binding.bottomPanel.visibility = if (expanded) View.VISIBLE else View.GONE
+        binding.bottomPanelCollapsed.visibility = if (expanded) View.GONE else View.VISIBLE
+        binding.bottomPanelContainer.layoutParams =
+            (binding.bottomPanelContainer.layoutParams as LinearLayout.LayoutParams).apply {
+                height = if (expanded) 0 else COLLAPSED_PANEL_HEIGHT_DP.dpToPx()
+                weight = if (expanded) 1f else 0f
+            }
+        binding.root.post {
+            updatePlayerViewSize(expanded)
+        }
+        if (!expanded) {
+            updateCollapsedEpisodeText()
+        }
+    }
+
+    private fun updatePlayerViewSize(panelExpanded: Boolean) {
+        val rootHeight = binding.root.height
+        if (rootHeight <= 0) {
+            binding.root.post {
+                updatePlayerViewSize(panelExpanded)
+            }
+            return
+        }
+        val displayMetrics = resources.displayMetrics
+        val screenWidth = displayMetrics.widthPixels
+        val screenHeight = displayMetrics.heightPixels
+        val videoWidth = playerView.currentVideoWidth
+        val videoHeight = playerView.currentVideoHeight
+        val aspectRatio = if (videoWidth > 0 && videoHeight > 0) {
+            videoHeight.toFloat() / videoWidth.toFloat()
+        } else {
+            9f / 16f
+        }
+        val targetHeight = if (panelExpanded) {
+            (screenWidth * aspectRatio).toInt()
+        } else {
+            val containerMarginBottom =
+                (binding.bottomPanelContainer.layoutParams as? LinearLayout.LayoutParams)
+                    ?.bottomMargin ?: 0
+            rootHeight - statusBarHeight - COLLAPSED_PANEL_HEIGHT_DP.dpToPx() - containerMarginBottom
+        }
+        val maxHeight = if (panelExpanded) screenHeight / 2 else screenHeight
+        playerView.layoutParams = playerView.layoutParams.apply {
+            width = screenWidth
+            height = targetHeight.coerceAtMost(maxHeight).coerceAtLeast(screenWidth * 9 / 16)
+        }
+    }
+
+    private fun updateCollapsedEpisodeText() {
+        val total = VideoPlay.episodes?.size?.takeIf { it > 0 }
+            ?: VideoPlay.toc?.count { !it.isVolume }?.takeIf { it > 0 }
+            ?: if (VideoPlay.singleUrl) 1 else 0
+        val current = if (total > 0) {
+            (VideoPlay.chapterInVolumeIndex + 1).coerceIn(1, total)
+        } else {
+            0
+        }
+        binding.tvCollapsedEpisode.text = "$current/$total"
     }
 
     private fun setupDetailTabs() {
@@ -630,6 +725,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
     private fun upView() {
         upEpisodesView()
         upVolumesView()
+        updateCollapsedEpisodeText()
     }
 
     private fun upEpisodesView() {
@@ -655,13 +751,14 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                 ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE //横屏
             }
             supportActionBar?.hide()
-            binding.bottomPanel.gone()
+            binding.bottomPanelContainer.gone()
             playerView.startWindowFullscreen(this, false, false)
         } else {
             requestedOrientation = orientation
             supportActionBar?.show()
             if (VideoPlay.book != null) {
-                binding.bottomPanel.visible()
+                binding.bottomPanelContainer.visible()
+                setBottomPanelExpanded(isBottomPanelExpanded)
                 selectVideoDetailTab(detailTabIndex)
             }
             playerView.postDelayed({
@@ -709,6 +806,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         //高度不超过一半屏幕
         layoutParams.height = if (height < screenHeight / 2) height else screenHeight / 2
         playerView.layoutParams = layoutParams
+        updatePlayerViewSize(isBottomPanelExpanded)
         playerView.isNeedOrientationUtils = false //关闭自带的屏幕方向控制
         playerView.fullscreenButton.setOnClickListener { toggleFullScreen() }
         playerView.setBackFromFullScreenListener { toggleFullScreen() }
@@ -745,6 +843,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                         //高度不超过一半屏幕
                         layoutParams.height = if (height < screenHeight / 2) height else screenHeight / 2
                         playerView.layoutParams = layoutParams
+                        updatePlayerViewSize(isBottomPanelExpanded)
                     }
                 }
             }
@@ -973,6 +1072,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
         VideoPlay.upEpisodes()
         (binding.chapters.adapter as? ChapterAdapter)?.updateData(VideoPlay.episodes)
         (binding.volumes.adapter as? ChapterAdapter)?.updateData(VideoPlay.volumes)
+        updateCollapsedEpisodeText()
     }
 
     private fun startFloatingWindow() {
@@ -998,6 +1098,7 @@ class VideoPlayerActivity : VMBaseActivity<ActivityVideoPlayerBinding, VideoPlay
                     1 -> upEpisodesView()
                 }
             }
+            updateCollapsedEpisodeText()
         }
 
     }

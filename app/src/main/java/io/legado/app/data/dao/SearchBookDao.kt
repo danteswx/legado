@@ -12,6 +12,9 @@ interface SearchBookDao {
     @Query("select * from searchBooks where name = :name and author = :author and origin in (select bookSourceUrl from book_sources) order by originOrder limit 1")
     fun getFirstByNameAuthor(name: String, author: String): SearchBook?
 
+    @Query("select * from searchBooks where bookUrl in (:bookUrls)")
+    fun getByBookUrls(bookUrls: List<String>): List<SearchBook>
+
     @Query(
         """select t1.name, t1.author, t1.origin, t1.originName, t1.coverUrl, t1.bookUrl, 
         t1.type, t1.time, t1.intro, t1.kind, t1.latestChapterTitle, t1.tocUrl, t1.variable, 

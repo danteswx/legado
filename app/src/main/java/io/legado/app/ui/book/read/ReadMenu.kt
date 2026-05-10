@@ -399,6 +399,7 @@ class ReadMenu @JvmOverloads constructor(
         panelPageAnim.setTextColor(textColor)
         panelPageAutoPage.setTextColor(textColor)
         panelPageTouchSlop.setTextColor(textColor)
+        panelPageAnimSpeed.setTextColor(textColor)
         panelPageVolumeKey.setTextColor(textColor)
         panelPageMouseWheel.setTextColor(textColor)
         panelMoreSearch.setTextColor(textColor)
@@ -1534,6 +1535,7 @@ class ReadMenu @JvmOverloads constructor(
             panelPageAnim,
             panelPageAutoPage,
             panelPageTouchSlop,
+            panelPageAnimSpeed,
             panelPageVolumeKey,
             panelPageMouseWheel
         ).forEach { it.setTextColor(color) }
@@ -1713,6 +1715,7 @@ class ReadMenu @JvmOverloads constructor(
         configureOptionButton(panelPageAnim, false)
         configureOptionButton(panelPageAutoPage, false)
         configureOptionButton(panelPageTouchSlop, AppConfig.pageTouchSlop > 0)
+        configureOptionButton(panelPageAnimSpeed, AppConfig.pageAnimationSpeed != 300)
         configureOptionButton(panelPageVolumeKey, AppConfig.volumeKeyPage)
         configureOptionButton(panelPageMouseWheel, AppConfig.mouseWheelPage)
     }
@@ -2470,6 +2473,21 @@ class ReadMenu @JvmOverloads constructor(
                 .show {
                     AppConfig.pageTouchSlop = it
                     postEvent(EventBus.UP_CONFIG, arrayListOf(4))
+                    updatePageTurnControls()
+                }
+        }
+        panelPageAnimSpeed.setOnClickListener {
+            NumberPickerDialog(context)
+                .setTitle(context.getString(R.string.page_animation_speed_dialog_title))
+                .setMaxValue(2000)
+                .setMinValue(0)
+                .setValue(AppConfig.pageAnimationSpeed)
+                .setCustomButton(R.string.btn_default_s) {
+                    AppConfig.pageAnimationSpeed = 300
+                    updatePageTurnControls()
+                }
+                .show {
+                    AppConfig.pageAnimationSpeed = it
                     updatePageTurnControls()
                 }
         }

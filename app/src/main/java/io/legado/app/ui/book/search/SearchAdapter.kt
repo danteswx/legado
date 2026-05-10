@@ -74,7 +74,11 @@ class SearchAdapter(context: Context, val callBack: CallBack) :
     override fun registerListener(holder: ItemViewHolder, binding: ItemSearchBinding) {
         binding.root.setOnClickListener {
             getItem(holder.layoutPosition)?.let {
-                callBack.showBookInfo(it)
+                if (it.origins.size > 1) {
+                    callBack.showBookSourceSelector(it)
+                } else {
+                    callBack.showBookInfo(it)
+                }
             }
         }
     }
@@ -145,5 +149,7 @@ class SearchAdapter(context: Context, val callBack: CallBack) :
          * 显示书籍详情
          */
         fun showBookInfo(book: SearchBook)
+
+        fun showBookSourceSelector(book: SearchBook)
     }
 }

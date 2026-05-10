@@ -22,6 +22,7 @@ import io.legado.app.R
 import io.legado.app.lib.theme.UiCorner
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.lib.theme.secondaryTextColor
+import io.legado.app.lib.theme.uiTypeface
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.printOnDebug
 
@@ -32,6 +33,7 @@ class SearchView @JvmOverloads constructor(
 ) : SearchView(context, attrs) {
     private var mSearchHintIcon: Drawable? = null
     private var textView: TextView? = null
+    private var styleApplied = false
 
     @SuppressLint("UseCompatLoadingForDrawables")
     override fun onLayout(
@@ -42,12 +44,25 @@ class SearchView @JvmOverloads constructor(
         bottom: Int
     ) {
         super.onLayout(changed, left, top, right, bottom)
+        if (!styleApplied) {
+            post(::applySearchStyle)
+        }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        post(::applySearchStyle)
+    }
+
+    @SuppressLint("UseCompatLoadingForDrawables")
+    private fun applySearchStyle() {
         try {
             if (textView == null) {
                 textView = findViewById(androidx.appcompat.R.id.search_src_text)
                 mSearchHintIcon = this.context.getDrawable(R.drawable.ic_search_hint)
             }
             // 改变字体
+            textView!!.typeface = context.uiTypeface()
             textView!!.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             textView!!.gravity = Gravity.CENTER_VERTICAL
             textView!!.setTextColor(context.primaryTextColor)
@@ -58,6 +73,7 @@ class SearchView @JvmOverloads constructor(
             ensureTransparentSurfaces()
             updateSearchBackground()
             updateQueryHint()
+            styleApplied = true
         } catch (e: Exception) {
             e.printOnDebug()
         }

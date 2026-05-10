@@ -11,6 +11,7 @@ import android.widget.TextView
 import com.google.android.flexbox.FlexboxLayout
 import io.legado.app.data.entities.rule.RowUi
 import io.legado.app.databinding.ItemSourceEditBinding
+import io.legado.app.lib.theme.applyUiBodyTypeface
 import io.legado.app.ui.widget.text.TextInputLayout
 import io.legado.app.utils.dpToPx
 
@@ -35,6 +36,7 @@ object RowUiForm {
         container.removeAllViews()
         rows.forEachIndexed { index, rowUi ->
             val row = createRow(inflater, container, rowUi, values, callback)
+            row.view.applyUiBodyTypeface(container.context)
             container.addView(row.view, createRowLayoutParams(rowUi))
             row.view.id = index + idOffset
             row.applyStyleAfterAdd(row.view)

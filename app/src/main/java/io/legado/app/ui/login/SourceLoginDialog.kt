@@ -21,6 +21,8 @@ import io.legado.app.data.entities.rule.RowUi
 import io.legado.app.databinding.DialogLoginBinding
 import io.legado.app.databinding.ItemSourceEditBinding
 import io.legado.app.lib.dialogs.alert
+import io.legado.app.lib.theme.applyUiToolbarTypeface
+import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.widget.RowUiForm
@@ -405,9 +407,10 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
             rowUis = loginUi(loginUiStr)
             buttonUi(source, rowUis)
         }
-        binding.toolBar.setBackgroundResource(R.color.background_menu)
+        binding.toolBar.setBackgroundColor(requireContext().primaryColor)
         binding.toolBar.setTitleTextColor(primaryTextColor)
         binding.toolBar.title = getString(R.string.login_source, source.getTag())
+        binding.toolBar.applyUiToolbarTypeface(requireContext())
         binding.toolBar.inflateMenu(R.menu.source_login)
         binding.toolBar.menu.applyTint(requireContext())
     }

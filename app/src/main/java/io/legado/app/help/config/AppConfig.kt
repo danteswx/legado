@@ -1082,6 +1082,18 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefInt(PreferKey.systemTypefaces, value)
         }
 
+    var uiFontPath: String
+        get() = appCtx.getPrefString(PreferKey.uiFontPath).orEmpty()
+        set(value) {
+            appCtx.putPrefString(PreferKey.uiFontPath, value)
+        }
+
+    var titleFontPath: String
+        get() = appCtx.getPrefString(PreferKey.titleFontPath).orEmpty()
+        set(value) {
+            appCtx.putPrefString(PreferKey.titleFontPath, value)
+        }
+
     var elevation: Int
         get() = if (isEInkMode) 0 else appCtx.getPrefInt(
             PreferKey.barElevation,
@@ -1426,6 +1438,12 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefInt(PreferKey.pageTouchClick, 0)
         set(value) {
             appCtx.putPrefInt(PreferKey.pageTouchClick, value)
+        }
+
+    var pageAnimationSpeed: Int
+        get() = appCtx.getPrefInt(PreferKey.pageAnimationSpeed, 300).coerceIn(0, 2000)
+        set(value) {
+            appCtx.putPrefInt(PreferKey.pageAnimationSpeed, value.coerceIn(0, 2000))
         }
 
     var bookshelfSort: Int

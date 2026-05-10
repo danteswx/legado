@@ -572,6 +572,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             title = getString(R.string.book_source),
             items = discoverSources,
             selectedKey = selectedDiscoverSourcePart?.bookSourceUrl,
+            searchHint = getString(R.string.screen_find),
             displayName = { it.getDisPlayNameGroup() },
             searchTexts = {
                 listOfNotNull(it.bookSourceName, it.bookSourceUrl, it.bookSourceGroup)

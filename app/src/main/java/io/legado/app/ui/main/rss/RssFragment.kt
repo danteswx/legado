@@ -584,6 +584,7 @@ class RssFragment() : VMBaseFragment<RssViewModel>(R.layout.fragment_rss), MainF
             searchTexts = {
                 listOfNotNull(it.sourceName, it.sourceUrl, it.sourceGroup)
             },
+            searchHint = getString(R.string.screen),
             itemKey = { it.sourceUrl }
         ) {
             selectSource(it, reload = true)

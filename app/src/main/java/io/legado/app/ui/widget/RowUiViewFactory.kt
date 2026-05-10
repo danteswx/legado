@@ -11,6 +11,7 @@ import io.legado.app.R
 import io.legado.app.data.entities.rule.RowUi
 import io.legado.app.databinding.ItemFilletTextBinding
 import io.legado.app.databinding.ItemSelectorSingleBinding
+import io.legado.app.lib.theme.applyUiBodyTypeface
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.setSelectionSafely
 
@@ -44,11 +45,23 @@ object RowUiViewFactory {
         val binding = ItemSelectorSingleBinding.inflate(inflater, parent, false)
         applyModernRowUiStyle(rowUi, binding.root)
         bindSelectTitle(rowUi, binding)
-        val adapter = ArrayAdapter(
+        val adapter = object : ArrayAdapter<String>(
             parent.context,
             R.layout.item_text_common,
             chars
-        )
+        ) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                return super.getView(position, convertView, parent).apply {
+                    applyUiBodyTypeface(context)
+                }
+            }
+
+            override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
+                return super.getDropDownView(position, convertView, parent).apply {
+                    applyUiBodyTypeface(context)
+                }
+            }
+        }
         adapter.setDropDownViewResource(R.layout.item_spinner_dropdown)
         val selector = binding.spType
         selector.adapter = adapter

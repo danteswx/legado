@@ -15,6 +15,6 @@
     android:paddingBottom="10dp"
     android:text="@string/book_intro"
     android:textColor="@color/secondaryText"
-    android:textIsSelectable="true"
+    android:textIsSelectable="false"
     android:textSize="13.5sp"
     tools:ignore="RtlSymmetry" />

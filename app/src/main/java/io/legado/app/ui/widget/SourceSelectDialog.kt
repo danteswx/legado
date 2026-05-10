@@ -7,6 +7,7 @@ import android.text.TextUtils
 import android.view.View
 import android.view.Gravity
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
@@ -16,6 +17,9 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.R
 import io.legado.app.lib.theme.UiCorner
+import io.legado.app.lib.theme.applyUiBodyTypeface
+import io.legado.app.lib.theme.applyUiLabelStyle
+import io.legado.app.lib.theme.applyUiSectionTitleStyle
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.utils.dpToPx
 
@@ -28,6 +32,7 @@ object SourceSelectDialog {
         selectedKey: String?,
         displayName: (T) -> String,
         searchTexts: (T) -> List<String>,
+        searchHint: String? = null,
         itemKey: (T) -> String,
         onSelect: (T) -> Unit
     ) {
@@ -51,7 +56,8 @@ object SourceSelectDialog {
             }
         }
         val searchView = SearchView(context).apply {
-            queryHint = context.getString(R.string.screen_find)
+            queryHint = searchHint ?: context.getString(R.string.screen)
+            setIconifiedByDefault(false)
             isIconified = false
             isSubmitButtonEnabled = false
             background = GradientDrawable().apply {
@@ -75,7 +81,13 @@ object SourceSelectDialog {
                     return true
                 }
             })
+            setOnCloseListener {
+                setQuery("", false)
+                isIconified = false
+                true
+            }
         }
+        searchView.applyUiBodyTypeface(context)
         val recyclerView = RecyclerView(context).apply {
             layoutManager = LinearLayoutManager(context)
             this.adapter = adapter
@@ -89,6 +101,8 @@ object SourceSelectDialog {
         }
         val container = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
+            isFocusable = true
+            isFocusableInTouchMode = true
             background = UiCorner.opaqueRounded(
                 ContextCompat.getColor(context, R.color.background_card),
                 UiCorner.panelRadius(context)
@@ -97,7 +111,7 @@ object SourceSelectDialog {
             addView(
                 TextView(context).apply {
                     text = title
-                    setTextColor(context.primaryTextColor)
+                    applyUiSectionTitleStyle(context)
                     textSize = 18f
                     includeFontPadding = false
                     gravity = Gravity.CENTER_VERTICAL
@@ -120,6 +134,11 @@ object SourceSelectDialog {
         dialog = AlertDialog.Builder(context)
             .setView(container)
             .create()
+        dialog.setOnShowListener {
+            container.requestFocus()
+            searchView.clearFocus()
+            dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
+        }
         dialog.show()
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
     }
@@ -135,7 +154,7 @@ object SourceSelectDialog {
             minHeight = 48.dpToPx()
             maxLines = 2
             ellipsize = TextUtils.TruncateAt.END
-            setTextColor(context.primaryTextColor)
+            applyUiLabelStyle(context)
             textSize = 15f
             setPadding(18.dpToPx(), 0, 18.dpToPx(), 0)
             background = UiCorner.actionSelector(

@@ -1697,6 +1697,18 @@
                         android:textSize="14sp" />
                 </LinearLayout>
 
+                <TextView
+                    android:id="@+id/panel_page_anim_speed"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_read_menu_panel_button"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="@string/page_animation_speed_title"
+                    android:textSize="14sp" />
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="44dp"

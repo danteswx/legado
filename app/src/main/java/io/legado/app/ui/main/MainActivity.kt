@@ -379,7 +379,9 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             scheduleLiquidGlassSetup(delayMillis = 32L)
         }
         bottomNavigationView.doOnLayout {
-            updateBottomNavigationIndicator(animate = false)
+            bottomNavigationView.post {
+                updateBottomNavigationIndicator(animate = false)
+            }
         }
         sideNavigationPanel.doOnLayout {
             placeSideNavigation(animate = false)
@@ -1337,8 +1339,10 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             bottomIndicatorWidth,
             (itemView.width - 16.dpToPx()).coerceAtLeast(42.dpToPx())
         )
-        indicator.layoutParams = indicator.layoutParams.apply {
-            width = targetWidth
+        if (indicator.layoutParams.width != targetWidth) {
+            indicator.layoutParams = indicator.layoutParams.apply {
+                width = targetWidth
+            }
         }
         val baseX = binding.bottomNavigationView.x + menuView.x + itemView.x
         val targetX = baseX + (itemView.width - targetWidth) / 2f

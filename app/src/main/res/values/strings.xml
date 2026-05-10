@@ -1023,6 +1023,7 @@
     <string name="read_record_read_rank">Reading rank</string>
     <string name="read_record_view_all_rank">View all rank</string>
     <string name="read_record_goal_card">Reading goal</string>
+    <string name="read_goal_widget_description">Reading goal card</string>
     <string name="read_record_goal_today">Today %1$s</string>
     <string name="read_record_goal_total">Total %1$s</string>
     <string name="read_record_goal_books">Books read %1$d</string>
@@ -1036,6 +1037,7 @@
     <string name="read_record_goal_avatar_pick">Choose image</string>
     <string name="read_record_goal_open_missing">Book no longer exists</string>
     <string name="read_record_rank_empty">No reading time rank yet</string>
+    <string name="read_rank_widget_description">Reading rank widget</string>
     <string name="read_record_rank_number">No.%1$d</string>
     <string name="read_record_goal_target_progress">Today\'s target %1$s / %2$s</string>
     <string name="read_record_open_book_info">Open book details</string>
@@ -1309,6 +1311,8 @@
     <string name="page_touch_slop_title">Sliding Page Threshold</string>
     <string name="page_touch_slop_dialog_title">Sliding page turn threshold (0 = system default)</string>
     <string name="page_touch_slop_summary">How far to slide to trigger a page slide (system default %s px)</string>
+    <string name="page_animation_speed_title">Flip Animation Speed</string>
+    <string name="page_animation_speed_dialog_title">Flip animation speed (ms)</string>
     <string name="page_touch_click_title">边缘点击阈值</string>
     <string name="page_touch_click_summary">左右边缘多少距离不会触发点击事件，默认为0px</string>
     <string name="page_touch_click_dialog_title">边缘点击阈值</string>
