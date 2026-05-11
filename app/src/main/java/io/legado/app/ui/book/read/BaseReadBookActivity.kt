@@ -28,7 +28,6 @@ import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.ThemeStore
-import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.model.CacheBook
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.config.BgTextConfigDialog
@@ -96,7 +95,7 @@ abstract class BaseReadBookActivity :
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
-        binding.navigationBar.setBackgroundColor(bottomBackground)
+        updateNavigationSpacerBackground()
         viewModel.permissionDenialLiveData.observe(this) {
             selectBookFolderResult.launch {
                 mode = HandleFileContract.DIR_SYS
@@ -233,7 +232,14 @@ abstract class BaseReadBookActivity :
 
     @SuppressLint("RtlHardcoded")
     private fun upNavigationBar() {
+        updateNavigationSpacerBackground()
         binding.navigationBar.gone(!menuLayoutIsVisible)
+    }
+
+    private fun updateNavigationSpacerBackground() {
+        binding.navigationBar.setBackgroundColor(
+            ColorUtils.withAlpha(ThemeStore.navigationBarColor(this), 1f)
+        )
     }
 
     /**

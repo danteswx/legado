@@ -71,8 +71,6 @@ import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.buttonDisabledColor
 import io.legado.app.lib.theme.getPrimaryTextColor
-import io.legado.app.lib.theme.primaryColor
-import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.lib.theme.view.ThemeSwitch
 import io.legado.app.model.ReadAloud
 import io.legado.app.model.ReadBook
@@ -414,28 +412,23 @@ class ReadMenu @JvmOverloads constructor(
         bindEvent()
     }
 
-    private fun initView(reset: Boolean = false) = binding.run {
+    private fun initView() = binding.run {
         initAnimation()
         setupExpandableBottomTabContainer()
         setupSearchPanel()
         setupTocPanel()
         setupAloudPanel()
-        if (immersiveMenu) {
-            val lightTextColor = ColorUtils.withAlpha(ColorUtils.lightenColor(textColor), 0.75f)
-            titleBar.setTextColor(textColor)
-            titleBar.setBackgroundColor(bgColor)
-            titleBar.setColorFilter(textColor)
-            tvChapterName.setTextColor(lightTextColor)
-            tvChapterUrl.setTextColor(lightTextColor)
-        } else if (reset) {
-            val bgColor = context.primaryColor
-            val textColor = context.primaryTextColor
-            titleBar.setTextColor(textColor)
-            titleBar.setBackgroundColor(bgColor)
-            titleBar.setColorFilter(textColor)
-            tvChapterName.setTextColor(textColor)
-            tvChapterUrl.setTextColor(textColor)
+        val topBarTextColor = textColor
+        val additionTextColor = if (immersiveMenu) {
+            ColorUtils.withAlpha(ColorUtils.lightenColor(topBarTextColor), 0.75f)
+        } else {
+            topBarTextColor
         }
+        titleBar.setTextColor(topBarTextColor)
+        titleBar.setBackgroundColor(ColorUtils.withAlpha(bgColor, 1f))
+        titleBar.setColorFilter(topBarTextColor)
+        tvChapterName.setTextColor(additionTextColor)
+        tvChapterUrl.setTextColor(additionTextColor)
         if (AppConfig.isEInkMode) {
             titleBar.setBackgroundResource(R.drawable.bg_eink_border_bottom)
         }
@@ -516,7 +509,7 @@ class ReadMenu @JvmOverloads constructor(
 
     fun reset() {
         upColorConfig()
-        initView(true)
+        initView()
     }
 
     fun refreshMenuColorFilter() {

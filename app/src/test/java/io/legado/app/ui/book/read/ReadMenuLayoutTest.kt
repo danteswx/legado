@@ -338,6 +338,26 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun readMenuTopBarAlwaysGetsOpaqueMenuSurface() {
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val initBlock = readMenu.substringAfter("private fun initView")
+            .substringBefore("if (AppConfig.isEInkMode)")
+
+        assertTrue(initBlock.contains("titleBar.setBackgroundColor(ColorUtils.withAlpha(bgColor, 1f))"))
+        assertFalse(initBlock.contains("} else if (reset) {"))
+    }
+
+    @Test
+    fun readerNavigationSpacerUsesThemeNavigationSurface() {
+        val activityLayout = parseXml(repoFile("app/src/main/res/layout/activity_book_read.xml"))
+        val baseReadActivity = repoFile("app/src/main/java/io/legado/app/ui/book/read/BaseReadBookActivity.kt").readText()
+
+        assertEquals("", activityLayout.elementById("navigation_bar").androidAttr("background"))
+        assertTrue(baseReadActivity.contains("binding.navigationBar.setBackgroundColor("))
+        assertTrue(baseReadActivity.contains("ColorUtils.withAlpha(ThemeStore.navigationBarColor(this), 1f)"))
+    }
+
+    @Test
     fun tocDownloadButtonShowsPendingStateAndRefreshesWhenDownloadFinishes() {
         val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
         val readBook = repoFile("app/src/main/java/io/legado/app/model/ReadBook.kt").readText()
