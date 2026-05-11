@@ -8,6 +8,7 @@ import android.view.MenuItem
 import android.widget.PopupWindow
 import android.view.SubMenu
 import android.view.View
+import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.SearchView
 import androidx.core.os.bundleOf
 import androidx.core.view.isGone
@@ -15,6 +16,7 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.script.rhino.runScriptWithContext
@@ -97,7 +99,6 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private val adapter by lazy { ExploreAdapter(requireContext(), this) }
     private val discoverBookAdapter by lazy { ExploreShowAdapter(requireContext(), this) }
     private val linearLayoutManager by lazy { LinearLayoutManager(context) }
-    private val discoverBookLayoutManager by lazy { LinearLayoutManager(requireContext()) }
     private val searchView: SearchView? by lazy {
         binding.titleBar.findViewById<SearchView?>(R.id.search_view)
     }
@@ -137,6 +138,12 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private var discoverLoadingSignals = 0
     private var discoverLoadingGeneration = 0L
     private var discoveryModeLoaded = false
+
+    private companion object {
+        const val MENU_DISCOVER_LOGIN = 1
+        const val MENU_DISCOVER_SWITCH_LAYOUT = 2
+        const val DISCOVER_LAYOUT_COUNT = 3
+    }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         setSupportToolbar(binding.titleBar.toolbar)
@@ -398,7 +405,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             selectedDiscoverMajorGroup = group
             applyDiscoverTagFilterAndSelect(preferredUrl = discoverCurrentUrl)
         }
-        binding.rvDiscoverBooks.layoutManager = discoverBookLayoutManager
+        applyDiscoverBookLayout()
         binding.rvDiscoverBooks.adapter = discoverBookAdapter
         binding.rvDiscoverBooks.setEdgeEffectColor(primaryColor)
         binding.rvDiscoverBooks.addOnScrollListener(object : RecyclerView.OnScrollListener() {
@@ -420,14 +427,14 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         binding.llDiscoverSourceSelect.setOnClickListener {
             showDiscoverSourceMenu()
         }
-        binding.btnDiscoverSourceLogin.setOnClickListener {
-            openSelectedSourceLogin()
-        }
         binding.btnDiscoverSourceSearch.setOnClickListener {
             openDiscoverSearch()
         }
         binding.btnDiscoverTagFilter.setOnClickListener {
             showDiscoverSettingsDialog()
+        }
+        binding.btnDiscoverMore.setOnClickListener {
+            showDiscoverMoreMenu()
         }
         updateDiscoverTagFilterButtonState()
         updateDiscoverSearchButtonState()
@@ -439,7 +446,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         val actionsWidth = listOf(
             binding.btnDiscoverSourceSearch,
             binding.btnDiscoverTagFilter,
-            binding.btnDiscoverSourceLogin
+            binding.btnDiscoverMore
         ).filter { it.isVisible }.sumOf { it.measuredWidth.takeIf { width -> width > 0 } ?: it.layoutParams.width }
         val spacing = 36.dpToPx()
         val maxWidth = (rowWidth - actionsWidth - spacing).coerceIn(96.dpToPx(), 190.dpToPx())
@@ -461,9 +468,50 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     }
 
     private fun updateDiscoverLoginButtonState() {
-        val canLogin = selectedDiscoverSourcePart?.hasLoginUrl == true
-        binding.btnDiscoverSourceLogin.isEnabled = canLogin
-        binding.btnDiscoverSourceLogin.alpha = if (canLogin) 1f else 0.45f
+        binding.btnDiscoverMore.alpha = 1f
+        binding.llDiscoverSourceRow.post(::updateDiscoverSourceNameWidth)
+    }
+
+    private fun showDiscoverMoreMenu() {
+        PopupMenu(requireContext(), binding.btnDiscoverMore).apply {
+            menu.add(Menu.NONE, MENU_DISCOVER_LOGIN, Menu.NONE, R.string.login).apply {
+                isEnabled = selectedDiscoverSourcePart?.hasLoginUrl == true
+                setIcon(R.drawable.ic_bottom_person)
+            }
+            menu.add(Menu.NONE, MENU_DISCOVER_SWITCH_LAYOUT, Menu.NONE, R.string.switchLayout).apply {
+                setIcon(R.drawable.ic_view_quilt)
+            }
+            setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    MENU_DISCOVER_LOGIN -> {
+                        openSelectedSourceLogin()
+                        true
+                    }
+                    MENU_DISCOVER_SWITCH_LAYOUT -> {
+                        switchDiscoverBookLayout()
+                        true
+                    }
+                    else -> false
+                }
+            }
+            show()
+        }
+    }
+
+    private fun switchDiscoverBookLayout() {
+        AppConfig.modernDiscoveryLayout = (AppConfig.modernDiscoveryLayout + 1) % DISCOVER_LAYOUT_COUNT
+        applyDiscoverBookLayout()
+    }
+
+    private fun applyDiscoverBookLayout() {
+        val style = AppConfig.modernDiscoveryLayout
+        discoverBookAdapter.layoutStyle = style
+        binding.rvDiscoverBooks.layoutManager = when (style) {
+            1 -> GridLayoutManager(requireContext(), 2)
+            2 -> GridLayoutManager(requireContext(), 3)
+            else -> LinearLayoutManager(requireContext())
+        }
+        discoverBookAdapter.notifyDataSetChanged()
     }
 
     private fun updateDiscoverSearchButtonState() {

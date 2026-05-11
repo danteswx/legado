@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.AttributeSet
 import android.widget.LinearLayout
 import android.widget.TextView
+import io.legado.app.lib.theme.uiTypeface
 import io.legado.app.ui.widget.text.AccentBgTextView
 import io.legado.app.utils.dpToPx
 
@@ -35,6 +36,7 @@ class LabelsBar @JvmOverloads constructor(
             AccentBgTextView(context, null).apply {
                 setPadding(3.dpToPx(), 0, 3.dpToPx(), 0)
                 setRadius(2)
+                typeface = context.uiTypeface()
                 val lp = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
                 lp.setMargins(0, 0, 2.dpToPx(), 0)
                 layoutParams = lp
@@ -46,6 +48,7 @@ class LabelsBar @JvmOverloads constructor(
             unUsedViews.last().apply {
                 usedViews.add(this)
                 unUsedViews.removeAt(unUsedViews.lastIndex)
+                typeface = context.uiTypeface()
             }
         }
         tv.textSize = textSize

@@ -4,10 +4,12 @@ import android.content.Context
 import android.os.Bundle
 import android.view.ViewGroup
 import androidx.core.view.isVisible
+import androidx.viewbinding.ViewBinding
 import io.legado.app.R
 import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.data.entities.SearchBook
+import io.legado.app.databinding.ItemExploreBookGridBinding
 import io.legado.app.databinding.ItemSearchBinding
 import io.legado.app.help.config.AppConfig
 import io.legado.app.utils.gone
@@ -15,30 +17,46 @@ import io.legado.app.utils.visible
 
 
 class ExploreShowAdapter(context: Context, val callBack: CallBack) :
-    RecyclerAdapter<SearchBook, ItemSearchBinding>(context) {
+    RecyclerAdapter<SearchBook, ViewBinding>(context) {
 
-    override fun getViewBinding(parent: ViewGroup): ItemSearchBinding {
-        return ItemSearchBinding.inflate(inflater, parent, false)
+    var layoutStyle: Int = 0
+
+    override fun getViewBinding(parent: ViewGroup): ViewBinding {
+        return when (layoutStyle) {
+            1, 2 -> ItemExploreBookGridBinding.inflate(inflater, parent, false)
+            else -> ItemSearchBinding.inflate(inflater, parent, false)
+        }
+    }
+
+    override fun getItemViewType(item: SearchBook, position: Int): Int {
+        return layoutStyle
     }
 
     override fun convert(
         holder: ItemViewHolder,
-        binding: ItemSearchBinding,
+        binding: ViewBinding,
         item: SearchBook,
         payloads: MutableList<Any>
     ) {
-        if (payloads.isEmpty()) {
-            bind(binding, item)
-        } else {
-            for (i in payloads.indices) {
-                val bundle = payloads[i] as Bundle
-                bindChange(binding, item, bundle)
+        when (binding) {
+            is ItemSearchBinding -> {
+                if (payloads.isEmpty()) {
+                    bindList(binding, item)
+                } else {
+                    for (i in payloads.indices) {
+                        val bundle = payloads[i] as Bundle
+                        bindListChange(binding, item, bundle)
+                    }
+                }
+            }
+            is ItemExploreBookGridBinding -> {
+                bindGrid(binding, item)
             }
         }
 
     }
 
-    private fun bind(binding: ItemSearchBinding, item: SearchBook) {
+    private fun bindList(binding: ItemSearchBinding, item: SearchBook) {
         binding.run {
             tvName.text = item.name
             tvAuthor.text = context.getString(R.string.author_show, item.author)
@@ -64,7 +82,40 @@ class ExploreShowAdapter(context: Context, val callBack: CallBack) :
         }
     }
 
-    private fun bindChange(binding: ItemSearchBinding, item: SearchBook, bundle: Bundle) {
+    private fun bindGrid(binding: ItemExploreBookGridBinding, item: SearchBook) {
+        binding.run {
+            val isCompact = layoutStyle == 2
+            tvName.text = item.name
+            tvAuthor.text = context.getString(R.string.author_show, item.author)
+            if (item.latestChapterTitle.isNullOrEmpty()) {
+                tvLasted.gone()
+            } else {
+                tvLasted.text = context.getString(R.string.lasted_show, item.latestChapterTitle)
+                tvLasted.visible()
+            }
+            val kinds = item.getKindList()
+            if (isCompact || kinds.isEmpty()) {
+                llKind.gone()
+            } else {
+                llKind.visible()
+                llKind.textSize = 11f
+                llKind.setLabels(kinds.take(3))
+            }
+            if (isCompact) {
+                tvIntroduce.gone()
+            } else {
+                tvIntroduce.text = item.trimIntro(context)
+                tvIntroduce.visible()
+            }
+            ivInBookshelf.isVisible = callBack.isInBookshelf(item)
+            ivCover.load(
+                item,
+                AppConfig.loadCoverOnlyWifi
+            )
+        }
+    }
+
+    private fun bindListChange(binding: ItemSearchBinding, item: SearchBook, bundle: Bundle) {
         binding.run {
             bundle.keySet().forEach {
                 when (it) {
@@ -75,7 +126,7 @@ class ExploreShowAdapter(context: Context, val callBack: CallBack) :
         }
     }
 
-    override fun registerListener(holder: ItemViewHolder, binding: ItemSearchBinding) {
+    override fun registerListener(holder: ItemViewHolder, binding: ViewBinding) {
         holder.itemView.setOnClickListener {
             getItem(holder.bindingAdapterPosition - getHeaderCount())?.let {
                 callBack.showBookInfo(it)

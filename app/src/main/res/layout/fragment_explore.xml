@@ -121,14 +121,14 @@
                         android:layout_height="1dp" />
 
                     <androidx.appcompat.widget.AppCompatImageButton
-                        android:id="@+id/btn_discover_source_login"
+                        android:id="@+id/btn_discover_more"
                         android:layout_width="@dimen/bookshelf_action_button_size"
                         android:layout_height="@dimen/bookshelf_action_button_size"
                         android:background="@drawable/bg_discover_embedded_action"
-                        android:contentDescription="@string/login"
+                        android:contentDescription="@string/menu"
                         android:padding="@dimen/bookshelf_action_button_padding"
                         android:scaleType="centerInside"
-                        android:src="@drawable/ic_bottom_person"
+                        android:src="@drawable/ic_more_vert"
                         android:tint="@color/primaryText" />
 
                 </LinearLayout>

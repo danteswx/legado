@@ -1003,27 +1003,37 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             val blurRadius = if (frostedMode) {
                 (10f + glassLevel * 24f).dpToPx()
             } else {
-                (5f + glassLevel * 14f).dpToPx()
+                5f.dpToPx()
             }
             val tintAlpha = if (frostedMode) {
                 0.12f + glassLevel * 0.18f
             } else {
-                0.05f + glassLevel * 0.10f
+                0.05f
             }
             val dispersion = if (frostedMode) {
                 (0.18f + glassLevel * 0.16f).coerceAtMost(0.42f)
             } else {
-                0.46f + glassLevel * 0.32f
+                0f
+            }
+            val searchButtonDispersion = if (frostedMode) {
+                (dispersion + 0.04f).coerceAtMost(1f)
+            } else {
+                dispersion
+            }
+            val indicatorDispersion = if (frostedMode) {
+                (dispersion + 0.08f).coerceAtMost(1f)
+            } else {
+                dispersion
             }
             val refractionHeight = if (frostedMode) {
                 (12f + glassLevel * 10f).dpToPx()
             } else {
-                (18f + glassLevel * 14f).dpToPx()
+                12f.dpToPx()
             }
             val refractionOffset = if (frostedMode) {
                 (36f + glassLevel * 18f).dpToPx()
             } else {
-                (72f + glassLevel * 34f).dpToPx()
+                20f.dpToPx()
             }
             bottomNavigationShellOverlay.background = createLiquidGlassShellDrawable(
                 glassLevel = glassLevel,
@@ -1060,7 +1070,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
                 refractionHeight = refractionHeight,
                 refractionOffset = refractionOffset,
                 blurRadius = blurRadius,
-                dispersion = (dispersion + 0.04f).coerceAtMost(1f),
+                dispersion = searchButtonDispersion,
                 tintAlpha = tintAlpha,
                 elasticEnabled = true,
                 touchEffectEnabled = true
@@ -1071,7 +1081,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
                 refractionHeight = (refractionHeight * 0.9f).coerceAtLeast(16f.dpToPx()),
                 refractionOffset = (refractionOffset * 0.72f).coerceAtLeast(46f.dpToPx()),
                 blurRadius = (blurRadius * 0.78f).coerceAtLeast(5f.dpToPx()),
-                dispersion = (dispersion + 0.08f).coerceAtMost(1f),
+                dispersion = indicatorDispersion,
                 tintAlpha = (tintAlpha + 0.05f).coerceAtMost(0.28f),
                 elasticEnabled = true,
                 touchEffectEnabled = true
