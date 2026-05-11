@@ -82,6 +82,8 @@
     <dimen name="bookshelf_action_button_size">34dp</dimen>
     <dimen name="bookshelf_action_button_margin_end">16dp</dimen>
     <dimen name="bookshelf_action_button_padding">8dp</dimen>
+    <dimen name="discover_top_action_button_size">48dp</dimen>
+    <dimen name="discover_top_action_button_padding">12dp</dimen>
     <dimen name="bookshelf_title_row_margin_start">16dp</dimen>
     <dimen name="bookshelf_title_row_margin_top">8dp</dimen>
     <dimen name="bookshelf_title_row_margin_end">10dp</dimen>

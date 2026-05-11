@@ -82,7 +82,7 @@ object RowUiViewFactory {
     }
 
     fun bindSelectTitle(rowUi: RowUi, binding: ItemSelectorSingleBinding) {
-        val displayName = rowUi.name.takeIf { it.isNotBlank() }
+        val displayName = (rowUi.viewName ?: rowUi.name).takeIf { it.isNotBlank() }
         binding.spName.text = displayName?.let { "$it:" }.orEmpty()
         binding.spName.visibility = if (displayName.isNullOrBlank()) {
             View.GONE

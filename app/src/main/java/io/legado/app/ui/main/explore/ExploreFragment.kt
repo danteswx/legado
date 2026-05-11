@@ -142,7 +142,10 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private companion object {
         const val MENU_DISCOVER_LOGIN = 1
         const val MENU_DISCOVER_SWITCH_LAYOUT = 2
-        const val DISCOVER_LAYOUT_COUNT = 3
+        const val DISCOVER_LAYOUT_LIST = 0
+        const val DISCOVER_LAYOUT_GRID = 1
+        private const val DISCOVER_GRID_COLUMNS_SETTING_NAME = "discover_grid_columns"
+        private val DISCOVER_GRID_COLUMN_VALUES = arrayOf<String?>("2", "3", "4")
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
@@ -430,6 +433,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         binding.btnDiscoverSourceSearch.setOnClickListener {
             openDiscoverSearch()
         }
+        binding.btnDiscoverLayoutToggle.setOnClickListener {
+            switchDiscoverBookLayout()
+        }
         binding.btnDiscoverTagFilter.setOnClickListener {
             showDiscoverSettingsDialog()
         }
@@ -445,10 +451,17 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         if (rowWidth <= 0) return
         val actionsWidth = listOf(
             binding.btnDiscoverSourceSearch,
+            binding.btnDiscoverLayoutToggle,
             binding.btnDiscoverTagFilter,
             binding.btnDiscoverMore
         ).filter { it.isVisible }.sumOf { it.measuredWidth.takeIf { width -> width > 0 } ?: it.layoutParams.width }
-        val spacing = 36.dpToPx()
+        val visibleActionCount = listOf(
+            binding.btnDiscoverSourceSearch,
+            binding.btnDiscoverLayoutToggle,
+            binding.btnDiscoverTagFilter,
+            binding.btnDiscoverMore
+        ).count { it.isVisible }
+        val spacing = (16 + (visibleActionCount - 1).coerceAtLeast(0) * 10).dpToPx()
         val maxWidth = (rowWidth - actionsWidth - spacing).coerceIn(96.dpToPx(), 190.dpToPx())
         if (binding.tvDiscoverSourceSelect.maxWidth != maxWidth) {
             binding.tvDiscoverSourceSelect.maxWidth = maxWidth
@@ -499,19 +512,48 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     }
 
     private fun switchDiscoverBookLayout() {
-        AppConfig.modernDiscoveryLayout = (AppConfig.modernDiscoveryLayout + 1) % DISCOVER_LAYOUT_COUNT
+        val currentStyle = normalizeDiscoverBookLayout(AppConfig.modernDiscoveryLayout)
+        val nextStyle = if (currentStyle == DISCOVER_LAYOUT_LIST) {
+            DISCOVER_LAYOUT_GRID
+        } else {
+            DISCOVER_LAYOUT_LIST
+        }
+        AppConfig.modernDiscoveryLayout = nextStyle
         applyDiscoverBookLayout()
     }
 
     private fun applyDiscoverBookLayout() {
-        val style = AppConfig.modernDiscoveryLayout
+        val style = normalizeDiscoverBookLayout(AppConfig.modernDiscoveryLayout)
+        if (AppConfig.modernDiscoveryLayout != style) {
+            AppConfig.modernDiscoveryLayout = style
+        }
         discoverBookAdapter.layoutStyle = style
+        discoverBookAdapter.gridColumns = AppConfig.modernDiscoveryGridColumns
         binding.rvDiscoverBooks.layoutManager = when (style) {
-            1 -> GridLayoutManager(requireContext(), 2)
-            2 -> GridLayoutManager(requireContext(), 3)
+            DISCOVER_LAYOUT_GRID -> GridLayoutManager(requireContext(), AppConfig.modernDiscoveryGridColumns)
             else -> LinearLayoutManager(requireContext())
         }
+        updateDiscoverLayoutToggleIcon(style)
+        updateDiscoverTagFilterButtonState()
         discoverBookAdapter.notifyDataSetChanged()
+    }
+
+    private fun normalizeDiscoverBookLayout(style: Int): Int {
+        return if (style == DISCOVER_LAYOUT_LIST) {
+            DISCOVER_LAYOUT_LIST
+        } else {
+            DISCOVER_LAYOUT_GRID
+        }
+    }
+
+    private fun updateDiscoverLayoutToggleIcon(style: Int) {
+        binding.btnDiscoverLayoutToggle.setImageResource(
+            if (style == DISCOVER_LAYOUT_LIST) {
+                R.drawable.ic_lucide_layout_grid
+            } else {
+                R.drawable.ic_lucide_layout_list
+            }
+        )
     }
 
     private fun updateDiscoverSearchButtonState() {
@@ -836,9 +878,11 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     private fun updateDiscoverTagFilterButtonState() {
         val enabled = discoverSettingItems.isNotEmpty()
+                || normalizeDiscoverBookLayout(AppConfig.modernDiscoveryLayout) == DISCOVER_LAYOUT_GRID
         binding.btnDiscoverTagFilter.isVisible = enabled
         binding.btnDiscoverTagFilter.isEnabled = enabled
         binding.btnDiscoverTagFilter.alpha = if (enabled) 1f else 0.45f
+        binding.llDiscoverSourceRow.post(::updateDiscoverSourceNameWidth)
     }
 
     private fun buildDiscoverSettingItems(): List<DiscoverTagItem> {
@@ -851,22 +895,26 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     }
 
     private fun showDiscoverSettingsDialog() {
-        if (discoverSettingItems.isEmpty()) return
+        val rows = buildDiscoverSettingsRows()
+        if (rows.isEmpty()) return
         val itemMap = discoverSettingItems.associateBy { it.toDiscoverRowUi().name }
         RowUiDialog.show(
             requireContext(),
             RowUiDialog.Config(
                 title = getString(R.string.discovery_settings_title),
-                rows = discoverSettingItems.map { it.toDiscoverRowUi() },
-                values = discoverSettingItems.associate {
-                    it.toDiscoverRowUi().name to currentDiscoverSelectValue(it)
-                },
+                rows = rows,
+                values = buildDiscoverSettingsValues(),
                 dismissOnAction = true,
                 dismissOnSelect = true,
                 dismissOnToggle = false
             ),
             object : RowUiDialog.Callback {
                 override fun onValueChanged(rowUi: RowUi, value: String) {
+                    if (rowUi.name == DISCOVER_GRID_COLUMNS_SETTING_NAME) {
+                        AppConfig.modernDiscoveryGridColumns = value.toIntOrNull() ?: return
+                        applyDiscoverBookLayout()
+                        return
+                    }
                     val item = itemMap[rowUi.name] ?: return
                     when (rowUi.type) {
                         RowUi.Type.select -> handleDiscoverSelectValue(item, value)
@@ -882,6 +930,36 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     }
                 }
             }
+        )
+    }
+
+    private fun buildDiscoverSettingsRows(): List<RowUi> {
+        return buildList {
+            if (normalizeDiscoverBookLayout(AppConfig.modernDiscoveryLayout) == DISCOVER_LAYOUT_GRID) {
+                add(discoverGridColumnsRow())
+            }
+            addAll(discoverSettingItems.map { it.toDiscoverRowUi() })
+        }
+    }
+
+    private fun buildDiscoverSettingsValues(): Map<String, String> {
+        return buildMap {
+            if (normalizeDiscoverBookLayout(AppConfig.modernDiscoveryLayout) == DISCOVER_LAYOUT_GRID) {
+                put(DISCOVER_GRID_COLUMNS_SETTING_NAME, AppConfig.modernDiscoveryGridColumns.toString())
+            }
+            putAll(discoverSettingItems.associate {
+                it.toDiscoverRowUi().name to currentDiscoverSelectValue(it)
+            })
+        }
+    }
+
+    private fun discoverGridColumnsRow(): RowUi {
+        return RowUi(
+            name = DISCOVER_GRID_COLUMNS_SETTING_NAME,
+            type = RowUi.Type.select,
+            chars = DISCOVER_GRID_COLUMN_VALUES,
+            default = AppConfig.modernDiscoveryGridColumns.toString(),
+            viewName = getString(R.string.discover_grid_columns)
         )
     }
 

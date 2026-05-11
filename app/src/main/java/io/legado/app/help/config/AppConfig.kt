@@ -344,6 +344,10 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefInt(PreferKey.modernDiscoveryLayout, 0).coerceIn(0, 2)
         set(value) = appCtx.putPrefInt(PreferKey.modernDiscoveryLayout, value.coerceIn(0, 2))
 
+    var modernDiscoveryGridColumns: Int
+        get() = appCtx.getPrefInt(PreferKey.modernDiscoveryGridColumns, 2).coerceIn(2, 4)
+        set(value) = appCtx.putPrefInt(PreferKey.modernDiscoveryGridColumns, value.coerceIn(2, 4))
+
     var modernRssSourceUrl: String?
         get() = appCtx.getPrefString(PreferKey.modernRssSourceUrl)
         set(value) {

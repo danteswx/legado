@@ -91,11 +91,11 @@
 
                     <androidx.appcompat.widget.AppCompatImageButton
                         android:id="@+id/btn_discover_source_search"
-                        android:layout_width="@dimen/bookshelf_action_button_size"
-                        android:layout_height="@dimen/bookshelf_action_button_size"
+                        android:layout_width="@dimen/discover_top_action_button_size"
+                        android:layout_height="@dimen/discover_top_action_button_size"
                         android:background="@drawable/bg_discover_embedded_action"
                         android:contentDescription="@string/search"
-                        android:padding="@dimen/bookshelf_action_button_padding"
+                        android:padding="@dimen/discover_top_action_button_padding"
                         android:scaleType="centerInside"
                         android:src="@drawable/ic_search"
                         android:tint="@color/primaryText"
@@ -106,14 +106,29 @@
                         android:layout_height="1dp" />
 
                     <androidx.appcompat.widget.AppCompatImageButton
+                        android:id="@+id/btn_discover_layout_toggle"
+                        android:layout_width="@dimen/discover_top_action_button_size"
+                        android:layout_height="@dimen/discover_top_action_button_size"
+                        android:background="@drawable/bg_discover_embedded_action"
+                        android:contentDescription="@string/switchLayout"
+                        android:padding="@dimen/discover_top_action_button_padding"
+                        android:scaleType="centerInside"
+                        android:src="@drawable/ic_lucide_layout_grid"
+                        android:tint="@color/primaryText" />
+
+                    <Space
+                        android:layout_width="10dp"
+                        android:layout_height="1dp" />
+
+                    <androidx.appcompat.widget.AppCompatImageButton
                         android:id="@+id/btn_discover_tag_filter"
-                        android:layout_width="@dimen/bookshelf_action_button_size"
-                        android:layout_height="@dimen/bookshelf_action_button_size"
+                        android:layout_width="@dimen/discover_top_action_button_size"
+                        android:layout_height="@dimen/discover_top_action_button_size"
                         android:background="@drawable/bg_discover_embedded_action"
                         android:contentDescription="@string/setting"
-                        android:padding="@dimen/bookshelf_action_button_padding"
+                        android:padding="@dimen/discover_top_action_button_padding"
                         android:scaleType="centerInside"
-                        android:src="@drawable/ic_settings"
+                        android:src="@drawable/ic_lucide_settings"
                         android:tint="@color/primaryText" />
 
                     <Space
@@ -122,11 +137,11 @@
 
                     <androidx.appcompat.widget.AppCompatImageButton
                         android:id="@+id/btn_discover_more"
-                        android:layout_width="@dimen/bookshelf_action_button_size"
-                        android:layout_height="@dimen/bookshelf_action_button_size"
+                        android:layout_width="@dimen/discover_top_action_button_size"
+                        android:layout_height="@dimen/discover_top_action_button_size"
                         android:background="@drawable/bg_discover_embedded_action"
                         android:contentDescription="@string/menu"
-                        android:padding="@dimen/bookshelf_action_button_padding"
+                        android:padding="@dimen/discover_top_action_button_padding"
                         android:scaleType="centerInside"
                         android:src="@drawable/ic_more_vert"
                         android:tint="@color/primaryText" />

@@ -1144,6 +1144,7 @@
     <string name="modern_discovery_page_summary">Use source selector + tag tabs + in-page discovery book list</string>
     <string name="discovery_settings_title">Discovery settings</string>
     <string name="discovery_settings_summary">Configure discovery entrance and page style.</string>
+    <string name="discover_grid_columns">Items per row</string>
     <string name="subscription_settings_title">Subscription settings</string>
     <string name="subscription_settings_summary">Configure subscription entrance and page style.</string>
     <string name="discovery_subscription_settings_title">Discovery and subscriptions</string>

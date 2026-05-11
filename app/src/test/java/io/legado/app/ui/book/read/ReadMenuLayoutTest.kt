@@ -22,6 +22,84 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun discoverTopActionButtonsUseReaderToolbarScale() {
+        val layout = parseXml(repoFile("app/src/main/res/layout/fragment_explore.xml"))
+        val dimens = repoFile("app/src/main/res/values/dimens.xml").readText()
+
+        listOf(
+            "btn_discover_source_search",
+            "btn_discover_layout_toggle",
+            "btn_discover_tag_filter",
+            "btn_discover_more"
+        ).forEach { id ->
+            val button = layout.elementById(id)
+            assertEquals("@dimen/discover_top_action_button_size", button.androidAttr("layout_width"))
+            assertEquals("@dimen/discover_top_action_button_size", button.androidAttr("layout_height"))
+            assertEquals("@dimen/discover_top_action_button_padding", button.androidAttr("padding"))
+            assertEquals("centerInside", button.androidAttr("scaleType"))
+        }
+        assertTrue(dimens.contains("<dimen name=\"discover_top_action_button_size\">48dp</dimen>"))
+        assertTrue(dimens.contains("<dimen name=\"discover_top_action_button_padding\">12dp</dimen>"))
+    }
+
+    @Test
+    fun discoverTopActionLayoutToggleUsesLucideIconsBetweenSearchAndMenu() {
+        val layout = parseXml(repoFile("app/src/main/res/layout/fragment_explore.xml"))
+        val toggle = layout.elementById("btn_discover_layout_toggle")
+        val settings = layout.elementById("btn_discover_tag_filter")
+
+        assertTrue(layout.elementById("btn_discover_source_search").isBefore(toggle))
+        assertTrue(toggle.isBefore(settings))
+        assertTrue(toggle.isBefore(layout.elementById("btn_discover_more")))
+        assertEquals("@string/switchLayout", toggle.androidAttr("contentDescription"))
+        assertEquals("@drawable/ic_lucide_layout_grid", toggle.androidAttr("src"))
+        assertEquals("@drawable/ic_lucide_settings", settings.androidAttr("src"))
+        assertTrue(repoFile("app/src/main/res/drawable/ic_lucide_layout_grid.xml").exists())
+        assertTrue(repoFile("app/src/main/res/drawable/ic_lucide_layout_list.xml").exists())
+    }
+
+    @Test
+    fun discoverTopActionLayoutToggleSwitchesBetweenListAndGridOnly() {
+        val exploreFragment = repoFile("app/src/main/java/io/legado/app/ui/main/explore/ExploreFragment.kt").readText()
+
+        assertTrue(exploreFragment.contains("binding.btnDiscoverLayoutToggle.setOnClickListener"))
+        assertTrue(exploreFragment.contains("private fun switchDiscoverBookLayout()"))
+        assertTrue(exploreFragment.contains("const val DISCOVER_LAYOUT_LIST = 0"))
+        assertTrue(exploreFragment.contains("const val DISCOVER_LAYOUT_GRID = 1"))
+        assertTrue(exploreFragment.contains("R.drawable.ic_lucide_layout_grid"))
+        assertTrue(exploreFragment.contains("R.drawable.ic_lucide_layout_list"))
+        assertTrue(exploreFragment.contains("DISCOVER_LAYOUT_GRID -> GridLayoutManager(requireContext(), AppConfig.modernDiscoveryGridColumns)"))
+        assertFalse(exploreFragment.contains("DISCOVER_LAYOUT_COUNT = 3"))
+    }
+
+    @Test
+    fun discoverGridLayoutColumnsAreConfigurableFromSettings() {
+        val exploreFragment = repoFile("app/src/main/java/io/legado/app/ui/main/explore/ExploreFragment.kt").readText()
+        val exploreShowAdapter = repoFile("app/src/main/java/io/legado/app/ui/book/explore/ExploreShowAdapter.kt").readText()
+        val appConfig = repoFile("app/src/main/java/io/legado/app/help/config/AppConfig.kt").readText()
+        val preferKey = repoFile("app/src/main/java/io/legado/app/constant/PreferKey.kt").readText()
+        val rowUiViewFactory = repoFile("app/src/main/java/io/legado/app/ui/widget/RowUiViewFactory.kt").readText()
+        val defaultStrings = repoFile("app/src/main/res/values/strings.xml").readText()
+        val zhStrings = repoFile("app/src/main/res/values-zh/strings.xml").readText()
+
+        assertTrue(preferKey.contains("const val modernDiscoveryGridColumns = \"modernDiscoveryGridColumns\""))
+        assertTrue(appConfig.contains("var modernDiscoveryGridColumns: Int"))
+        assertTrue(appConfig.contains("get() = appCtx.getPrefInt(PreferKey.modernDiscoveryGridColumns, 2).coerceIn(2, 4)"))
+        assertTrue(exploreFragment.contains("private const val DISCOVER_GRID_COLUMNS_SETTING_NAME = \"discover_grid_columns\""))
+        assertTrue(exploreFragment.contains("private val DISCOVER_GRID_COLUMN_VALUES = arrayOf<String?>(\"2\", \"3\", \"4\")"))
+        assertTrue(exploreFragment.contains("name = DISCOVER_GRID_COLUMNS_SETTING_NAME"))
+        assertTrue(exploreFragment.contains("viewName = getString(R.string.discover_grid_columns)"))
+        assertTrue(exploreFragment.contains("AppConfig.modernDiscoveryGridColumns = value.toIntOrNull() ?: return"))
+        assertTrue(exploreFragment.contains("put(DISCOVER_GRID_COLUMNS_SETTING_NAME, AppConfig.modernDiscoveryGridColumns.toString())"))
+        assertTrue(exploreFragment.contains("discoverBookAdapter.gridColumns = AppConfig.modernDiscoveryGridColumns"))
+        assertTrue(exploreShowAdapter.contains("var gridColumns: Int = 2"))
+        assertTrue(exploreShowAdapter.contains("val isCompact = gridColumns >= 3"))
+        assertTrue(rowUiViewFactory.contains("rowUi.viewName ?: rowUi.name"))
+        assertTrue(defaultStrings.contains("<string name=\"discover_grid_columns\">Items per row</string>"))
+        assertTrue(zhStrings.contains("<string name=\"discover_grid_columns\">每行数量</string>"))
+    }
+
+    @Test
     fun primaryReadBottomMenuUsesOptionAOrder() {
         val menu = parseXml(repoFile("app/src/main/res/menu/read_bottom_primary.xml"))
         val items = menu.childElements("item")

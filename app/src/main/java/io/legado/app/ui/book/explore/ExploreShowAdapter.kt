@@ -20,6 +20,7 @@ class ExploreShowAdapter(context: Context, val callBack: CallBack) :
     RecyclerAdapter<SearchBook, ViewBinding>(context) {
 
     var layoutStyle: Int = 0
+    var gridColumns: Int = 2
 
     override fun getViewBinding(parent: ViewGroup): ViewBinding {
         return when (layoutStyle) {
@@ -84,7 +85,7 @@ class ExploreShowAdapter(context: Context, val callBack: CallBack) :
 
     private fun bindGrid(binding: ItemExploreBookGridBinding, item: SearchBook) {
         binding.run {
-            val isCompact = layoutStyle == 2
+            val isCompact = gridColumns >= 3
             tvName.text = item.name
             tvAuthor.text = context.getString(R.string.author_show, item.author)
             if (item.latestChapterTitle.isNullOrEmpty()) {
