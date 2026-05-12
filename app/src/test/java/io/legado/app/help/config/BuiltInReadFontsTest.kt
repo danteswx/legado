@@ -1,27 +1,38 @@
 package io.legado.app.help.config
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BuiltInReadFontsTest {
 
     @Test
-    fun sourceHanFontsResolveToVariableAssets() {
+    fun sourceHanSansResolvesToVariableAsset() {
         val sansPlan = BuiltInReadFonts.weightPlan(
             BuiltInReadFonts.uri("font/source_han_sans_cn_regular.otf"),
             875
-        )
-        val serifPlan = BuiltInReadFonts.weightPlan(
-            BuiltInReadFonts.uri(BuiltInReadFonts.SOURCE_HAN_SERIF_CN),
-            325
         )
 
         assertEquals("font/source_han_sans_sc_vf.otf", sansPlan?.assetPath)
         assertTrue(sansPlan?.variable == true)
         assertEquals(0f, sansPlan?.syntheticStrokeEm ?: -1f, 0f)
-        assertEquals("font/source_han_serif_sc_vf.otf", serifPlan?.assetPath)
-        assertTrue(serifPlan?.variable == true)
+    }
+
+    @Test
+    fun sourceHanSerifIsNotABuiltInReadFont() {
+        assertNull(
+            BuiltInReadFonts.weightPlan(
+                BuiltInReadFonts.uri("font/source_han_serif_cn_regular.otf"),
+                400
+            )
+        )
+        assertNull(
+            BuiltInReadFonts.weightPlan(
+                BuiltInReadFonts.uri("font/source_han_serif_sc_vf.otf"),
+                400
+            )
+        )
     }
 
     @Test

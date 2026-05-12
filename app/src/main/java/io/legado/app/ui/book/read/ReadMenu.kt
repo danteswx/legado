@@ -259,13 +259,6 @@ class ReadMenu @JvmOverloads constructor(
             ),
             FontSample(
                 newFontSampleCard(),
-                R.string.read_style_font_source,
-                builtInTypeface(BuiltInReadFonts.SOURCE_HAN_SERIF_CN),
-                { isBuiltInFontSelected(BuiltInReadFonts.SOURCE_HAN_SERIF_CN) },
-                { setBuiltInFont(BuiltInReadFonts.SOURCE_HAN_SERIF_CN) }
-            ),
-            FontSample(
-                newFontSampleCard(),
                 R.string.read_style_font_sans,
                 builtInTypeface(BuiltInReadFonts.SOURCE_HAN_SANS_CN),
                 { isBuiltInFontSelected(BuiltInReadFonts.SOURCE_HAN_SANS_CN) },
@@ -346,6 +339,13 @@ class ReadMenu @JvmOverloads constructor(
                 96.dpToPx(),
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply {
+                if (withEndMargin) {
+                    marginEnd = 8.dpToPx()
+                }
+            }
+            binding.llFontSampleRow.addView(card.root, params)
+        }
+    }
     private val pageAnimSampleBindings by lazy {
         listOf(
             PageAnimSample(newPageAnimSampleCard(), R.string.btn_default_s, null),
@@ -379,13 +379,6 @@ class ReadMenu @JvmOverloads constructor(
         }
     }
 
-                if (withEndMargin) {
-                    marginEnd = 8.dpToPx()
-                }
-            }
-            binding.llFontSampleRow.addView(card.root, params)
-        }
-    }
     private val backgroundSampleBindings by lazy {
         listOf(
             BackgroundSample(binding.backgroundCardBeach, "午后沙滩.jpg"),
@@ -943,6 +936,13 @@ class ReadMenu @JvmOverloads constructor(
                     settleTocPanelDrag()
                     tocDragHandle.parent.requestDisallowInterceptTouchEvent(false)
                     true
+                }
+
+                else -> false
+            }
+        }
+    }
+
     private fun settleTocPanelDrag() {
         val currentHeight = binding.flExpandedPanel.height
             .coerceIn(tocDefaultPanelHeight(), tocFullPanelHeight())
@@ -956,13 +956,6 @@ class ReadMenu @JvmOverloads constructor(
 
     private fun tocFullscreenThresholdHeight(): Int =
         (tocDefaultPanelHeight() + tocFullPanelHeight()) / 2
-
-                }
-
-                else -> false
-            }
-        }
-    }
 
     private fun setTocPanelPage(page: TocPanelPage) {
         if (tocPanelPage == page) {
@@ -3130,6 +3123,13 @@ class ReadMenu @JvmOverloads constructor(
 
     private fun updatePageTurnControls() = binding.run {
         updatePageAnimSampleCards()
+        configureOptionButton(panelPageAutoPage, false)
+        configureOptionButton(panelPageTouchSlop, AppConfig.pageTouchSlop > 0)
+        configureOptionButton(panelPageAnimSpeed, AppConfig.pageAnimationSpeed != 300)
+        configureOptionButton(panelPageVolumeKey, AppConfig.volumeKeyPage)
+        configureOptionButton(panelPageMouseWheel, AppConfig.mouseWheelPage)
+    }
+
     private fun updatePageAnimSampleCards() {
         val explicitAnim = ReadBook.book?.config?.pageAnim?.takeIf { it >= 0 }
         pageAnimSampleBindings.forEach { sample ->
@@ -3172,13 +3172,6 @@ class ReadMenu @JvmOverloads constructor(
         ReadBook.loadContent(resetPageOffset = false)
         updatePageTurnControls()
         updateThemePresetCards()
-    }
-
-        configureOptionButton(panelPageAutoPage, false)
-        configureOptionButton(panelPageTouchSlop, AppConfig.pageTouchSlop > 0)
-        configureOptionButton(panelPageAnimSpeed, AppConfig.pageAnimationSpeed != 300)
-        configureOptionButton(panelPageVolumeKey, AppConfig.volumeKeyPage)
-        configureOptionButton(panelPageMouseWheel, AppConfig.mouseWheelPage)
     }
 
     private fun updateThemeControlsFromConfig() = binding.run {
@@ -4827,6 +4820,13 @@ class ReadMenu @JvmOverloads constructor(
         fun onClickReadAloud()
         fun showHelp()
         fun showLogin()
+        fun payAction()
+        fun disableSource()
+        fun skipToChapter(index: Int)
+        fun onMenuShow()
+        fun onMenuHide()
+    }
+
     private class PageAnimPreviewDrawable(
         private val pageColor: Int,
         private val inkColor: Int,
@@ -5012,13 +5012,6 @@ class ReadMenu @JvmOverloads constructor(
 
         @Suppress("DEPRECATION")
         override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
-    }
-
-        fun payAction()
-        fun disableSource()
-        fun skipToChapter(index: Int)
-        fun onMenuShow()
-        fun onMenuHide()
     }
 
     private class ReadMenuTocAdapter(

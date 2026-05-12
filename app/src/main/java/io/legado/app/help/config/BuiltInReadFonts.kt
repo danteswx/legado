@@ -11,9 +11,7 @@ object BuiltInReadFonts {
     const val HARMONYOS_SANS_SC_MEDIUM = "font/harmonyos_sans_sc_medium.ttf"
     const val HARMONYOS_SANS_SC_BOLD = "font/harmonyos_sans_sc_bold.ttf"
     const val HARMONYOS_SANS_SC_BLACK = "font/harmonyos_sans_sc_black.ttf"
-    const val SOURCE_HAN_SERIF_CN = "font/source_han_serif_cn_regular.otf"
     const val SOURCE_HAN_SANS_CN = "font/source_han_sans_cn_regular.otf"
-    const val SOURCE_HAN_SERIF_SC_VF = "font/source_han_serif_sc_vf.otf"
     const val SOURCE_HAN_SANS_SC_VF = "font/source_han_sans_sc_vf.otf"
     const val WEN_YUAN_SANS_SC_VF = "font/wenyuan_sans_sc_vf.otf"
     const val MI_SANS_VF = "font/mi_sans_vf.ttf"
@@ -73,14 +71,6 @@ object BuiltInReadFonts {
             SOURCE_HAN_SANS_CN,
             SOURCE_HAN_SANS_SC_VF -> WeightPlan(
                 assetPath = SOURCE_HAN_SANS_SC_VF,
-                variable = true,
-                baseWeight = weight,
-                syntheticStrokeEm = 0f,
-            )
-
-            SOURCE_HAN_SERIF_CN,
-            SOURCE_HAN_SERIF_SC_VF -> WeightPlan(
-                assetPath = SOURCE_HAN_SERIF_SC_VF,
                 variable = true,
                 baseWeight = weight,
                 syntheticStrokeEm = 0f,

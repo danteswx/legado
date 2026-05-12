@@ -975,6 +975,22 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun builtInFontSamplesDoNotExposeSourceHanSerif() {
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val builtInFonts = repoFile("app/src/main/java/io/legado/app/help/config/BuiltInReadFonts.kt").readText()
+        val defaultStrings = repoFile("app/src/main/res/values/strings.xml").readText()
+        val zhStrings = repoFile("app/src/main/res/values-zh/strings.xml").readText()
+
+        assertFalse(readMenu.contains("read_style_font_source"))
+        assertFalse(readMenu.contains("SOURCE_HAN_SERIF"))
+        assertFalse(builtInFonts.contains("SOURCE_HAN_SERIF"))
+        assertFalse(defaultStrings.contains("read_style_font_source"))
+        assertFalse(zhStrings.contains("read_style_font_source"))
+        assertFalse(repoFile("app/src/main/assets/font/source_han_serif_cn_regular.otf").exists())
+        assertFalse(repoFile("app/src/main/assets/font/source_han_serif_sc_vf.otf").exists())
+    }
+
+    @Test
     fun chapterLayoutKeyIncludesTypefaceInputs() {
         val readBook = repoFile("app/src/main/java/io/legado/app/model/ReadBook.kt").readText()
 

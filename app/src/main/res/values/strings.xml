@@ -1858,7 +1858,6 @@ Current chapter: %4$s (chapter %5$d)
 Selected text or question:
 %6$s</string>
     <string name="compose_type">Typesetting</string>
-    <string name="read_style_font_source">Source Serif</string>
     <string name="read_style_font_sans">Source Sans</string>
     <string name="read_style_font_wenyuan_sans_vf">WenYuan Sans VF</string>
     <string name="read_style_font_mi_sans_vf">MiSans VF</string>
