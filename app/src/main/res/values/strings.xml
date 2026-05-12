@@ -1860,7 +1860,14 @@ Selected text or question:
     <string name="compose_type">Typesetting</string>
     <string name="read_style_font_source">Source Serif</string>
     <string name="read_style_font_sans">Source Sans</string>
-    <string name="read_style_font_art">ZCool Art</string>
+    <string name="read_style_font_wenyuan_sans_vf">WenYuan Sans VF</string>
+    <string name="read_style_font_mi_sans_vf">MiSans VF</string>
+    <string name="read_style_font_alimama_fang_yuan_ti_vf">Alimama FangYuanTi VF</string>
+    <string name="read_style_font_lxgw_wenkai_screen">LXGW WenKai Screen</string>
+    <string name="read_style_font_lxgw_neo_xihei">LXGW Neo XiHei</string>
+    <string name="read_style_font_lxgw_fasmart_gothic">LXGW Fasmart Gothic</string>
+    <string name="read_style_font_lxgw_zhenkai">LXGW ZhenKai</string>
+    <string name="read_style_font_harmonyos_sans">HarmonyOS Sans</string>
     <string name="read_style_font_custom">Custom Font</string>
     <string name="read_style_font_weight">Font weight</string>
     <string name="read_style_weight_standard">Standard / %d</string>

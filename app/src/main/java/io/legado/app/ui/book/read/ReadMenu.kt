@@ -57,6 +57,7 @@ import io.legado.app.databinding.ViewReadBackgroundCardBinding
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.config.AdvancedTitleConfig
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.BuiltInReadFonts
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ReadTipConfig
@@ -229,41 +230,114 @@ class ReadMenu @JvmOverloads constructor(
     private val fontSampleBindings by lazy {
         listOf(
             FontSample(
-                binding.fontCardSource,
-                R.string.read_style_font_source,
-                Typeface.SERIF,
+                newFontSampleCard(),
+                R.string.default_font,
+                Typeface.DEFAULT,
                 { ReadBookConfig.textFont.isBlank() && AppConfig.systemTypefaces == 0 },
                 { setSystemFont(0) }
             ),
             FontSample(
-                binding.fontCardSans,
+                newFontSampleCard(),
+                R.string.read_style_font_harmonyos_sans,
+                builtInTypeface(BuiltInReadFonts.HARMONYOS_SANS_SC),
+                { isBuiltInFontSelected(BuiltInReadFonts.HARMONYOS_SANS_SC) },
+                { setBuiltInFont(BuiltInReadFonts.HARMONYOS_SANS_SC) }
+            ),
+            FontSample(
+                newFontSampleCard(),
+                R.string.read_style_font_source,
+                builtInTypeface(BuiltInReadFonts.SOURCE_HAN_SERIF_CN),
+                { isBuiltInFontSelected(BuiltInReadFonts.SOURCE_HAN_SERIF_CN) },
+                { setBuiltInFont(BuiltInReadFonts.SOURCE_HAN_SERIF_CN) }
+            ),
+            FontSample(
+                newFontSampleCard(),
                 R.string.read_style_font_sans,
-                Typeface.SANS_SERIF,
-                { ReadBookConfig.textFont.isBlank() && AppConfig.systemTypefaces == 1 },
-                { setSystemFont(1) }
+                builtInTypeface(BuiltInReadFonts.SOURCE_HAN_SANS_CN),
+                { isBuiltInFontSelected(BuiltInReadFonts.SOURCE_HAN_SANS_CN) },
+                { setBuiltInFont(BuiltInReadFonts.SOURCE_HAN_SANS_CN) }
             ),
             FontSample(
-                binding.fontCardArt,
-                R.string.read_style_font_art,
-                Typeface.DEFAULT_BOLD,
-                { ReadBookConfig.textFont.isBlank() && AppConfig.systemTypefaces == 2 },
-                { setSystemFont(2) }
+                newFontSampleCard(),
+                R.string.read_style_font_wenyuan_sans_vf,
+                builtInTypeface(BuiltInReadFonts.WEN_YUAN_SANS_SC_VF),
+                { isBuiltInFontSelected(BuiltInReadFonts.WEN_YUAN_SANS_SC_VF) },
+                { setBuiltInFont(BuiltInReadFonts.WEN_YUAN_SANS_SC_VF) }
             ),
             FontSample(
-                binding.fontCardCustom,
-                R.string.read_style_font_custom,
-                Typeface.DEFAULT,
-                { ReadBookConfig.textFont.isNotBlank() },
-                { openFontSelectDialog() }
+                newFontSampleCard(),
+                R.string.read_style_font_mi_sans_vf,
+                builtInTypeface(BuiltInReadFonts.MI_SANS_VF),
+                { isBuiltInFontSelected(BuiltInReadFonts.MI_SANS_VF) },
+                { setBuiltInFont(BuiltInReadFonts.MI_SANS_VF) }
             ),
             FontSample(
-                binding.fontCardAddCustom,
+                newFontSampleCard(),
+                R.string.read_style_font_alimama_fang_yuan_ti_vf,
+                builtInTypeface(BuiltInReadFonts.ALIMAMA_FANG_YUAN_TI_VF),
+                { isBuiltInFontSelected(BuiltInReadFonts.ALIMAMA_FANG_YUAN_TI_VF) },
+                { setBuiltInFont(BuiltInReadFonts.ALIMAMA_FANG_YUAN_TI_VF) }
+            ),
+            FontSample(
+                newFontSampleCard(),
+                R.string.read_style_font_lxgw_wenkai_screen,
+                builtInTypeface(BuiltInReadFonts.LXGW_WENKAI_SCREEN),
+                { isBuiltInFontSelected(BuiltInReadFonts.LXGW_WENKAI_SCREEN) },
+                { setBuiltInFont(BuiltInReadFonts.LXGW_WENKAI_SCREEN) }
+            ),
+            FontSample(
+                newFontSampleCard(),
+                R.string.read_style_font_lxgw_neo_xihei,
+                builtInTypeface(BuiltInReadFonts.LXGW_NEO_XIHEI),
+                { isBuiltInFontSelected(BuiltInReadFonts.LXGW_NEO_XIHEI) },
+                { setBuiltInFont(BuiltInReadFonts.LXGW_NEO_XIHEI) }
+            ),
+            FontSample(
+                newFontSampleCard(),
+                R.string.read_style_font_lxgw_fasmart_gothic,
+                builtInTypeface(BuiltInReadFonts.LXGW_FASMART_GOTHIC),
+                { isBuiltInFontSelected(BuiltInReadFonts.LXGW_FASMART_GOTHIC) },
+                { setBuiltInFont(BuiltInReadFonts.LXGW_FASMART_GOTHIC) }
+            ),
+            FontSample(
+                newFontSampleCard(),
+                R.string.read_style_font_lxgw_zhenkai,
+                builtInTypeface(BuiltInReadFonts.LXGW_ZHENKAI_GB),
+                { isBuiltInFontSelected(BuiltInReadFonts.LXGW_ZHENKAI_GB) },
+                { setBuiltInFont(BuiltInReadFonts.LXGW_ZHENKAI_GB) }
+            ),
+            FontSample(
+                newFontSampleCard(false),
                 R.string.read_menu_add_custom_font,
                 Typeface.DEFAULT,
-                { false },
+                {
+                    ReadBookConfig.textFont.isNotBlank() &&
+                        BuiltInReadFonts.assetPath(ReadBookConfig.textFont) == null
+                },
                 { openFontSelectDialog() }
             )
         )
+    }
+
+    private fun newFontSampleCard(withEndMargin: Boolean = true): ViewReadThemeCardBinding {
+        return ViewReadThemeCardBinding.inflate(
+            LayoutInflater.from(context),
+            binding.llFontSampleRow,
+            false
+        ).also { card ->
+            card.themeCardPreview.updateLayoutParams<ViewGroup.LayoutParams> {
+                height = 82.dpToPx()
+            }
+            val params = LinearLayout.LayoutParams(
+                96.dpToPx(),
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                if (withEndMargin) {
+                    marginEnd = 8.dpToPx()
+                }
+            }
+            binding.llFontSampleRow.addView(card.root, params)
+        }
     }
     private val backgroundSampleBindings by lazy {
         listOf(
@@ -2837,7 +2911,7 @@ class ReadMenu @JvmOverloads constructor(
             when (mode) {
                 LayoutMarginAdjustMode.Body -> R.string.main_body
                 LayoutMarginAdjustMode.Text -> R.string.read_menu_text_style
-                LayoutMarginAdjustMode.Title -> R.string.body_title
+                LayoutMarginAdjustMode.Title -> R.string.title
                 LayoutMarginAdjustMode.Header -> R.string.read_menu_header
                 LayoutMarginAdjustMode.Footer -> R.string.read_menu_footer
             }
@@ -3353,6 +3427,23 @@ class ReadMenu @JvmOverloads constructor(
         postEvent(EventBus.UP_CONFIG, arrayListOf(2, 5))
     }
 
+    private fun setBuiltInFont(assetPath: String) {
+        ReadBookConfig.textFont = BuiltInReadFonts.uri(assetPath)
+        ReadBookConfig.save()
+        updateFontButtons()
+        postEvent(EventBus.UP_CONFIG, arrayListOf(2, 5))
+    }
+
+    private fun isBuiltInFontSelected(assetPath: String): Boolean {
+        return ReadBookConfig.textFont == BuiltInReadFonts.uri(assetPath)
+    }
+
+    private fun builtInTypeface(assetPath: String): Typeface {
+        return runCatching {
+            Typeface.createFromAsset(context.assets, assetPath)
+        }.getOrDefault(Typeface.DEFAULT)
+    }
+
     private fun updateFontButtons() = binding.run {
         updateFontSampleCards()
     }
@@ -3365,27 +3456,51 @@ class ReadMenu @JvmOverloads constructor(
 
     private fun bindFontSampleCard(sample: FontSample, selected: Boolean) {
         val card = sample.binding
+        if (sample.titleRes == R.string.read_menu_add_custom_font) {
+            bindFontAddCard(card)
+            return
+        }
+        val previewTextColor = ReadBookConfig.durConfig.curTextColor()
         card.themeCardPreview.background = roundedRect(
-            ColorUtils.adjustAlpha(textColor, if (selected) 0.18f else 0.06f),
+            currentBackgroundColor(),
             12f.dpToPx(),
             if (selected) 2.dpToPx() else 1.dpToPx(),
             if (selected) context.accentColor else ColorUtils.adjustAlpha(textColor, 0.14f)
         )
-        if (sample.titleRes == R.string.read_menu_add_custom_font) {
-            card.tvThemeCardTitle.text = "+"
-            card.tvThemeCardBody.setText(R.string.read_style_font_custom)
-        } else {
-            card.tvThemeCardTitle.text = context.getString(R.string.chapter_list)
-            card.tvThemeCardBody.text = "夜色微凉，星光洒落..."
-        }
+        card.tvThemeCardTitle.text = context.getString(R.string.chapter_list)
+        card.tvThemeCardBody.text = "夜色微凉，星光洒落..."
+        card.tvThemeCardBody.isVisible = true
+        card.tvThemeCardTitle.gravity = Gravity.NO_GRAVITY
+        card.tvThemeCardTitle.textSize = 13f
+        card.tvThemeCardTitle.includeFontPadding = true
         card.tvThemeCardLabel.setText(sample.titleRes)
         card.tvThemeCardTitle.typeface = sample.typeface
         card.tvThemeCardBody.typeface = sample.typeface
-        card.tvThemeCardTitle.setTextColor(textColor)
-        card.tvThemeCardBody.setTextColor(ColorUtils.adjustAlpha(textColor, 0.72f))
+        card.tvThemeCardTitle.setTextColor(previewTextColor)
+        card.tvThemeCardBody.setTextColor(ColorUtils.adjustAlpha(previewTextColor, 0.76f))
         card.tvThemeCardLabel.setTextColor(if (selected) context.accentColor else textColor)
         card.ivThemeCardCheck.background = roundedRect(context.accentColor, 13f.dpToPx())
         card.ivThemeCardCheck.isVisible = selected
+    }
+
+    private fun bindFontAddCard(card: ViewReadThemeCardBinding) {
+        card.themeCardPreview.background = roundedRect(
+            ColorUtils.adjustAlpha(textColor, 0.06f),
+            12f.dpToPx(),
+            1.dpToPx(),
+            ColorUtils.adjustAlpha(textColor, 0.14f)
+        )
+        card.tvThemeCardTitle.text = "+"
+        card.tvThemeCardBody.isGone = true
+        card.tvThemeCardLabel.setText(R.string.read_menu_add_custom_font)
+        card.tvThemeCardTitle.gravity = Gravity.CENTER
+        card.tvThemeCardTitle.textSize = 28f
+        card.tvThemeCardTitle.includeFontPadding = false
+        card.tvThemeCardTitle.typeface = Typeface.DEFAULT
+        card.tvThemeCardTitle.setTextColor(context.accentColor)
+        card.tvThemeCardLabel.setTextColor(textColor)
+        card.ivThemeCardCheck.isVisible = false
+        card.tvThemeCardBadge.isVisible = false
     }
 
     private fun updateBackgroundSampleCards() {

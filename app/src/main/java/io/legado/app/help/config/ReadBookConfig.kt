@@ -517,7 +517,7 @@ object ReadBookConfig {
         ZipUtils.unZipToPath(zipFile, configDir)
         val configFile = configDir.getFile(configFileName)
         val config: Config = GSON.fromJsonObject<Config>(configFile.readText()).getOrThrow()
-        if (config.textFont.isNotEmpty()) {
+        if (config.textFont.isNotEmpty() && BuiltInReadFonts.assetPath(config.textFont) == null) {
             val fontName = config.textFont
             val fontPath =
                 FileUtils.getPath(appCtx.externalFiles, "font", fontName)

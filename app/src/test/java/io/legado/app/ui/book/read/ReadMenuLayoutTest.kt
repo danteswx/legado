@@ -312,14 +312,16 @@ class ReadMenuLayoutTest {
     }
 
     @Test
-    fun brightnessControlLivesInInterfaceLayoutPanelInsteadOfSideRail() {
+    fun brightnessControlLivesInThemePanelInsteadOfSideRail() {
         val layout = readMenuLayout()
         val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
         val layoutXml = repoFile("app/src/main/res/layout/view_read_menu.xml").readText()
         val brightness = layout.elementById("ll_brightness")
         val layoutPanel = layout.elementById("panel_layout")
+        val themePanel = layout.elementById("panel_theme")
 
-        assertTrue(brightness.hasAncestor(layoutPanel))
+        assertTrue(brightness.hasAncestor(themePanel))
+        assertFalse(brightness.hasAncestor(layoutPanel))
         assertTrue(layout.elementById("seek_brightness").hasAncestor(brightness))
         assertEquals("io.legado.app.lib.theme.view.ThemeSeekBar", layout.elementById("seek_brightness").tagName)
         assertFalse(layoutXml.contains("vw_brightness_pos_adjust"))
@@ -348,13 +350,31 @@ class ReadMenuLayoutTest {
     }
 
     @Test
-    fun readerNavigationSpacerUsesThemeNavigationSurface() {
+    fun readerNavigationSpacerUsesBookBackground() {
         val activityLayout = parseXml(repoFile("app/src/main/res/layout/activity_book_read.xml"))
         val baseReadActivity = repoFile("app/src/main/java/io/legado/app/ui/book/read/BaseReadBookActivity.kt").readText()
 
         assertEquals("", activityLayout.elementById("navigation_bar").androidAttr("background"))
         assertTrue(baseReadActivity.contains("binding.navigationBar.setBackgroundColor("))
-        assertTrue(baseReadActivity.contains("ColorUtils.withAlpha(ThemeStore.navigationBarColor(this), 1f)"))
+        assertTrue(baseReadActivity.contains("private fun updateNavigationSpacerBackground(color: Int = ReadBookConfig.bgMeanColor)"))
+        assertTrue(baseReadActivity.contains("ColorUtils.withAlpha(color, 1f)"))
+    }
+
+    @Test
+    fun readerNavigationBarAlwaysUsesBookBackgroundWithoutSystemContrastScrim() {
+        val baseReadActivity = repoFile("app/src/main/java/io/legado/app/ui/book/read/BaseReadBookActivity.kt").readText()
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val navBlock = baseReadActivity.substringAfter("override fun upNavigationBarColor()")
+            .substringBefore("@SuppressLint(\"RtlHardcoded\")")
+
+        assertTrue(navBlock.contains("updateReaderNavigationBarColor()"))
+        assertFalse(navBlock.contains("super.upNavigationBarColor()"))
+        assertTrue(baseReadActivity.contains("window.isNavigationBarContrastEnforced = false"))
+        assertTrue(baseReadActivity.contains("private fun updateReaderNavigationBarColor()"))
+        assertTrue(baseReadActivity.contains("val navigationColor = ReadBookConfig.bgMeanColor"))
+        assertTrue(baseReadActivity.contains("setNavigationBarColorAuto(navigationColor)"))
+        assertFalse(readMenu.contains("fun navigationBarSpacerColor(): Int"))
+        assertFalse(readMenu.contains("bottomTabNavigationSurfaceColor"))
     }
 
     @Test
@@ -378,20 +398,17 @@ class ReadMenuLayoutTest {
     fun layoutPanelIncludesFontSamplesWithoutDuplicateFontTitle() {
         val layout = readMenuLayout()
         val layoutXml = repoFile("app/src/main/res/layout/view_read_menu.xml").readText()
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
         val fontPanel = layout.elementById("panel_layout_font")
-        val fontCards = listOf(
-            "font_card_source",
-            "font_card_sans",
-            "font_card_art",
-            "font_card_custom",
-            "font_card_add_custom"
-        ).map { id -> layout.elementById(id) }
+        val fontRow = layout.elementById("ll_font_sample_row")
 
         assertFalse(layoutXml.contains("tv_theme_font_label"))
-        fontCards.forEach { card ->
-            assertTrue(card.getAttribute("layout").contains("view_read_theme_card"))
-            assertTrue(card.hasAncestor(fontPanel))
-        }
+        assertTrue(fontRow.hasAncestor(fontPanel))
+        assertTrue(readMenu.contains("private fun newFontSampleCard(withEndMargin: Boolean = true): ViewReadThemeCardBinding"))
+        assertTrue(readMenu.contains("ViewReadThemeCardBinding.inflate("))
+        assertTrue(readMenu.contains("binding.llFontSampleRow.addView(card.root, params)"))
+        assertFalse(layoutXml.contains("font_card_source"))
+        assertFalse(layoutXml.contains("font_card_add_custom"))
     }
 
     @Test
@@ -881,26 +898,34 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun customFontAddCardUsesSameCenteredPlusStyleAsThemeAddCard() {
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+
+        assertTrue(readMenu.contains("bindFontAddCard(card)"))
+        assertFalse(readMenu.contains("card.tvThemeCardBody.setText(R.string.read_style_font_custom)"))
+    }
+
+    @Test
+    fun fontCardsUseTallerPreviewSizingThanThemeCards() {
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+
+        assertTrue(readMenu.contains("height = 82.dpToPx()"))
+    }
+
+    @Test
     fun fontControlsBelongToLayoutPanelOnly() {
         val layout = readMenuLayout()
         val layoutPanel = layout.elementById("panel_layout")
         val themePanel = layout.elementById("panel_theme")
         val previewHost = layout.elementById("layout_margin_adjust_preview_host")
-        val fontControls = listOf(
-            "font_card_source",
-            "font_card_sans",
-            "font_card_art",
-            "font_card_custom"
-        ).map { id -> layout.elementById(id) }
+        val fontRow = layout.elementById("ll_font_sample_row")
         val textStyleControls = listOf(
             "seek_theme_font_weight",
             "seek_theme_text_size"
         ).map { id -> layout.elementById(id) }
 
-        fontControls.forEach { control ->
-            assertTrue(control.hasAncestor(layoutPanel))
-            assertFalse(control.hasAncestor(themePanel))
-        }
+        assertTrue(fontRow.hasAncestor(layoutPanel))
+        assertFalse(fontRow.hasAncestor(themePanel))
         textStyleControls.forEach { control ->
             assertTrue(control.hasAncestor(previewHost))
             assertFalse(control.hasAncestor(themePanel))

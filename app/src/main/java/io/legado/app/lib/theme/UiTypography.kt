@@ -15,6 +15,7 @@ import androidx.viewbinding.ViewBinding
 import com.google.android.material.tabs.TabLayout
 import io.legado.app.R
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.BuiltInReadFonts
 import io.legado.app.ui.widget.TitleBar
 import io.legado.app.utils.RealPathUtil
 import io.legado.app.utils.dpToPx
@@ -24,7 +25,7 @@ private fun Context.baseSystemTypeface(): Typeface {
     return when (AppConfig.systemTypefaces) {
         1 -> Typeface.SERIF
         2 -> Typeface.MONOSPACE
-        else -> Typeface.SANS_SERIF
+        else -> Typeface.DEFAULT
     }
 }
 
@@ -62,7 +63,10 @@ private object UiTypefaceCache {
     fun get(context: Context, fontPath: String): Typeface? {
         cache[fontPath]?.let { return it }
         return runCatching {
+            val builtInAssetPath = BuiltInReadFonts.assetPath(fontPath)
             when {
+                builtInAssetPath != null -> Typeface.createFromAsset(context.assets, builtInAssetPath)
+
                 fontPath.startsWith("content://", ignoreCase = true) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> {
                     context.contentResolver.openFileDescriptor(android.net.Uri.parse(fontPath), "r")?.use {
                         Typeface.Builder(it.fileDescriptor).build()

@@ -1,5 +1,6 @@
 package io.legado.app.ui.book.read.page.provider
 
+import android.graphics.Paint
 import android.graphics.Paint.FontMetrics
 import android.graphics.RectF
 import android.graphics.Typeface
@@ -14,6 +15,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.help.book.BookContent
 import io.legado.app.help.book.isEpub
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.BuiltInReadFonts
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.page.entities.TextChapter
@@ -143,6 +145,11 @@ object ChapterProvider {
 
     private var upViewSizeRunnable: Runnable? = null
 
+    private data class TypefacePlan(
+        val typeface: Typeface?,
+        val syntheticStrokeEm: Float = 0f,
+    )
+
     init {
         upStyle()
     }
@@ -175,8 +182,14 @@ object ChapterProvider {
      * 更新样式
      */
     fun upStyle() {
-        typeface = getTypeface(ReadBookConfig.textFont)
-        getPaints(typeface).let {
+        val textWeight = readTextWeight()
+        val titleTypefacePlan = getTypefacePlan(
+            ReadBookConfig.textFont,
+            textWeight.coerceAtLeast(700)
+        )
+        val contentTypefacePlan = getTypefacePlan(ReadBookConfig.textFont, textWeight)
+        typeface = contentTypefacePlan.typeface
+        getPaints(titleTypefacePlan, contentTypefacePlan).let {
             titlePaint = it.first
             contentPaint = it.second
 //            reviewPaint.color = contentPaint.color
@@ -205,9 +218,48 @@ object ChapterProvider {
         upLayout()
     }
 
+    private fun getTypefacePlan(fontPath: String, targetWeight: Int): TypefacePlan {
+        val builtInWeightPlan = BuiltInReadFonts.weightPlan(fontPath, targetWeight)
+        if (builtInWeightPlan != null) {
+            return kotlin.runCatching {
+                val assetTypeface = Typeface.createFromAsset(
+                    appCtx.assets,
+                    builtInWeightPlan.assetPath
+                )
+                val weightedTypeface = if (
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+                    builtInWeightPlan.variable
+                ) {
+                    Typeface.create(assetTypeface, targetWeight.coerceIn(100, 900), false)
+                } else {
+                    assetTypeface
+                }
+                TypefacePlan(
+                    typeface = weightedTypeface,
+                    syntheticStrokeEm = builtInWeightPlan.syntheticStrokeEm,
+                )
+            }.getOrElse {
+                ReadBookConfig.textFont = ""
+                ReadBookConfig.save()
+                TypefacePlan(Typeface.SANS_SERIF)
+            }
+        }
+        val fallbackTypeface = getTypeface(fontPath)
+        return TypefacePlan(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                Typeface.create(fallbackTypeface, targetWeight.coerceIn(100, 900), false)
+            } else {
+                fallbackTypeface
+            }
+        )
+    }
+
     private fun getTypeface(fontPath: String): Typeface? {
         return kotlin.runCatching {
+            val builtInAssetPath = BuiltInReadFonts.assetPath(fontPath)
             when {
+                builtInAssetPath != null -> Typeface.createFromAsset(appCtx.assets, builtInAssetPath)
+
                 fontPath.isContentScheme() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> {
                     appCtx.contentResolver
                         .openFileDescriptor(fontPath.toUri(), "r")!!
@@ -224,7 +276,7 @@ object ChapterProvider {
                 else -> when (AppConfig.systemTypefaces) {
                     1 -> Typeface.SERIF
                     2 -> Typeface.MONOSPACE
-                    else -> Typeface.SANS_SERIF
+                    else -> Typeface.DEFAULT
                 }
             }
         }.getOrElse {
@@ -234,15 +286,18 @@ object ChapterProvider {
         } ?: Typeface.DEFAULT
     }
 
-    private fun getPaints(typeface: Typeface?): Pair<TextPaint, TextPaint> {
+    private fun getPaints(
+        titleTypefacePlan: TypefacePlan,
+        contentTypefacePlan: TypefacePlan,
+    ): Pair<TextPaint, TextPaint> {
         // 字体统一处理
-        val bold = Typeface.create(typeface, Typeface.BOLD)
-        val normal = Typeface.create(typeface, Typeface.NORMAL)
+        val baseTypeface = contentTypefacePlan.typeface
+        val bold = Typeface.create(baseTypeface, Typeface.BOLD)
+        val normal = Typeface.create(baseTypeface, Typeface.NORMAL)
         val (titleFont, textFont) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            val textWeight = readTextWeight()
             Pair(
-                Typeface.create(typeface, textWeight.coerceAtLeast(700), false),
-                Typeface.create(typeface, textWeight, false)
+                titleTypefacePlan.typeface,
+                contentTypefacePlan.typeface
             )
         } else {
             when (ReadBookConfig.textBold) {
@@ -262,6 +317,9 @@ object ChapterProvider {
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q && AppConfig.optimizeRender) {
             tPaint.isLinearText = true
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            applySyntheticStroke(tPaint, titleTypefacePlan.syntheticStrokeEm)
+        }
         //正文
         val cPaint = TextPaint()
         cPaint.color = ReadBookConfig.textColor
@@ -272,7 +330,18 @@ object ChapterProvider {
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q && AppConfig.optimizeRender) {
             cPaint.isLinearText = true
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            applySyntheticStroke(cPaint, contentTypefacePlan.syntheticStrokeEm)
+        }
         return Pair(tPaint, cPaint)
+    }
+
+    private fun applySyntheticStroke(paint: TextPaint, strokeEm: Float) {
+        if (strokeEm <= 0f) {
+            return
+        }
+        paint.style = Paint.Style.FILL_AND_STROKE
+        paint.strokeWidth = paint.textSize * strokeEm
     }
 
     private fun readTextWeight(): Int {

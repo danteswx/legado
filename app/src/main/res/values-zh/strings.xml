@@ -1754,8 +1754,15 @@
     <string name="compose_type">排版</string>
     <string name="read_style_font_source">思源宋体</string>
     <string name="read_style_font_sans">思源黑体</string>
-    <string name="read_style_font_art">站酷文艺体</string>
-    <string name="read_style_font_custom">霞鹜文楷</string>
+    <string name="read_style_font_wenyuan_sans_vf">文源黑体 VF</string>
+    <string name="read_style_font_mi_sans_vf">MiSans VF</string>
+    <string name="read_style_font_alimama_fang_yuan_ti_vf">阿里妈妈方圆体 VF</string>
+    <string name="read_style_font_lxgw_wenkai_screen">霞鹜文楷阅读版</string>
+    <string name="read_style_font_lxgw_neo_xihei">霞鹜新晰黑</string>
+    <string name="read_style_font_lxgw_fasmart_gothic">霞鹜尚智黑</string>
+    <string name="read_style_font_lxgw_zhenkai">霞鹜臻楷</string>
+    <string name="read_style_font_harmonyos_sans">鸿蒙字体</string>
+    <string name="read_style_font_custom">自定义字体</string>
     <string name="read_style_font_weight">字重</string>
     <string name="read_style_weight_standard">标准 / %d</string>
     <string name="read_style_weight_bold">加粗 / %d</string>

@@ -92,6 +92,9 @@ abstract class BaseReadBookActivity :
             }
             windowInsets
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
@@ -221,13 +224,7 @@ abstract class BaseReadBookActivity :
 
     override fun upNavigationBarColor() {
         upNavigationBar()
-        when {
-            binding.readMenu.isVisible -> super.upNavigationBarColor()
-            binding.searchMenu.bottomMenuVisible -> super.upNavigationBarColor()
-            bottomDialog > 0 -> super.upNavigationBarColor()
-            !AppConfig.immNavigationBar -> super.upNavigationBarColor()
-            else -> setNavigationBarColorAuto(ReadBookConfig.bgMeanColor)
-        }
+        updateReaderNavigationBarColor()
     }
 
     @SuppressLint("RtlHardcoded")
@@ -236,10 +233,16 @@ abstract class BaseReadBookActivity :
         binding.navigationBar.gone(!menuLayoutIsVisible)
     }
 
-    private fun updateNavigationSpacerBackground() {
+    private fun updateNavigationSpacerBackground(color: Int = ReadBookConfig.bgMeanColor) {
         binding.navigationBar.setBackgroundColor(
-            ColorUtils.withAlpha(ThemeStore.navigationBarColor(this), 1f)
+            ColorUtils.withAlpha(color, 1f)
         )
+    }
+
+    private fun updateReaderNavigationBarColor() {
+        val navigationColor = ReadBookConfig.bgMeanColor
+        updateNavigationSpacerBackground(navigationColor)
+        setNavigationBarColorAuto(navigationColor)
     }
 
     /**

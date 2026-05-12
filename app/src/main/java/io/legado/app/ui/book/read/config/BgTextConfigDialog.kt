@@ -25,6 +25,7 @@ import io.legado.app.databinding.DialogReadBgTextBinding
 import io.legado.app.databinding.ItemBgImageBinding
 import io.legado.app.help.DefaultData
 import io.legado.app.help.book.isImage
+import io.legado.app.help.config.BuiltInReadFonts
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
@@ -338,7 +339,7 @@ class BgTextConfigDialog : BaseDialogFragment(R.layout.dialog_read_bg_text) {
             configFile.createFileReplace()
             val config = ReadBookConfig.getExportConfig()
             val fontPath = ReadBookConfig.textFont
-            if (fontPath.isNotEmpty()) {
+            if (fontPath.isNotEmpty() && BuiltInReadFonts.assetPath(fontPath) == null) {
                 val fontDoc = FileDoc.fromFile(fontPath)
                 val fontName = fontDoc.name
                 val fontInputStream = fontDoc.openInputStream().getOrNull()
