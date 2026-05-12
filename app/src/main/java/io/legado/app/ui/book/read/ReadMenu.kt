@@ -9,8 +9,14 @@ import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.ColorFilter
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.PixelFormat
 import android.graphics.PorterDuff
+import android.graphics.RectF
 import android.graphics.Typeface
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.text.TextUtils
 import android.util.AttributeSet
@@ -46,6 +52,7 @@ import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.qmdeve.liquidglass.widget.LiquidGlassView
 import io.legado.app.R
 import io.legado.app.constant.EventBus
+import io.legado.app.constant.PageAnim
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.entities.BookChapter
@@ -119,6 +126,7 @@ import java.util.Locale
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlin.math.abs
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
@@ -214,6 +222,12 @@ class ReadMenu @JvmOverloads constructor(
         val typeface: Typeface,
         val isSelected: () -> Boolean,
         val onClick: () -> Unit
+    )
+
+    private data class PageAnimSample(
+        val binding: ViewReadThemeCardBinding,
+        val labelRes: Int,
+        val anim: Int?
     )
 
     private data class BackgroundSample(
@@ -332,6 +346,39 @@ class ReadMenu @JvmOverloads constructor(
                 96.dpToPx(),
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply {
+    private val pageAnimSampleBindings by lazy {
+        listOf(
+            PageAnimSample(newPageAnimSampleCard(), R.string.btn_default_s, null),
+            PageAnimSample(newPageAnimSampleCard(), R.string.page_anim_cover, PageAnim.coverPageAnim),
+            PageAnimSample(newPageAnimSampleCard(), R.string.page_anim_linked_cover, PageAnim.linkedCoverPageAnim),
+            PageAnimSample(newPageAnimSampleCard(), R.string.page_anim_slide, PageAnim.slidePageAnim),
+            PageAnimSample(newPageAnimSampleCard(), R.string.page_anim_simulation, PageAnim.simulationPageAnim),
+            PageAnimSample(newPageAnimSampleCard(), R.string.page_anim_scroll, PageAnim.scrollPageAnim),
+            PageAnimSample(newPageAnimSampleCard(false), R.string.page_anim_none, PageAnim.noAnim)
+        )
+    }
+
+    private fun newPageAnimSampleCard(withEndMargin: Boolean = true): ViewReadThemeCardBinding {
+        return ViewReadThemeCardBinding.inflate(
+            LayoutInflater.from(context),
+            binding.llPageAnimCardRow,
+            false
+        ).also { card ->
+            card.themeCardPreview.updateLayoutParams<ViewGroup.LayoutParams> {
+                height = 82.dpToPx()
+            }
+            val params = LinearLayout.LayoutParams(
+                96.dpToPx(),
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                if (withEndMargin) {
+                    marginEnd = 8.dpToPx()
+                }
+            }
+            binding.llPageAnimCardRow.addView(card.root, params)
+        }
+    }
+
                 if (withEndMargin) {
                     marginEnd = 8.dpToPx()
                 }
@@ -530,7 +577,7 @@ class ReadMenu @JvmOverloads constructor(
         tvPanelThemeTitle.setTextColor(textColor)
         tvPanelPageTurnTitle.setTextColor(textColor)
         tvPanelMoreTitle.setTextColor(textColor)
-        panelPageAnim.setTextColor(textColor)
+        tvPageAnimCardsTitle.setTextColor(textColor)
         panelPageAutoPage.setTextColor(textColor)
         panelPageTouchSlop.setTextColor(textColor)
         panelPageAnimSpeed.setTextColor(textColor)
@@ -893,15 +940,23 @@ class ReadMenu @JvmOverloads constructor(
 
                 MotionEvent.ACTION_UP,
                 MotionEvent.ACTION_CANCEL -> {
-                    val middleHeight = (tocDefaultPanelHeight() + tocFullPanelHeight()) / 2
-                    val targetHeight = if (flExpandedPanel.height >= middleHeight) {
-                        tocFullPanelHeight()
-                    } else {
-                        tocDefaultPanelHeight()
-                    }
-                    animateTocPanelTo(targetHeight)
+                    settleTocPanelDrag()
                     tocDragHandle.parent.requestDisallowInterceptTouchEvent(false)
                     true
+    private fun settleTocPanelDrag() {
+        val currentHeight = binding.flExpandedPanel.height
+            .coerceIn(tocDefaultPanelHeight(), tocFullPanelHeight())
+        val thresholdHeight = tocFullscreenThresholdHeight()
+        if (currentHeight >= thresholdHeight) {
+            animateTocPanelTo(tocFullPanelHeight())
+        } else {
+            animateTocPanelTo(currentHeight)
+        }
+    }
+
+    private fun tocFullscreenThresholdHeight(): Int =
+        (tocDefaultPanelHeight() + tocFullPanelHeight()) / 2
+
                 }
 
                 else -> false
@@ -2345,7 +2400,7 @@ class ReadMenu @JvmOverloads constructor(
     private fun tintPageTurnPanel(color: Int) = binding.run {
         listOf(
             tvPanelPageTurnTitle,
-            panelPageAnim,
+            tvPageAnimCardsTitle,
             panelPageAutoPage,
             panelPageTouchSlop,
             panelPageAnimSpeed,
@@ -3074,7 +3129,51 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     private fun updatePageTurnControls() = binding.run {
-        configureOptionButton(panelPageAnim, false)
+        updatePageAnimSampleCards()
+    private fun updatePageAnimSampleCards() {
+        val explicitAnim = ReadBook.book?.config?.pageAnim?.takeIf { it >= 0 }
+        pageAnimSampleBindings.forEach { sample ->
+            val selected = if (sample.anim == null) {
+                explicitAnim == null
+            } else {
+                explicitAnim == sample.anim
+            }
+            bindPageAnimSampleCard(sample, selected)
+        }
+    }
+
+    private fun bindPageAnimSampleCard(sample: PageAnimSample, selected: Boolean) {
+        val card = sample.binding
+        val label = context.getString(sample.labelRes)
+        val pageColor = currentBackgroundColor()
+        val inkColor = ReadBookConfig.durConfig.curTextColor()
+        card.themeCardPreview.background = PageAnimPreviewDrawable(
+            pageColor = pageColor,
+            inkColor = inkColor,
+            menuTextColor = textColor,
+            accentColor = context.accentColor,
+            anim = sample.anim,
+            selected = selected
+        )
+        card.tvThemeCardTitle.isGone = true
+        card.tvThemeCardBody.isGone = true
+        card.tvThemeCardTitle.typeface = Typeface.DEFAULT
+        card.tvThemeCardBody.typeface = Typeface.DEFAULT
+        card.tvThemeCardLabel.text = label
+        card.tvThemeCardLabel.setTextColor(if (selected) context.accentColor else textColor)
+        card.ivThemeCardCheck.background = roundedRect(context.accentColor, 13f.dpToPx())
+        card.ivThemeCardCheck.isVisible = selected
+        card.tvThemeCardBadge.isVisible = false
+        card.root.contentDescription = label
+    }
+
+    private fun applyPageAnimSample(anim: Int?) {
+        ReadBook.book?.setPageAnim(anim ?: -1)
+        ReadBook.loadContent(resetPageOffset = false)
+        updatePageTurnControls()
+        updateThemePresetCards()
+    }
+
         configureOptionButton(panelPageAutoPage, false)
         configureOptionButton(panelPageTouchSlop, AppConfig.pageTouchSlop > 0)
         configureOptionButton(panelPageAnimSpeed, AppConfig.pageAnimationSpeed != 300)
@@ -4389,15 +4488,9 @@ class ReadMenu @JvmOverloads constructor(
         setupBottomNavigationEvents()
 
         //朗读
-        panelPageAnim.setOnClickListener {
-            runMenuOut {
-                activity?.let { owner ->
-                    if (owner is BaseReadBookActivity) {
-                        owner.showPageAnimConfig {
-                            ReadBook.loadContent(resetPageOffset = false)
-                        }
-                    }
-                }
+        pageAnimSampleBindings.forEach { sample ->
+            sample.binding.root.setOnClickListener {
+                applyPageAnimSample(sample.anim)
             }
         }
         panelPageAutoPage.setOnClickListener {
@@ -4734,6 +4827,193 @@ class ReadMenu @JvmOverloads constructor(
         fun onClickReadAloud()
         fun showHelp()
         fun showLogin()
+    private class PageAnimPreviewDrawable(
+        private val pageColor: Int,
+        private val inkColor: Int,
+        private val menuTextColor: Int,
+        private val accentColor: Int,
+        private val anim: Int?,
+        private val selected: Boolean
+    ) : Drawable() {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val path = Path()
+        private val rect = RectF()
+
+        override fun draw(canvas: Canvas) {
+            val b = bounds
+            if (b.width() <= 0 || b.height() <= 0) {
+                return
+            }
+            val radius = min(b.width(), b.height()) * 0.16f
+            rect.set(b.left.toFloat(), b.top.toFloat(), b.right.toFloat(), b.bottom.toFloat())
+            paint.style = Paint.Style.FILL
+            paint.color = ColorUtils.adjustAlpha(menuTextColor, 0.045f)
+            canvas.drawRoundRect(rect, radius, radius, paint)
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = if (selected) 2.5f else 1.2f
+            paint.color = if (selected) accentColor else ColorUtils.adjustAlpha(menuTextColor, 0.14f)
+            canvas.drawRoundRect(rect, radius, radius, paint)
+
+            when (anim) {
+                null -> drawDefault(canvas, b)
+                PageAnim.coverPageAnim -> drawCover(canvas, b)
+                PageAnim.linkedCoverPageAnim -> drawLinkedCover(canvas, b)
+                PageAnim.slidePageAnim -> drawSlide(canvas, b)
+                PageAnim.simulationPageAnim -> drawSimulation(canvas, b)
+                PageAnim.scrollPageAnim -> drawScroll(canvas, b)
+                PageAnim.noAnim -> drawNone(canvas, b)
+                else -> drawCover(canvas, b)
+            }
+        }
+
+        private fun drawDefault(canvas: Canvas, b: android.graphics.Rect) {
+            val page = pageRect(b, 0.25f, 0.18f, 0.78f, 0.82f)
+            drawPage(canvas, page, selected)
+            drawLines(canvas, page, 3)
+            drawAccentDot(canvas, b.centerX().toFloat(), b.bottom - b.height() * 0.22f)
+        }
+
+        private fun drawCover(canvas: Canvas, b: android.graphics.Rect) {
+            val back = pageRect(b, 0.18f, 0.20f, 0.70f, 0.82f)
+            val front = pageRect(b, 0.34f, 0.16f, 0.86f, 0.78f)
+            drawPage(canvas, back, false)
+            drawPage(canvas, front, selected)
+            drawLines(canvas, front, 3)
+        }
+
+        private fun drawLinkedCover(canvas: Canvas, b: android.graphics.Rect) {
+            val left = pageRect(b, 0.14f, 0.18f, 0.56f, 0.82f)
+            val right = pageRect(b, 0.44f, 0.18f, 0.86f, 0.82f)
+            drawPage(canvas, left, false)
+            drawPage(canvas, right, selected)
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = 2f
+            paint.color = ColorUtils.adjustAlpha(accentColor, 0.72f)
+            canvas.drawLine(right.left, right.top + 3f, right.left, right.bottom - 3f, paint)
+            drawLines(canvas, right, 2)
+        }
+
+        private fun drawSlide(canvas: Canvas, b: android.graphics.Rect) {
+            val first = pageRect(b, 0.10f, 0.22f, 0.48f, 0.80f)
+            val second = pageRect(b, 0.54f, 0.18f, 0.92f, 0.76f)
+            drawPage(canvas, first, false)
+            drawPage(canvas, second, selected)
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = 2.4f
+            paint.color = ColorUtils.adjustAlpha(accentColor, 0.82f)
+            val y = b.centerY().toFloat()
+            canvas.drawLine(first.right + 4f, y, second.left - 6f, y, paint)
+            canvas.drawLine(second.left - 10f, y - 5f, second.left - 5f, y, paint)
+            canvas.drawLine(second.left - 10f, y + 5f, second.left - 5f, y, paint)
+        }
+
+        private fun drawSimulation(canvas: Canvas, b: android.graphics.Rect) {
+            val page = pageRect(b, 0.20f, 0.16f, 0.82f, 0.82f)
+            drawPage(canvas, page, selected)
+            drawLines(canvas, page, 2)
+            path.reset()
+            path.moveTo(page.right - page.width() * 0.30f, page.top)
+            path.quadTo(page.right - 2f, page.top + 4f, page.right, page.top + page.height() * 0.34f)
+            path.lineTo(page.right, page.top)
+            path.close()
+            paint.style = Paint.Style.FILL
+            paint.color = ColorUtils.adjustAlpha(accentColor, 0.32f)
+            canvas.drawPath(path, paint)
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = 1.6f
+            paint.color = ColorUtils.adjustAlpha(accentColor, 0.68f)
+            canvas.drawPath(path, paint)
+        }
+
+        private fun drawScroll(canvas: Canvas, b: android.graphics.Rect) {
+            val strip = pageRect(b, 0.26f, 0.12f, 0.74f, 0.88f)
+            drawPage(canvas, strip, selected)
+            drawLines(canvas, strip, 4)
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = 2.2f
+            paint.color = ColorUtils.adjustAlpha(accentColor, 0.82f)
+            val x = strip.right + b.width() * 0.09f
+            canvas.drawLine(x, strip.top + 6f, x, strip.bottom - 6f, paint)
+            canvas.drawLine(x - 5f, strip.bottom - 12f, x, strip.bottom - 6f, paint)
+            canvas.drawLine(x + 5f, strip.bottom - 12f, x, strip.bottom - 6f, paint)
+        }
+
+        private fun drawNone(canvas: Canvas, b: android.graphics.Rect) {
+            val page = pageRect(b, 0.22f, 0.18f, 0.78f, 0.82f)
+            drawPage(canvas, page, selected)
+            drawLines(canvas, page, 3)
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = 2.4f
+            paint.color = ColorUtils.adjustAlpha(accentColor, 0.78f)
+            val left = page.left + page.width() * 0.28f
+            val right = page.right - page.width() * 0.28f
+            val y = page.bottom - page.height() * 0.18f
+            canvas.drawLine(left, y, right, y, paint)
+        }
+
+        private fun pageRect(
+            b: android.graphics.Rect,
+            left: Float,
+            top: Float,
+            right: Float,
+            bottom: Float
+        ): RectF {
+            return RectF(
+                b.left + b.width() * left,
+                b.top + b.height() * top,
+                b.left + b.width() * right,
+                b.top + b.height() * bottom
+            )
+        }
+
+        private fun drawPage(canvas: Canvas, page: RectF, highlighted: Boolean) {
+            paint.style = Paint.Style.FILL
+            paint.color = pageColor
+            canvas.drawRoundRect(page, 7f, 7f, paint)
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = if (highlighted) 2f else 1.2f
+            paint.color = if (highlighted) {
+                ColorUtils.adjustAlpha(accentColor, 0.78f)
+            } else {
+                ColorUtils.adjustAlpha(menuTextColor, 0.22f)
+            }
+            canvas.drawRoundRect(page, 7f, 7f, paint)
+        }
+
+        private fun drawLines(canvas: Canvas, page: RectF, count: Int) {
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = 1.5f
+            paint.color = ColorUtils.adjustAlpha(inkColor, 0.52f)
+            val left = page.left + page.width() * 0.18f
+            val right = page.right - page.width() * 0.18f
+            val firstY = page.top + page.height() * 0.32f
+            val gap = page.height() * 0.14f
+            repeat(count) { index ->
+                val y = firstY + gap * index
+                canvas.drawLine(left, y, right - if (index == count - 1) page.width() * 0.16f else 0f, y, paint)
+            }
+        }
+
+        private fun drawAccentDot(canvas: Canvas, x: Float, y: Float) {
+            paint.style = Paint.Style.FILL
+            paint.color = ColorUtils.adjustAlpha(accentColor, 0.86f)
+            canvas.drawCircle(x, y, 3.5f, paint)
+        }
+
+        override fun setAlpha(alpha: Int) {
+            paint.alpha = alpha
+            invalidateSelf()
+        }
+
+        override fun setColorFilter(colorFilter: ColorFilter?) {
+            paint.colorFilter = colorFilter
+            invalidateSelf()
+        }
+
+        @Suppress("DEPRECATION")
+        override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
+    }
+
         fun payAction()
         fun disableSource()
         fun skipToChapter(index: Int)

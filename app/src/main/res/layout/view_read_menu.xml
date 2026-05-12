@@ -1842,22 +1842,32 @@
                     android:layout_weight="1"
                     android:tag="toc_content_host">
 
-                    <androidx.recyclerview.widget.RecyclerView
+                    <io.legado.app.ui.widget.recycler.scroller.FastScrollRecyclerView
                         android:id="@+id/rv_panel_toc"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:clipToPadding="false"
                         android:overScrollMode="never"
-                        android:paddingBottom="6dp" />
+                        android:paddingEnd="18dp"
+                        android:paddingBottom="6dp"
+                        android:scrollbars="none"
+                        app:fadeScrollbar="false"
+                        app:showBubble="false"
+                        app:showTrack="true" />
 
-                    <androidx.recyclerview.widget.RecyclerView
+                    <io.legado.app.ui.widget.recycler.scroller.FastScrollRecyclerView
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:clipToPadding="false"
                         android:overScrollMode="never"
+                        android:paddingEnd="18dp"
                         android:paddingBottom="6dp"
+                        android:scrollbars="none"
                         android:tag="rv_panel_bookmarks"
-                        android:visibility="gone" />
+                        android:visibility="gone"
+                        app:fadeScrollbar="false"
+                        app:showBubble="false"
+                        app:showTrack="true" />
 
                     <TextView
                         android:layout_width="match_parent"
@@ -3104,15 +3114,29 @@
                     android:textStyle="bold" />
 
                 <TextView
-                    android:id="@+id/panel_page_anim"
-                    android:layout_width="match_parent"
-                    android:layout_height="44dp"
+                    android:id="@+id/tv_page_anim_cards_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:background="@drawable/bg_read_menu_panel_button"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:text="@string/page_anim" />
+                    android:text="@string/page_anim"
+                    android:textSize="14sp" />
+
+                <HorizontalScrollView
+                    android:id="@+id/hsv_page_anim_cards"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:fillViewport="false"
+                    android:overScrollMode="never"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:id="@+id/ll_page_anim_card_row"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:baselineAligned="false"
+                        android:orientation="horizontal" />
+                </HorizontalScrollView>
 
                 <LinearLayout
                     android:layout_width="match_parent"

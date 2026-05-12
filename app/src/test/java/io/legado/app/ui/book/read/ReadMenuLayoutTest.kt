@@ -291,6 +291,24 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun tocPanelListsUseFastDragScrollbars() {
+        val layout = readMenuLayout()
+        val tocRecycler = layout.elementById("rv_panel_toc")
+        val bookmarkRecycler = layout.elementByTag("rv_panel_bookmarks")
+        val fastScrollRecyclerView =
+            "io.legado.app.ui.widget.recycler.scroller.FastScrollRecyclerView"
+
+        listOf(tocRecycler, bookmarkRecycler).forEach { recycler ->
+            assertEquals(fastScrollRecyclerView, recycler.tagName)
+            assertEquals("none", recycler.androidAttr("scrollbars"))
+            assertEquals("false", recycler.appAttr("fadeScrollbar"))
+            assertEquals("true", recycler.appAttr("showTrack"))
+            assertEquals("false", recycler.appAttr("showBubble"))
+            assertEquals("18dp", recycler.androidAttr("paddingEnd"))
+        }
+    }
+
+    @Test
     fun settingsPanelUsesNativeGlassRowsInsteadOfEmbeddedPreferenceSurface() {
         val layout = readMenuLayout()
         val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
@@ -421,7 +439,8 @@ class ReadMenuLayoutTest {
         assertTrue(readMenu.contains("R.id.menu_read_page_turn -> BottomTab.PageTurn"))
         assertTrue(readMenu.contains("panelPageTurn.gone(tab != BottomTab.PageTurn)"))
         listOf(
-            "panel_page_anim",
+            "hsv_page_anim_cards",
+            "ll_page_anim_card_row",
             "panel_page_auto_page",
             "panel_page_volume_key",
             "panel_page_mouse_wheel",
@@ -429,6 +448,40 @@ class ReadMenuLayoutTest {
         ).forEach { id ->
             assertTrue(layout.elementById(id).hasAncestor(pageTurnPanel))
         }
+    }
+
+    @Test
+    fun pageTurnPanelUsesAnimationCardsInsteadOfSecondaryMenu() {
+        val layout = readMenuLayout()
+        val layoutXml = repoFile("app/src/main/res/layout/view_read_menu.xml").readText()
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val pageTurnPanel = layout.elementById("panel_page_turn")
+
+        listOf("hsv_page_anim_cards", "ll_page_anim_card_row").forEach { id ->
+            assertTrue(layout.elementById(id).hasAncestor(pageTurnPanel))
+        }
+        listOf(
+            "R.string.btn_default_s, null",
+            "R.string.page_anim_cover, PageAnim.coverPageAnim",
+            "R.string.page_anim_linked_cover, PageAnim.linkedCoverPageAnim",
+            "R.string.page_anim_slide, PageAnim.slidePageAnim",
+            "R.string.page_anim_simulation, PageAnim.simulationPageAnim",
+            "R.string.page_anim_scroll, PageAnim.scrollPageAnim",
+            "R.string.page_anim_none, PageAnim.noAnim"
+        ).forEach { sampleConfig ->
+            assertTrue(readMenu.contains(sampleConfig))
+        }
+        assertFalse(layoutXml.contains("android:id=\"@+id/panel_page_anim\""))
+        assertFalse(layoutXml.contains("android:id=\"@+id/page_anim_card_"))
+        assertTrue(readMenu.contains("private data class PageAnimSample"))
+        assertTrue(readMenu.contains("private val pageAnimSampleBindings by lazy"))
+        assertTrue(readMenu.contains("private fun newPageAnimSampleCard(withEndMargin: Boolean = true): ViewReadThemeCardBinding"))
+        assertTrue(readMenu.contains("ViewReadThemeCardBinding.inflate("))
+        assertTrue(readMenu.contains("binding.llPageAnimCardRow.addView(card.root, params)"))
+        assertTrue(readMenu.contains("PageAnimPreviewDrawable"))
+        assertTrue(readMenu.contains("private fun applyPageAnimSample(anim: Int?)"))
+        assertFalse(readMenu.contains("panelPageAnim.setOnClickListener"))
+        assertFalse(readMenu.contains("showPageAnimConfig"))
     }
 
     @Test
@@ -573,6 +626,22 @@ class ReadMenuLayoutTest {
         assertTrue(readMenu.contains("chapter.wordCount"))
         assertTrue(readMenu.contains("BookHelp.hasContent"))
         assertTrue(readMenu.contains("ic_lucide_download"))
+    }
+
+    @Test
+    fun tocDragHandleKeepsDraggedHeightBelowFullscreenThreshold() {
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val tocSetup = readMenu.substringAfter("private fun setupTocPanel()")
+            .substringBefore("private fun setTocPanelPage")
+
+        assertTrue(tocSetup.contains("tocDragHandle.setOnTouchListener"))
+        assertFalse(tocSetup.contains("rvPanelToc.setOnTouchListener"))
+        assertFalse(tocSetup.contains("taggedRecycler(\"rv_panel_bookmarks\").setOnTouchListener"))
+        assertTrue(readMenu.contains("private fun settleTocPanelDrag()"))
+        assertTrue(readMenu.contains("val currentHeight = binding.flExpandedPanel.height"))
+        assertTrue(readMenu.contains("val thresholdHeight = tocFullscreenThresholdHeight()"))
+        assertTrue(readMenu.contains("animateTocPanelTo(currentHeight)"))
+        assertFalse(readMenu.contains("val middleHeight = (tocDefaultPanelHeight() + tocFullPanelHeight()) / 2"))
     }
 
     @Test
