@@ -70,54 +70,6 @@
 
     </io.legado.app.ui.widget.TitleBar>
 
-    <LinearLayout
-        android:id="@+id/ll_brightness"
-        android:layout_width="wrap_content"
-        android:layout_height="0dp"
-        android:layout_marginHorizontal="16dp"
-        android:layout_marginTop="16dp"
-        android:background="@color/transparent30"
-        android:gravity="center_horizontal"
-        android:orientation="vertical"
-        app:layout_constraintBottom_toTopOf="@+id/bottom_menu"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/title_bar"
-        tools:ignore="RtlHardcoded">
-
-        <ImageView
-            android:id="@+id/iv_brightness_auto"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:layout_margin="8dp"
-            android:contentDescription="@string/brightness_auto"
-            android:src="@drawable/ic_brightness_auto"
-            tools:ignore="ImageContrastCheck" />
-
-        <io.legado.app.ui.widget.seekbar.VerticalSeekBarWrapper
-            android:layout_width="wrap_content"
-            android:layout_height="0dp"
-            android:layout_weight="1">
-
-            <io.legado.app.ui.widget.seekbar.VerticalSeekBar
-                android:id="@+id/seek_brightness"
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:max="255"
-                app:seekBarRotation="CW270" />
-
-        </io.legado.app.ui.widget.seekbar.VerticalSeekBarWrapper>
-
-        <androidx.appcompat.widget.AppCompatImageView
-            android:id="@+id/vw_brightness_pos_adjust"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:layout_margin="8dp"
-            android:contentDescription="@string/adjust_pos"
-            android:src="@drawable/ic_swap_horiz"
-            app:tint="@color/white" />
-
-    </LinearLayout>
-
     <FrameLayout
         android:id="@+id/layout_margin_adjust_overlay"
         android:layout_width="match_parent"
@@ -130,17 +82,47 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <LinearLayout
+        <FrameLayout
             android:id="@+id/layout_margin_adjust_panel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:background="@drawable/bg_read_menu_panel"
-            android:orientation="vertical"
-            android:paddingStart="14dp"
-            android:paddingTop="12dp"
-            android:paddingEnd="14dp"
-            android:paddingBottom="12dp">
+            android:clipChildren="true"
+            android:clipToOutline="true"
+            android:clipToPadding="true">
+
+            <ImageView
+                android:id="@+id/layout_margin_adjust_blur_backdrop"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:clickable="false"
+                android:focusable="false"
+                android:scaleType="fitXY" />
+
+            <com.qmdeve.liquidglass.widget.LiquidGlassView
+                android:id="@+id/layout_margin_adjust_glass_view"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:clickable="false"
+                android:focusable="false" />
+
+            <View
+                android:id="@+id/layout_margin_adjust_shell_overlay"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:clickable="false"
+                android:focusable="false" />
+
+            <LinearLayout
+                android:id="@+id/layout_margin_adjust_content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="14dp"
+                android:paddingTop="12dp"
+                android:paddingEnd="14dp"
+                android:paddingBottom="12dp">
 
             <LinearLayout
                 android:id="@+id/layout_margin_adjust_header"
@@ -170,7 +152,7 @@
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:id="@+id/layout_margin_adjust_preview_host"
                 android:layout_width="match_parent"
-                android:layout_height="500dp"
+                android:layout_height="220dp"
                 android:layout_marginTop="4dp"
                 android:clipChildren="false"
                 android:clipToPadding="false">
@@ -270,7 +252,6 @@
                         android:id="@+id/tv_layout_padding_bottom_label"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
                         android:text="@string/padding_bottom"
                         android:textSize="14sp" />
 
@@ -814,11 +795,10 @@
                 <LinearLayout
                     android:id="@+id/layout_tip_controls"
                     android:layout_width="match_parent"
-                    android:layout_height="0dp"
+                    android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
                     android:orientation="vertical"
                     android:visibility="gone"
-                    app:layout_constraintBottom_toBottomOf="parent"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toBottomOf="@id/layout_margin_adjust_preview">
@@ -844,15 +824,18 @@
                         <LinearLayout
                             android:id="@+id/layout_header_display_auto_card"
                             android:layout_width="match_parent"
-                            android:layout_height="52dp"
+                            android:layout_height="wrap_content"
                             android:layout_marginTop="6dp"
+                            android:minHeight="64dp"
                             android:background="@drawable/bg_read_menu_panel_button"
                             android:clickable="true"
                             android:focusable="true"
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
                             android:paddingStart="16dp"
-                            android:paddingEnd="16dp">
+                            android:paddingTop="10dp"
+                            android:paddingEnd="16dp"
+                            android:paddingBottom="10dp">
 
                             <View
                                 android:id="@+id/vw_header_display_auto_radio"
@@ -919,7 +902,7 @@
                                     android:layout_marginTop="4dp"
                                     android:ellipsize="end"
                                     android:lineSpacingExtra="2dp"
-                                    android:singleLine="true"
+                                    android:maxLines="2"
                                     android:text="@string/read_menu_header_auto_summary"
                                     android:textSize="11sp" />
                             </LinearLayout>
@@ -928,15 +911,18 @@
                         <LinearLayout
                             android:id="@+id/layout_header_display_show_card"
                             android:layout_width="match_parent"
-                            android:layout_height="52dp"
+                            android:layout_height="wrap_content"
                             android:layout_marginTop="12dp"
+                            android:minHeight="64dp"
                             android:background="@drawable/bg_read_menu_panel_button"
                             android:clickable="true"
                             android:focusable="true"
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
                             android:paddingStart="16dp"
-                            android:paddingEnd="16dp">
+                            android:paddingTop="10dp"
+                            android:paddingEnd="16dp"
+                            android:paddingBottom="10dp">
 
                             <View
                                 android:id="@+id/vw_header_display_show_radio"
@@ -996,7 +982,7 @@
                                     android:layout_marginTop="4dp"
                                     android:ellipsize="end"
                                     android:lineSpacingExtra="2dp"
-                                    android:singleLine="true"
+                                    android:maxLines="2"
                                     android:text="@string/read_menu_header_show_summary"
                                     android:textSize="11sp" />
                             </LinearLayout>
@@ -1005,15 +991,18 @@
                         <LinearLayout
                             android:tag="layout_header_display_hide_card"
                             android:layout_width="match_parent"
-                            android:layout_height="52dp"
+                            android:layout_height="wrap_content"
                             android:layout_marginTop="12dp"
+                            android:minHeight="64dp"
                             android:background="@drawable/bg_read_menu_panel_button"
                             android:clickable="true"
                             android:focusable="true"
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
                             android:paddingStart="16dp"
-                            android:paddingEnd="16dp">
+                            android:paddingTop="10dp"
+                            android:paddingEnd="16dp"
+                            android:paddingBottom="10dp">
 
                             <View
                                 android:tag="vw_header_display_hide_radio"
@@ -1067,7 +1056,7 @@
                                     android:layout_marginTop="4dp"
                                     android:ellipsize="end"
                                     android:lineSpacingExtra="2dp"
-                                    android:singleLine="true"
+                                    android:maxLines="2"
                                     android:text="@string/read_menu_header_hide_summary"
                                     android:textSize="11sp" />
                             </LinearLayout>
@@ -1090,15 +1079,18 @@
                         <LinearLayout
                             android:tag="layout_footer_display_auto_card"
                             android:layout_width="match_parent"
-                            android:layout_height="52dp"
+                            android:layout_height="wrap_content"
                             android:layout_marginTop="6dp"
+                            android:minHeight="64dp"
                             android:background="@drawable/bg_read_menu_panel_button"
                             android:clickable="true"
                             android:focusable="true"
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
                             android:paddingStart="16dp"
-                            android:paddingEnd="16dp">
+                            android:paddingTop="10dp"
+                            android:paddingEnd="16dp"
+                            android:paddingBottom="10dp">
 
                             <View
                                 android:tag="vw_footer_display_auto_radio"
@@ -1164,7 +1156,7 @@
                                     android:layout_marginTop="4dp"
                                     android:ellipsize="end"
                                     android:lineSpacingExtra="2dp"
-                                    android:singleLine="true"
+                                    android:maxLines="2"
                                     android:text="@string/read_menu_footer_auto_summary"
                                     android:textSize="11sp" />
                             </LinearLayout>
@@ -1173,15 +1165,18 @@
                         <LinearLayout
                             android:id="@+id/layout_footer_display_show_card"
                             android:layout_width="match_parent"
-                            android:layout_height="52dp"
+                            android:layout_height="wrap_content"
                             android:layout_marginTop="12dp"
+                            android:minHeight="64dp"
                             android:background="@drawable/bg_read_menu_panel_button"
                             android:clickable="true"
                             android:focusable="true"
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
                             android:paddingStart="16dp"
-                            android:paddingEnd="16dp">
+                            android:paddingTop="10dp"
+                            android:paddingEnd="16dp"
+                            android:paddingBottom="10dp">
 
                             <View
                                 android:id="@+id/vw_footer_display_show_radio"
@@ -1242,7 +1237,7 @@
                                     android:layout_marginTop="4dp"
                                     android:ellipsize="end"
                                     android:lineSpacingExtra="2dp"
-                                    android:singleLine="true"
+                                    android:maxLines="2"
                                     android:text="@string/read_menu_footer_show_summary"
                                     android:textSize="11sp" />
                             </LinearLayout>
@@ -1251,15 +1246,18 @@
                         <LinearLayout
                             android:id="@+id/layout_footer_display_hide_card"
                             android:layout_width="match_parent"
-                            android:layout_height="52dp"
+                            android:layout_height="wrap_content"
                             android:layout_marginTop="12dp"
+                            android:minHeight="64dp"
                             android:background="@drawable/bg_read_menu_panel_button"
                             android:clickable="true"
                             android:focusable="true"
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
                             android:paddingStart="16dp"
-                            android:paddingEnd="16dp">
+                            android:paddingTop="10dp"
+                            android:paddingEnd="16dp"
+                            android:paddingBottom="10dp">
 
                             <View
                                 android:id="@+id/vw_footer_display_hide_radio"
@@ -1313,7 +1311,7 @@
                                     android:layout_marginTop="4dp"
                                     android:ellipsize="end"
                                     android:lineSpacingExtra="2dp"
-                                    android:singleLine="true"
+                                    android:maxLines="2"
                                     android:text="@string/read_menu_footer_hide_summary"
                                     android:textSize="11sp" />
                             </LinearLayout>
@@ -1594,7 +1592,8 @@
                     </LinearLayout>
                 </LinearLayout>
             </androidx.constraintlayout.widget.ConstraintLayout>
-        </LinearLayout>
+            </LinearLayout>
+        </FrameLayout>
     </FrameLayout>
 
     <FrameLayout
@@ -1732,14 +1731,39 @@
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
-                    <TextView
-                        android:id="@+id/tv_panel_toc_title"
+                    <LinearLayout
                         android:layout_width="0dp"
-                        android:layout_height="wrap_content"
+                        android:layout_height="match_parent"
                         android:layout_weight="1"
-                        android:text="@string/chapter_list"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:tag="toc_page_tabs">
+
+                        <TextView
+                            android:layout_width="54dp"
+                            android:layout_height="36dp"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center"
+                            android:singleLine="true"
+                            android:tag="tv_toc_tab_chapters"
+                            android:text="@string/chapter_list"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="54dp"
+                            android:layout_height="36dp"
+                            android:layout_marginStart="8dp"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center"
+                            android:singleLine="true"
+                            android:tag="tv_toc_tab_bookmarks"
+                            android:text="@string/bookmark"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
 
                     <TextView
                         android:id="@+id/tv_panel_toc_count"
@@ -1751,18 +1775,22 @@
                 <LinearLayout
                     android:id="@+id/toc_progress_panel"
                     android:layout_width="match_parent"
-                    android:layout_height="42dp"
+                    android:layout_height="52dp"
                     android:layout_marginTop="6dp"
                     android:background="@drawable/bg_read_menu_panel_button"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp">
+                    android:paddingStart="10dp"
+                    android:paddingTop="7dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="7dp">
 
                     <TextView
                         android:id="@+id/toc_progress_mode_toggle"
                         android:layout_width="64dp"
-                        android:layout_height="32dp"
+                        android:layout_height="38dp"
                         android:background="@drawable/bg_read_menu_panel_button"
                         android:clickable="true"
                         android:focusable="true"
@@ -1773,9 +1801,9 @@
 
                     <TextView
                         android:id="@+id/tv_toc_prev_chapter"
-                        android:layout_width="64dp"
-                        android:layout_height="32dp"
-                        android:layout_marginStart="8dp"
+                        android:layout_width="60dp"
+                        android:layout_height="36dp"
+                        android:layout_marginStart="6dp"
                         android:background="@drawable/bg_read_menu_panel_button"
                         android:clickable="true"
                         android:enabled="false"
@@ -1788,15 +1816,15 @@
                     <io.legado.app.lib.theme.view.ThemeSeekBar
                         android:id="@+id/seek_toc_progress"
                         android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_marginStart="8dp"
-                        android:layout_marginEnd="8dp"
+                        android:layout_height="38dp"
+                        android:layout_marginStart="6dp"
+                        android:layout_marginEnd="6dp"
                         android:layout_weight="1" />
 
                     <TextView
                         android:id="@+id/tv_toc_next_chapter"
-                        android:layout_width="64dp"
-                        android:layout_height="32dp"
+                        android:layout_width="60dp"
+                        android:layout_height="36dp"
                         android:background="@drawable/bg_read_menu_panel_button"
                         android:clickable="true"
                         android:enabled="false"
@@ -1807,15 +1835,367 @@
                         android:textSize="12sp" />
                 </LinearLayout>
 
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/rv_panel_toc"
+                <FrameLayout
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
                     android:layout_marginTop="6dp"
                     android:layout_weight="1"
+                    android:tag="toc_content_host">
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rv_panel_toc"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:clipToPadding="false"
+                        android:overScrollMode="never"
+                        android:paddingBottom="6dp" />
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:clipToPadding="false"
+                        android:overScrollMode="never"
+                        android:paddingBottom="6dp"
+                        android:tag="rv_panel_bookmarks"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:tag="tv_panel_bookmarks_empty"
+                        android:text="@string/read_menu_bookmark_empty"
+                        android:textSize="14sp"
+                        android:visibility="gone" />
+                </FrameLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="16dp"
+                android:paddingTop="12dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="12dp"
+                android:tag="panel_aloud"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:tag="tv_panel_aloud_title"
+                    android:text="@string/read_aloud"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_read_menu_panel_button"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:tag="aloud_transport_panel">
+
+                    <TextView
+                        android:layout_width="68dp"
+                        android:layout_height="42dp"
+                        android:background="@drawable/bg_read_menu_panel_button"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:singleLine="true"
+                        android:tag="tv_aloud_prev_chapter"
+                        android:text="@string/previous_chapter"
+                        android:textSize="13sp" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <androidx.appcompat.widget.AppCompatImageButton
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:layout_marginStart="2dp"
+                        android:layout_marginEnd="2dp"
+                        android:background="@color/transparent"
+                        android:contentDescription="@string/prev_sentence"
+                        android:padding="7dp"
+                        android:src="@drawable/ic_skip_previous"
+                        android:tag="iv_aloud_play_prev"
+                        android:tooltipText="@string/prev_sentence" />
+
+                    <androidx.appcompat.widget.AppCompatImageButton
+                        android:layout_width="42dp"
+                        android:layout_height="42dp"
+                        android:layout_marginStart="2dp"
+                        android:layout_marginEnd="2dp"
+                        android:background="@drawable/bg_read_menu_panel_button"
+                        android:contentDescription="@string/audio_play"
+                        android:padding="9dp"
+                        android:src="@drawable/ic_play_24dp"
+                        android:tag="iv_aloud_play_pause"
+                        android:tooltipText="@string/audio_play" />
+
+                    <androidx.appcompat.widget.AppCompatImageButton
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:layout_marginStart="2dp"
+                        android:layout_marginEnd="2dp"
+                        android:background="@color/transparent"
+                        android:contentDescription="@string/stop"
+                        android:padding="7dp"
+                        android:src="@drawable/ic_stop_black_24dp"
+                        android:tag="iv_aloud_stop"
+                        android:tooltipText="@string/stop" />
+
+                    <androidx.appcompat.widget.AppCompatImageButton
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:layout_marginStart="2dp"
+                        android:layout_marginEnd="2dp"
+                        android:background="@color/transparent"
+                        android:contentDescription="@string/next_sentence"
+                        android:padding="7dp"
+                        android:src="@drawable/ic_skip_next"
+                        android:tag="iv_aloud_play_next"
+                        android:tooltipText="@string/next_sentence" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <TextView
+                        android:layout_width="68dp"
+                        android:layout_height="42dp"
+                        android:background="@drawable/bg_read_menu_panel_button"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:singleLine="true"
+                        android:tag="tv_aloud_next_chapter"
+                        android:text="@string/next_chapter"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_read_menu_panel_button"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp">
+
+                    <androidx.appcompat.widget.AppCompatImageButton
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:background="@color/transparent"
+                        android:contentDescription="@string/set_timer"
+                        android:padding="8dp"
+                        android:src="@drawable/ic_time_add_24dp"
+                        android:tag="iv_aloud_timer"
+                        android:tooltipText="@string/set_timer" />
+
+                    <io.legado.app.lib.theme.view.ThemeSeekBar
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_marginStart="6dp"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:max="180"
+                        android:tag="seek_aloud_timer" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_read_menu_panel_button"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:minWidth="72dp"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        android:tag="tv_aloud_timer"
+                        android:text="@string/timer_m"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_read_menu_panel_button"
+                    android:orientation="vertical"
+                    android:paddingStart="10dp"
+                    android:paddingTop="8dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="8dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="34dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:tag="tv_aloud_tts_speed"
+                            android:text="@string/read_aloud_speed"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:paddingStart="4dp"
+                            android:paddingEnd="4dp"
+                            android:tag="tv_aloud_tts_speed_value"
+                            android:textSize="14sp" />
+
+                        <Space
+                            android:layout_width="0dp"
+                            android:layout_height="1dp"
+                            android:layout_weight="1" />
+
+                        <io.legado.app.lib.theme.view.ThemeSwitch
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:contentDescription="@string/flow_sys"
+                            android:tag="cb_aloud_tts_follow_sys"
+                            android:text="@string/flow_sys" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <androidx.appcompat.widget.AppCompatImageButton
+                            android:layout_width="38dp"
+                            android:layout_height="38dp"
+                            android:background="@color/transparent"
+                            android:contentDescription="@string/tts_speech_reduce"
+                            android:padding="9dp"
+                            android:src="@drawable/ic_reduce"
+                            android:tag="iv_aloud_tts_speech_reduce"
+                            android:tooltipText="@string/tts_speech_reduce" />
+
+                        <io.legado.app.lib.theme.view.ThemeSeekBar
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:max="45"
+                            android:tag="seek_aloud_tts_speech_rate" />
+
+                        <androidx.appcompat.widget.AppCompatImageButton
+                            android:layout_width="38dp"
+                            android:layout_height="38dp"
+                            android:background="@color/transparent"
+                            android:contentDescription="@string/tts_speech_add"
+                            android:padding="9dp"
+                            android:src="@drawable/ic_add"
+                            android:tag="iv_aloud_tts_speech_add"
+                            android:tooltipText="@string/tts_speech_add" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="8dp"
+                    android:baselineAligned="false"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_read_menu_panel_button"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:tag="panel_aloud_catalog"
+                        android:text="@string/chapter_list"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="6dp"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_read_menu_panel_button"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:tag="panel_aloud_setting"
+                        android:text="@string/setting"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_read_menu_panel_button"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:tag="panel_aloud_backstage"
+                        android:text="@string/to_backstage"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="16dp"
+                android:paddingTop="12dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="12dp"
+                android:tag="panel_settings"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:tag="tv_panel_settings_title"
+                    android:text="@string/setting"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <ScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="360dp"
+                    android:layout_marginTop="10dp"
                     android:clipToPadding="false"
-                    android:overScrollMode="never"
-                    android:paddingBottom="6dp" />
+                    android:fadeScrollbars="false"
+                    android:overScrollMode="ifContentScrolls"
+                    android:scrollbarStyle="outsideOverlay"
+                    android:scrollbars="vertical"
+                    android:tag="panel_settings_scroll">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingStart="10dp"
+                        android:paddingTop="8dp"
+                        android:paddingEnd="10dp"
+                        android:paddingBottom="8dp"
+                        android:tag="panel_settings_list" />
+                </ScrollView>
             </LinearLayout>
 
             <LinearLayout
@@ -1853,6 +2233,52 @@
                         android:text="@string/compose_type"
                         android:textSize="18sp"
                         android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:id="@+id/ll_brightness"
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/bg_read_menu_panel_button"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp">
+
+                        <androidx.appcompat.widget.AppCompatImageButton
+                            android:id="@+id/iv_brightness_auto"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="@color/transparent"
+                            android:contentDescription="@string/brightness_auto"
+                            android:padding="8dp"
+                            android:src="@drawable/ic_brightness_auto"
+                            android:tooltipText="@string/brightness_auto" />
+
+                        <TextView
+                            android:id="@+id/tv_layout_brightness_label"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:text="@string/brightness"
+                            android:textSize="14sp" />
+
+                        <io.legado.app.lib.theme.view.ThemeSeekBar
+                            android:id="@+id/seek_brightness"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_marginStart="10dp"
+                            android:layout_marginEnd="10dp"
+                            android:layout_weight="1"
+                            android:max="255" />
+
+                        <TextView
+                            android:id="@+id/tv_layout_brightness_value"
+                            android:layout_width="52dp"
+                            android:layout_height="wrap_content"
+                            android:gravity="end|center_vertical"
+                            android:textSize="13sp" />
+                    </LinearLayout>
 
                     <LinearLayout
                         android:id="@+id/panel_layout_font"
@@ -2366,48 +2792,6 @@
                         android:textSize="18sp"
                         android:textStyle="bold" />
 
-                    <LinearLayout
-                        android:id="@+id/ll_theme_tabs"
-                        android:layout_width="match_parent"
-                        android:layout_height="38dp"
-                        android:layout_marginTop="8dp"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:id="@+id/ll_theme_tab_preset"
-                            android:layout_width="0dp"
-                            android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:gravity="center"
-                            android:text="@string/read_menu_theme_preset"
-                            android:textSize="14sp" />
-
-                        <TextView
-                            android:id="@+id/ll_theme_tab_custom"
-                            android:layout_width="0dp"
-                            android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:gravity="center"
-                            android:text="@string/read_menu_theme_custom"
-                            android:textSize="14sp" />
-
-                        <TextView
-                            android:id="@+id/ll_theme_tab_eye"
-                            android:layout_width="0dp"
-                            android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:gravity="center"
-                            android:text="@string/read_menu_theme_eye_mode"
-                            android:textSize="14sp" />
-                    </LinearLayout>
-
                     <HorizontalScrollView
                         android:id="@+id/hsv_theme_presets"
                         android:layout_width="match_parent"
@@ -2463,6 +2847,13 @@
                                 android:id="@+id/theme_card_night"
                                 layout="@layout/view_read_theme_card"
                                 android:layout_width="96dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginEnd="8dp" />
+
+                            <include
+                                android:id="@+id/theme_card_add"
+                                layout="@layout/view_read_theme_card"
+                                android:layout_width="96dp"
                                 android:layout_height="wrap_content" />
                         </LinearLayout>
                     </HorizontalScrollView>
@@ -2504,6 +2895,13 @@
                         android:layout_height="wrap_content"
                         android:baselineAligned="false"
                         android:orientation="horizontal">
+
+                        <include
+                            android:tag="background_card_color"
+                            layout="@layout/view_read_background_card"
+                            android:layout_width="96dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="8dp" />
 
                         <include
                             android:id="@+id/background_card_beach"

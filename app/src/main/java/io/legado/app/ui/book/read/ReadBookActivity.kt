@@ -1625,6 +1625,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                 if (AppConfig.readBarStyleFollowPage) {
                     postEvent(EventBus.UPDATE_READ_ACTION_BAR, true)
                 }
+                binding.readMenu.reset()
             }
 
             TIP_COLOR -> {

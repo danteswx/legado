@@ -6,6 +6,8 @@ import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.ColorStateList
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.PorterDuff
 import android.graphics.Typeface
@@ -24,13 +26,18 @@ import android.view.animation.Animation
 import android.view.animation.DecelerateInterpolator
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
 import androidx.appcompat.widget.AppCompatImageButton
 import androidx.appcompat.widget.PopupMenu
+import androidx.appcompat.widget.SwitchCompat
+import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.constraintlayout.widget.ConstraintSet
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
+import androidx.core.view.doOnPreDraw
 import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -40,8 +47,10 @@ import com.qmdeve.liquidglass.widget.LiquidGlassView
 import io.legado.app.R
 import io.legado.app.constant.EventBus
 import io.legado.app.data.appDb
+import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.constant.PreferKey
+import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.databinding.ViewReadThemeCardBinding
 import io.legado.app.databinding.ViewReadMenuBinding
 import io.legado.app.databinding.ViewReadBackgroundCardBinding
@@ -64,11 +73,19 @@ import io.legado.app.lib.theme.buttonDisabledColor
 import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.primaryTextColor
+import io.legado.app.lib.theme.view.ThemeSwitch
+import io.legado.app.model.ReadAloud
 import io.legado.app.model.ReadBook
+import io.legado.app.service.BaseReadAloudService
 import io.legado.app.ui.browser.WebViewActivity
 import io.legado.app.ui.font.FontSelectDialog
+import io.legado.app.ui.book.read.config.BgTextConfigDialog.Companion.BG_COLOR
+import io.legado.app.ui.book.read.config.ContentSelectMenuConfigDialog
+import io.legado.app.ui.book.read.config.PageKeyDialog
+import io.legado.app.ui.book.read.config.ReadAloudConfigDialog
 import io.legado.app.ui.book.read.config.BgTextConfigDialog.Companion.TEXT_COLOR
 import io.legado.app.ui.book.read.config.TipConfigDialog.Companion.TIP_DIVIDER_COLOR
+import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.ui.book.searchContent.SearchContentAdapter
 import io.legado.app.ui.book.searchContent.SearchContentViewModel
 import io.legado.app.ui.book.searchContent.SearchResult
@@ -76,22 +93,26 @@ import io.legado.app.ui.widget.number.NumberPickerDialog
 import io.legado.app.ui.widget.seekbar.SeekBarChangeListener
 import io.legado.app.utils.ChineseUtils
 import io.legado.app.utils.ColorUtils
-import io.legado.app.utils.ConstraintModify
+import io.legado.app.utils.canvasrecorder.CanvasRecorderFactory
 import io.legado.app.utils.activity
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getCompatColor
+import io.legado.app.utils.getPrefString
+import io.legado.app.utils.putPrefInt
 import io.legado.app.utils.gone
 import io.legado.app.utils.hexString
 import io.legado.app.utils.invisible
 import io.legado.app.utils.loadAnimation
-import io.legado.app.utils.modifyBegin
 import io.legado.app.utils.openUrl
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.putPrefBoolean
+import io.legado.app.utils.putPrefString
 import io.legado.app.utils.showDialogFragment
+import io.legado.app.utils.stackBlur
 import io.legado.app.utils.startActivity
+import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.visible
 import splitties.views.onClick
 import java.io.File
@@ -115,6 +136,8 @@ class ReadMenu @JvmOverloads constructor(
     private enum class BottomTab {
         Search,
         Toc,
+        Aloud,
+        Settings,
         Layout,
         PageTurn,
         Background,
@@ -124,12 +147,6 @@ class ReadMenu @JvmOverloads constructor(
     private enum class BottomTabMode {
         Primary,
         Interface
-    }
-
-    private enum class ThemeTab {
-        Preset,
-        Custom,
-        Eye
     }
 
     private enum class LayoutMarginAdjustMode {
@@ -147,6 +164,11 @@ class ReadMenu @JvmOverloads constructor(
         Right
     }
 
+    private enum class TocPanelPage {
+        Chapters,
+        Bookmarks
+    }
+
     private var activeBottomTab: BottomTab? = null
     private var bottomTabMode: BottomTabMode = BottomTabMode.Primary
     private var activeLayoutMarginAdjustMode: LayoutMarginAdjustMode = LayoutMarginAdjustMode.Body
@@ -154,13 +176,20 @@ class ReadMenu @JvmOverloads constructor(
     private var bottomTabPanelAttached: Boolean = false
     private var bottomTabHeightAnimator: ValueAnimator? = null
     private var bottomTabGlassStyleKey: String? = null
+    private var layoutAdjustGlassStyleKey: String? = null
     private var bottomTabGlassLayerHeight: Int = 0
+    private var layoutAdjustGlassLayerHeight: Int = 0
+    private var layoutAdjustBackdropBitmap: Bitmap? = null
+    private var layoutAdjustBackdropCropBitmap: Bitmap? = null
     private var tocLoadJob: Coroutine<List<BookChapter>>? = null
+    private var bookmarkLoadJob: Coroutine<List<Bookmark>>? = null
     private var tocPanelFullscreen: Boolean = false
+    private var tocPanelPage: TocPanelPage = TocPanelPage.Chapters
     private var tocDragStartY: Float = 0f
     private var tocDragStartPanelHeight: Int = 0
     private val boundBottomTabGlassViewIds = hashSetOf<Int>()
     private val tocAdapter by lazy { ReadMenuTocAdapter(::openTocChapter) }
+    private val bookmarkAdapter by lazy { ReadMenuBookmarkAdapter(::openBookmark) }
     private val searchPanelAdapter by lazy {
         SearchContentAdapter(context, object : SearchContentAdapter.Callback {
             override fun openSearchResult(searchResult: SearchResult, index: Int) {
@@ -180,7 +209,6 @@ class ReadMenu @JvmOverloads constructor(
     private val searchPanelResults = arrayListOf<SearchResult>()
     private var searchPanelJob: Coroutine<List<SearchResult>>? = null
     private var tocProgressWholeBook: Boolean = false
-    private var activeThemeTab: ThemeTab = ThemeTab.Preset
     private data class FontSample(
         val binding: ViewReadThemeCardBinding,
         val titleRes: Int,
@@ -192,6 +220,12 @@ class ReadMenu @JvmOverloads constructor(
     private data class BackgroundSample(
         val binding: ViewReadBackgroundCardBinding,
         val assetName: String
+    )
+
+    private data class ThemeSuiteCard(
+        val suite: ReadMenuThemeSuite,
+        val selected: Boolean,
+        val custom: Boolean
     )
 
     private val fontSampleBindings by lazy {
@@ -251,6 +285,11 @@ class ReadMenu @JvmOverloads constructor(
             BackgroundSample(binding.backgroundCardBright, "明媚倾城.jpg")
         )
     }
+    private val backgroundColorCardBinding by lazy {
+        ViewReadBackgroundCardBinding.bind(
+            binding.llBackgroundImageRow.getChildAt(0)
+        )
+    }
     private val themePresets by lazy { ReadMenuThemePreset.defaultPresets() }
     private val themeCardBindings by lazy {
         listOf(
@@ -262,6 +301,9 @@ class ReadMenu @JvmOverloads constructor(
             binding.themeCardNight
         )
     }
+    private val dynamicThemeCardBindings = mutableListOf<ViewReadThemeCardBinding>()
+    private var selectedThemeDeleteButton: AppCompatImageButton? = null
+    private var selectedThemeDeleteButtonAnimator: ValueAnimator? = null
     private val menuTopIn: Animation by lazy {
         loadAnimation(context, R.anim.anim_readbook_top_in)
     }
@@ -306,11 +348,6 @@ class ReadMenu @JvmOverloads constructor(
         .setPressedColor(ColorUtils.darkenColor(bgColor))
         .create()
     private var onMenuOutEnd: (() -> Unit)? = null
-    private val showBrightnessView
-        get() = context.getPrefBoolean(
-            PreferKey.showBrightnessView,
-            true
-        )
     private val sourceMenu by lazy {
         PopupMenu(context, binding.tvSourceAction).apply {
             inflate(R.menu.book_read_source)
@@ -331,7 +368,6 @@ class ReadMenu @JvmOverloads constructor(
                 ReadBook.bookSource?.bookSourceName ?: context.getString(R.string.book_source)
             binding.tvSourceAction.isGone = ReadBook.isLocalBook
             callBack.upSystemUiVisibility()
-            binding.llBrightness.visible(showBrightnessView)
         }
 
         @SuppressLint("RtlHardcoded")
@@ -356,6 +392,7 @@ class ReadMenu @JvmOverloads constructor(
             binding.titleBar.invisible()
             binding.bottomMenu.invisible()
             binding.layoutMarginAdjustOverlay.gone()
+            clearLayoutAdjustBackdrop()
             binding.flExpandedPanel.gone()
             binding.flExpandedPanel.alpha = 0f
             setBottomTabBarHeight(bottomTabCollapsedHeight())
@@ -382,6 +419,7 @@ class ReadMenu @JvmOverloads constructor(
         setupExpandableBottomTabContainer()
         setupSearchPanel()
         setupTocPanel()
+        setupAloudPanel()
         if (immersiveMenu) {
             val lightTextColor = ColorUtils.withAlpha(ColorUtils.lightenColor(textColor), 0.75f)
             titleBar.setTextColor(textColor)
@@ -398,21 +436,28 @@ class ReadMenu @JvmOverloads constructor(
             tvChapterName.setTextColor(textColor)
             tvChapterUrl.setTextColor(textColor)
         }
-        val brightnessBackground = GradientDrawable()
-        brightnessBackground.cornerRadius = 5F.dpToPx()
-        brightnessBackground.setColor(ColorUtils.adjustAlpha(bgColor, 0.5f))
-        llBrightness.background = brightnessBackground
         if (AppConfig.isEInkMode) {
             titleBar.setBackgroundResource(R.drawable.bg_eink_border_bottom)
         }
         flExpandedPanel.background = null
         flExpandedPanel.elevation = 0f
-        tvPanelTocTitle.setTextColor(textColor)
         tvPanelTocCount.setTextColor(textColor)
+        taggedText("tv_panel_bookmarks_empty").setTextColor(ColorUtils.adjustAlpha(textColor, 0.62f))
         tocProgressModeToggle.setTextColor(textColor)
         tvTocPrevChapter.setTextColor(textColor)
         tvTocNextChapter.setTextColor(textColor)
         tvPanelSearchTitle.setTextColor(textColor)
+        taggedText("tv_panel_aloud_title").setTextColor(textColor)
+        taggedText("tv_aloud_prev_chapter").setTextColor(textColor)
+        taggedText("tv_aloud_next_chapter").setTextColor(textColor)
+        taggedText("tv_aloud_timer").setTextColor(textColor)
+        taggedText("tv_aloud_tts_speed").setTextColor(textColor)
+        taggedText("tv_aloud_tts_speed_value").setTextColor(textColor)
+        taggedSwitch("cb_aloud_tts_follow_sys").setTextColor(textColor)
+        taggedText("panel_aloud_catalog").setTextColor(textColor)
+        taggedText("panel_aloud_setting").setTextColor(textColor)
+        taggedText("panel_aloud_backstage").setTextColor(textColor)
+        taggedText("tv_panel_settings_title").setTextColor(textColor)
         tvPanelLayoutTitle.setTextColor(textColor)
         tvPanelBackgroundTitle.setTextColor(textColor)
         tvPanelThemeTitle.setTextColor(textColor)
@@ -428,6 +473,15 @@ class ReadMenu @JvmOverloads constructor(
         panelMoreAutoPage.setTextColor(textColor)
         panelMoreReplace.setTextColor(textColor)
         panelMoreSettings.setTextColor(textColor)
+        listOf(
+            taggedImageButton("iv_aloud_play_prev"),
+            taggedImageButton("iv_aloud_play_pause"),
+            taggedImageButton("iv_aloud_stop"),
+            taggedImageButton("iv_aloud_play_next"),
+            taggedImageButton("iv_aloud_timer"),
+            taggedImageButton("iv_aloud_tts_speech_reduce"),
+            taggedImageButton("iv_aloud_tts_speech_add")
+        ).forEach { it.setColorFilter(textColor) }
         tintLayoutPanel(textColor)
         tintThemePanel(textColor)
         tintSearchPanel(textColor)
@@ -435,7 +489,6 @@ class ReadMenu @JvmOverloads constructor(
         tintPageTurnPanel(textColor)
         renderLayoutPanel()
         renderBottomTabState()
-        renderThemeTabs()
         updateLayoutControlsFromConfig()
         updatePageTurnControls()
         updateThemeControlsFromConfig()
@@ -443,17 +496,18 @@ class ReadMenu @JvmOverloads constructor(
         updateFontSampleCards()
         updateBackgroundSampleCards()
         updateBackgroundControlsFromConfig()
-        vwBrightnessPosAdjust.setColorFilter(textColor, PorterDuff.Mode.SRC_IN)
-        llBrightness.setOnClickListener(null)
+        updateAloudControls()
+        renderSettingsPanel()
+        ivBrightnessAuto.setColorFilter(textColor, PorterDuff.Mode.SRC_IN)
         seekBrightness.post {
             seekBrightness.progress = AppConfig.readBrightness
+            updateBrightnessValue()
         }
         if (AppConfig.showReadTitleBarAddition) {
             titleBarAddition.visible()
         } else {
             titleBarAddition.gone()
         }
-        upBrightnessVwPos()
         /**
          * 确保视图不被导航栏遮挡
          */
@@ -498,7 +552,16 @@ class ReadMenu @JvmOverloads constructor(
             binding.ivBrightnessAuto.setColorFilter(context.buttonDisabledColor)
             binding.seekBrightness.isEnabled = true
         }
+        updateBrightnessValue()
         setScreenBrightness(AppConfig.readBrightness.toFloat())
+    }
+
+    private fun updateBrightnessValue() = binding.run {
+        tvLayoutBrightnessValue.text = if (brightnessAuto()) {
+            context.getString(R.string.read_menu_brightness_auto)
+        } else {
+            "${(seekBrightness.progress * 100f / seekBrightness.max.coerceAtLeast(1)).roundToInt()}%"
+        }
     }
 
     /**
@@ -553,7 +616,7 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     private fun brightnessAuto(): Boolean {
-        return context.getPrefBoolean("brightnessAuto", true) || !showBrightnessView
+        return context.getPrefBoolean("brightnessAuto", true)
     }
 
     private fun setupExpandableBottomTabContainer() = binding.run {
@@ -699,6 +762,18 @@ class ReadMenu @JvmOverloads constructor(
             rvPanelToc.layoutManager = LinearLayoutManager(context)
             rvPanelToc.adapter = tocAdapter
         }
+        val bookmarkRecycler = taggedRecycler("rv_panel_bookmarks")
+        if (bookmarkRecycler.adapter == null) {
+            bookmarkRecycler.layoutManager = LinearLayoutManager(context)
+            bookmarkRecycler.adapter = bookmarkAdapter
+        }
+        taggedText("tv_toc_tab_chapters").setOnClickListener {
+            setTocPanelPage(TocPanelPage.Chapters)
+        }
+        taggedText("tv_toc_tab_bookmarks").setOnClickListener {
+            setTocPanelPage(TocPanelPage.Bookmarks)
+        }
+        renderTocPanelPage()
         tocDragHandleIndicator.background = roundedRect(
             ColorUtils.adjustAlpha(bottomTabContentColor(), 0.26f),
             2f.dpToPx()
@@ -767,7 +842,34 @@ class ReadMenu @JvmOverloads constructor(
         }
     }
 
+    private fun setTocPanelPage(page: TocPanelPage) {
+        if (tocPanelPage == page) {
+            return
+        }
+        tocPanelPage = page
+        renderTocPanelPage()
+        loadTocPanel()
+    }
+
+    private fun renderTocPanelPage() = binding.run {
+        val showingChapters = tocPanelPage == TocPanelPage.Chapters
+        configureTocHeaderTab(taggedText("tv_toc_tab_chapters"), showingChapters)
+        configureTocHeaderTab(taggedText("tv_toc_tab_bookmarks"), !showingChapters)
+        tocProgressPanel.gone(!showingChapters)
+        rvPanelToc.gone(!showingChapters)
+        taggedRecycler("rv_panel_bookmarks").gone(showingChapters)
+        taggedText("tv_panel_bookmarks_empty").gone(showingChapters || bookmarkAdapter.itemCount > 0)
+        if (!showingChapters) {
+            tvPanelTocCount.text = bookmarkAdapter.itemCount.toString()
+        }
+    }
+
     private fun loadTocPanel() {
+        renderTocPanelPage()
+        if (tocPanelPage == TocPanelPage.Bookmarks) {
+            loadBookmarkPanel()
+            return
+        }
         val book = ReadBook.book
         if (book == null) {
             tocAdapter.submit(emptyList())
@@ -794,6 +896,33 @@ class ReadMenu @JvmOverloads constructor(
         }
     }
 
+    private fun loadBookmarkPanel() {
+        val book = ReadBook.book
+        if (book == null) {
+            bookmarkAdapter.submit(emptyList())
+            binding.tvPanelTocCount.text = "0"
+            taggedText("tv_panel_bookmarks_empty").visible()
+            return
+        }
+        bookmarkLoadJob?.cancel()
+        bookmarkLoadJob = Coroutine.async {
+            appDb.bookmarkDao.getByBook(book.name, book.author)
+        }.onSuccess {
+            bookmarkAdapter.submit(it)
+            binding.tvPanelTocCount.text = it.size.toString()
+            taggedText("tv_panel_bookmarks_empty").gone(it.isNotEmpty())
+            val currentIndex = it.indexOfLast { bookmark ->
+                bookmark.chapterIndex <= ReadBook.durChapterIndex
+            }.coerceAtLeast(0)
+            if (it.isNotEmpty()) {
+                taggedRecycler("rv_panel_bookmarks").post {
+                    (taggedRecycler("rv_panel_bookmarks").layoutManager as? LinearLayoutManager)
+                        ?.scrollToPositionWithOffset(currentIndex, 64.dpToPx())
+                }
+            }
+        }
+    }
+
     private fun openTocChapter(chapter: BookChapter) {
         if (chapter.isVolume) {
             return
@@ -803,6 +932,14 @@ class ReadMenu @JvmOverloads constructor(
         }
     }
 
+    private fun openBookmark(bookmark: Bookmark) {
+        runMenuOut {
+            ReadBook.saveCurrentBookProgress()
+            ReadBook.openChapter(bookmark.chapterIndex, bookmark.chapterPos)
+        }
+    }
+
+
     private fun animateTocPanelTo(targetHeight: Int) {
         tocPanelFullscreen = targetHeight >= tocFullPanelHeight()
         updateBottomTabGlassLayerHeight(tocFullPanelHeight())
@@ -811,6 +948,479 @@ class ReadMenu @JvmOverloads constructor(
             animate = !AppConfig.isEInkMode
         ) {
             renderBottomTabState()
+        }
+    }
+
+    private fun setupAloudPanel() = binding.run {
+        taggedImageButton("iv_aloud_play_pause").setOnClickListener {
+            callBack.onClickReadAloud()
+            updateAloudControls()
+        }
+        taggedImageButton("iv_aloud_stop").setOnClickListener {
+            ReadAloud.stop(context)
+            updateAloudControls()
+        }
+        taggedImageButton("iv_aloud_play_prev").setOnClickListener { ReadAloud.prevParagraph(context) }
+        taggedImageButton("iv_aloud_play_next").setOnClickListener { ReadAloud.nextParagraph(context) }
+        taggedText("tv_aloud_prev_chapter").setOnClickListener {
+            ReadBook.moveToPrevChapter(upContent = true, toLast = false)
+        }
+        taggedText("tv_aloud_next_chapter").setOnClickListener { ReadBook.moveToNextChapter(true) }
+        taggedImageButton("iv_aloud_timer").setOnClickListener {
+            ReadAloud.setTimer(context, taggedSeekBar("seek_aloud_timer").progress)
+        }
+        taggedText("tv_aloud_timer").setOnClickListener {
+            val times = intArrayOf(0, 5, 10, 15, 30, 60, 90, 180)
+            val timeKeys = times.map { context.getString(R.string.timer_m, it) }
+            context.selector(context.getString(R.string.set_timer), timeKeys) { _, index ->
+                ReadAloud.setTimer(context, times[index])
+                taggedSeekBar("seek_aloud_timer").progress = times[index]
+                updateAloudTimerText(times[index])
+            }
+        }
+        taggedSeekBar("seek_aloud_timer").setOnSeekBarChangeListener(object : SeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                updateAloudTimerText(progress)
+            }
+
+            override fun onStopTrackingTouch(seekBar: SeekBar) {
+                ReadAloud.setTimer(context, seekBar.progress)
+            }
+        })
+        taggedSwitch("cb_aloud_tts_follow_sys").setOnCheckedChangeListener { _, isChecked ->
+            AppConfig.ttsFlowSys = isChecked
+            updateAloudTtsSpeechRateEnabled(!isChecked)
+            applyAloudTtsSpeechRate()
+        }
+        taggedImageButton("iv_aloud_tts_speech_reduce").setOnClickListener {
+            setAloudTtsSpeechRate(AppConfig.ttsSpeechRate - 1)
+        }
+        taggedImageButton("iv_aloud_tts_speech_add").setOnClickListener {
+            setAloudTtsSpeechRate(AppConfig.ttsSpeechRate + 1)
+        }
+        taggedSeekBar("seek_aloud_tts_speech_rate").setOnSeekBarChangeListener(object : SeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                updateAloudTtsSpeechRateText(progress)
+            }
+
+            override fun onStopTrackingTouch(seekBar: SeekBar) {
+                setAloudTtsSpeechRate(seekBar.progress)
+            }
+        })
+        taggedText("panel_aloud_catalog").setOnClickListener {
+            showBottomPanel(BottomTab.Toc)
+        }
+        taggedText("panel_aloud_setting").setOnClickListener {
+            activity?.showDialogFragment<ReadAloudConfigDialog>()
+        }
+        taggedText("panel_aloud_backstage").setOnClickListener {
+            runMenuOut { activity?.finish() }
+        }
+    }
+
+    private fun updateAloudControls() = binding.run {
+        updateAloudPlayState()
+        val timer = if (BaseReadAloudService.timeMinute > 0) {
+            BaseReadAloudService.timeMinute
+        } else {
+            AppConfig.ttsTimer
+        }
+        taggedSeekBar("seek_aloud_timer").progress = timer
+        updateAloudTimerText(timer)
+        taggedSwitch("cb_aloud_tts_follow_sys").isChecked = AppConfig.ttsFlowSys
+        taggedSeekBar("seek_aloud_tts_speech_rate").progress = AppConfig.ttsSpeechRate
+        updateAloudTtsSpeechRateEnabled(!AppConfig.ttsFlowSys)
+        updateAloudTtsSpeechRateText(AppConfig.ttsSpeechRate)
+    }
+
+    private fun updateAloudPlayState() = binding.run {
+        val isPlaying = BaseReadAloudService.isRun && !BaseReadAloudService.pause
+        val iconRes = if (isPlaying) {
+            R.drawable.ic_pause_24dp
+        } else {
+            R.drawable.ic_play_24dp
+        }
+        val descriptionRes = if (isPlaying) {
+            R.string.pause
+        } else {
+            R.string.audio_play
+        }
+        taggedImageButton("iv_aloud_play_pause").run {
+            setImageResource(iconRes)
+            contentDescription = context.getString(descriptionRes)
+            setColorFilter(textColor)
+        }
+    }
+
+    private fun updateAloudTimerText(value: Int) {
+        taggedText("tv_aloud_timer").text = context.getString(R.string.timer_m, value.coerceAtLeast(0))
+    }
+
+    private fun updateAloudTtsSpeechRateEnabled(enabled: Boolean) = binding.run {
+        val speechRateSeek = taggedSeekBar("seek_aloud_tts_speech_rate")
+        val reduceButton = taggedImageButton("iv_aloud_tts_speech_reduce")
+        val addButton = taggedImageButton("iv_aloud_tts_speech_add")
+        taggedText("tv_aloud_tts_speed_value").visible(enabled)
+        speechRateSeek.isEnabled = enabled
+        reduceButton.isEnabled = enabled
+        addButton.isEnabled = enabled
+        val alpha = if (enabled) 1f else 0.42f
+        speechRateSeek.alpha = alpha
+        reduceButton.alpha = alpha
+        addButton.alpha = alpha
+    }
+
+    @SuppressLint("SetTextI18n")
+    private fun updateAloudTtsSpeechRateText(value: Int) {
+        taggedText("tv_aloud_tts_speed_value").text = ((value + 5) / 10f).toString()
+    }
+
+    private fun setAloudTtsSpeechRate(value: Int) = binding.run {
+        val speechRateSeek = taggedSeekBar("seek_aloud_tts_speech_rate")
+        val boundedValue = value.coerceIn(0, speechRateSeek.max)
+        speechRateSeek.progress = boundedValue
+        AppConfig.ttsSpeechRate = boundedValue
+        applyAloudTtsSpeechRate()
+    }
+
+    private fun applyAloudTtsSpeechRate() {
+        ReadAloud.upTtsSpeechRate(context)
+        if (!BaseReadAloudService.pause) {
+            ReadAloud.pause(context)
+            ReadAloud.resume(context)
+        }
+        updateAloudTtsSpeechRateText(AppConfig.ttsSpeechRate)
+    }
+
+    private fun loadSettingsPanel() {
+        renderSettingsPanel()
+    }
+
+    private fun renderSettingsPanel() {
+        val list = taggedLinear("panel_settings_list")
+        list.removeAllViews()
+        addReadSettingChoice(
+            list,
+            R.string.screen_direction,
+            PreferKey.screenOrientation,
+            R.array.screen_direction_title,
+            R.array.screen_direction_value,
+            "0"
+        )
+        addReadSettingChoice(
+            list,
+            R.string.keep_light,
+            PreferKey.keepLight,
+            R.array.screen_time_out,
+            R.array.screen_time_out_value,
+            "0"
+        )
+        addReadSettingSwitch(list, R.string.pt_hide_status_bar, PreferKey.hideStatusBar)
+        addReadSettingSwitch(list, R.string.pt_hide_navigation_bar, PreferKey.hideNavigationBar)
+        addReadSettingSwitch(list, R.string.read_body_to_lh, PreferKey.readBodyToLh, true)
+        addReadSettingSwitch(list, R.string.padding_display_cutouts, PreferKey.paddingDisplayCutouts, true)
+        addReadSettingChoice(
+            list,
+            R.string.double_page_horizontal,
+            PreferKey.doublePageHorizontal,
+            R.array.double_page_title,
+            R.array.double_page_value,
+            "0"
+        )
+        addReadSettingChoice(
+            list,
+            R.string.progress_bar_behavior,
+            PreferKey.progressBarBehavior,
+            R.array.progress_bar_behavior_title,
+            R.array.progress_bar_behavior_value,
+            "page"
+        )
+        addReadSettingSwitch(list, R.string.use_zh_layout, PreferKey.useZhLayout)
+        addReadSettingSwitch(list, R.string.text_full_justify, PreferKey.textFullJustify, true)
+        addReadSettingSwitch(list, R.string.text_bottom_justify, PreferKey.textBottomJustify, true)
+        addReadSettingSwitch(list, R.string.adapt_special_style, PreferKey.adaptSpecialStyle, true)
+        addReadSettingSwitch(list, R.string.mouse_wheel_page, PreferKey.mouseWheelPage, true)
+        addReadSettingSwitch(list, R.string.volume_key_page, PreferKey.volumeKeyPage, true)
+        addReadSettingSwitch(list, R.string.volume_key_page_on_play, PreferKey.volumeKeyPageOnPlay)
+        addReadSettingSwitch(list, R.string.key_page_on_long_press, PreferKey.keyPageOnLongPress)
+        addReadSettingAction(
+            list,
+            R.string.page_touch_slop_title,
+            context.getString(R.string.page_touch_slop_summary, AppConfig.pageTouchSlop)
+        ) {
+            NumberPickerDialog(context)
+                .setTitle(context.getString(R.string.page_touch_slop_dialog_title))
+                .setMaxValue(9999)
+                .setMinValue(0)
+                .setValue(AppConfig.pageTouchSlop)
+                .show {
+                    AppConfig.pageTouchSlop = it
+                    onReadSettingChanged(PreferKey.pageTouchSlop)
+                    renderSettingsPanel()
+                }
+        }
+        addReadSettingAction(
+            list,
+            R.string.page_touch_click_title,
+            context.getString(R.string.page_touch_click_summary, AppConfig.pageTouchClick)
+        ) {
+            NumberPickerDialog(context)
+                .setTitle(context.getString(R.string.page_touch_click_dialog_title))
+                .setMaxValue(399)
+                .setMinValue(0)
+                .setValue(AppConfig.pageTouchClick)
+                .show {
+                    AppConfig.pageTouchClick = it
+                    onReadSettingChanged(PreferKey.pageTouchClick)
+                    renderSettingsPanel()
+                }
+        }
+        addReadSettingAction(
+            list,
+            R.string.read_menu_alpha,
+            context.getString(R.string.ui_layout_alpha_value, AppConfig.readMenuAlpha)
+        ) {
+            NumberPickerDialog(context)
+                .setTitle(context.getString(R.string.read_menu_alpha))
+                .setMaxValue(100)
+                .setMinValue(35)
+                .setValue(AppConfig.readMenuAlpha)
+                .setCustomButton(R.string.btn_default_s) {
+                    AppConfig.readMenuAlpha = 100
+                    onReadSettingChanged(PreferKey.readMenuAlpha)
+                    renderSettingsPanel()
+                }
+                .show {
+                    AppConfig.readMenuAlpha = it.coerceIn(35, 100)
+                    onReadSettingChanged(PreferKey.readMenuAlpha)
+                    renderSettingsPanel()
+                }
+        }
+        addReadSettingSwitch(list, R.string.auto_change_source, PreferKey.autoChangeSource, true)
+        addReadSettingSwitch(list, R.string.selectText, PreferKey.textSelectAble, true)
+        addReadSettingSwitch(list, R.string.no_anim_scroll_page, PreferKey.noAnimScrollPage)
+        addReadSettingChoice(
+            list,
+            R.string.click_image_way,
+            PreferKey.clickImgWay,
+            R.array.click_image_way_title,
+            R.array.click_image_way_value,
+            "0"
+        )
+        if (CanvasRecorderFactory.isSupport) {
+            addReadSettingSwitch(list, R.string.enable_optimize_render, PreferKey.optimizeRender)
+        }
+        addReadSettingAction(list, R.string.click_regional_config) {
+            (activity as? BaseReadBookActivity)?.showClickRegionalConfig()
+        }
+        addReadSettingSwitch(list, R.string.disable_return_key, "disableReturnKey")
+        addReadSettingAction(list, R.string.custom_page_key) {
+            PageKeyDialog(context).show()
+        }
+        addReadSettingSwitch(list, R.string.expand_text_menu, PreferKey.expandTextMenu)
+        addReadSettingAction(
+            list,
+            R.string.content_select_menu_config,
+            context.getString(R.string.content_select_menu_config_summary)
+        ) {
+            activity?.showDialogFragment(ContentSelectMenuConfigDialog())
+        }
+        addReadSettingSwitch(list, R.string.show_read_title_addition, PreferKey.showReadTitleAddition, true)
+        addReadSettingSwitch(list, R.string.read_bar_style_follow_page, PreferKey.readBarStyleFollowPage)
+    }
+
+    private fun addReadSettingChoice(
+        parent: LinearLayout,
+        titleRes: Int,
+        key: String,
+        entriesRes: Int,
+        valuesRes: Int,
+        defaultValue: String
+    ) {
+        val entries = resources.getTextArray(entriesRes).map { it.toString() }
+        val values = resources.getStringArray(valuesRes)
+        val currentValue = context.getPrefString(key, defaultValue) ?: defaultValue
+        val selectedIndex = values.indexOf(currentValue)
+            .takeIf { it >= 0 }
+            ?: values.indexOf(defaultValue).takeIf { it >= 0 }
+            ?: 0
+        val row = createReadSettingRow(parent)
+        addReadSettingLabel(row, context.getString(titleRes))
+        row.addView(readSettingValueChip(entries[selectedIndex]))
+        row.setOnClickListener {
+            context.selector(context.getString(titleRes), entries) { _, index ->
+                context.putPrefString(key, values[index])
+                onReadSettingChanged(key)
+                renderSettingsPanel()
+            }
+        }
+    }
+
+    private fun addReadSettingSwitch(
+        parent: LinearLayout,
+        titleRes: Int,
+        key: String,
+        defaultValue: Boolean = false
+    ) {
+        val row = createReadSettingRow(parent)
+        addReadSettingLabel(row, context.getString(titleRes))
+        val switch = SwitchCompat(context).apply {
+            isChecked = context.getPrefBoolean(key, defaultValue)
+            setTextColor(textColor)
+            setOnCheckedChangeListener { _, checked ->
+                context.putPrefBoolean(key, checked)
+                onReadSettingChanged(key)
+            }
+        }
+        row.addView(switch)
+        row.setOnClickListener {
+            switch.isChecked = !switch.isChecked
+        }
+    }
+
+    private fun addReadSettingAction(
+        parent: LinearLayout,
+        titleRes: Int,
+        summary: String? = null,
+        onClick: () -> Unit
+    ) {
+        val row = createReadSettingRow(parent)
+        addReadSettingLabel(row, context.getString(titleRes), summary)
+        row.addView(readSettingValueChip(">"))
+        row.setOnClickListener { onClick() }
+    }
+
+    private fun createReadSettingRow(parent: LinearLayout): LinearLayout {
+        val row = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = 58.dpToPx()
+            setPadding(14.dpToPx(), 8.dpToPx(), 12.dpToPx(), 8.dpToPx())
+        }
+        row.background = readSettingRowBackground()
+        parent.addView(
+            row,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = 8.dpToPx()
+            }
+        )
+        return row
+    }
+
+    private fun addReadSettingLabel(row: LinearLayout, title: String, summary: String? = null) {
+        row.addView(
+            LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(TextView(context).apply {
+                    text = title
+                    setTextColor(textColor)
+                    textSize = 15f
+                    maxLines = 2
+                    ellipsize = TextUtils.TruncateAt.END
+                })
+                if (!summary.isNullOrBlank()) {
+                    addView(TextView(context).apply {
+                        text = summary
+                        setTextColor(ColorUtils.adjustAlpha(textColor, 0.68f))
+                        textSize = 12f
+                        maxLines = 2
+                        ellipsize = TextUtils.TruncateAt.END
+                    })
+                }
+            },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        )
+    }
+
+    private fun readSettingValueChip(text: String): TextView {
+        return TextView(context).apply {
+            this.text = text
+            setTextColor(textColor)
+            textSize = 13f
+            gravity = Gravity.CENTER
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            minWidth = 48.dpToPx()
+            maxWidth = 148.dpToPx()
+            setPadding(12.dpToPx(), 7.dpToPx(), 12.dpToPx(), 7.dpToPx())
+            background = readSettingChipBackground()
+        }
+    }
+
+    private fun readSettingRowBackground(): GradientDrawable {
+        return GradientDrawable().apply {
+            cornerRadius = 14f.dpToPx()
+            setColor(ColorUtils.adjustAlpha(Color.WHITE, 0.08f))
+            setStroke(1.dpToPx(), ColorUtils.adjustAlpha(Color.WHITE, 0.22f))
+        }
+    }
+
+    private fun readSettingChipBackground(): GradientDrawable {
+        return GradientDrawable().apply {
+            cornerRadius = 12f.dpToPx()
+            setColor(ColorUtils.adjustAlpha(context.accentColor, 0.30f))
+        }
+    }
+
+    private fun onReadSettingChanged(key: String) {
+        when (key) {
+            PreferKey.readBodyToLh -> activity?.recreate()
+            PreferKey.hideStatusBar -> {
+                ReadBookConfig.hideStatusBar = context.getPrefBoolean(PreferKey.hideStatusBar)
+                postEvent(EventBus.UP_CONFIG, arrayListOf(0, 2))
+            }
+
+            PreferKey.hideNavigationBar -> {
+                ReadBookConfig.hideNavigationBar = context.getPrefBoolean(PreferKey.hideNavigationBar)
+                postEvent(EventBus.UP_CONFIG, arrayListOf(0, 2))
+            }
+
+            PreferKey.keepLight -> postEvent(key, true)
+            PreferKey.textSelectAble -> postEvent(key, context.getPrefBoolean(key))
+            PreferKey.screenOrientation -> (activity as? BaseReadBookActivity)?.setOrientation()
+            PreferKey.textFullJustify,
+            PreferKey.textBottomJustify,
+            PreferKey.useZhLayout,
+            PreferKey.adaptSpecialStyle -> {
+                postEvent(EventBus.UP_CONFIG, arrayListOf(5))
+            }
+
+            PreferKey.expandTextMenu -> {
+                (activity as? ReadBookActivity)?.textActionMenu?.upMenu()
+            }
+
+            PreferKey.doublePageHorizontal -> {
+                ChapterProvider.upLayout()
+                ReadBook.loadContent(false)
+            }
+
+            PreferKey.showReadTitleAddition,
+            PreferKey.readBarStyleFollowPage,
+            PreferKey.readMenuAlpha -> {
+                postEvent(EventBus.UPDATE_READ_ACTION_BAR, true)
+            }
+
+            PreferKey.progressBarBehavior -> {
+                postEvent(EventBus.UP_SEEK_BAR, true)
+                upSeekBar()
+            }
+
+            PreferKey.noAnimScrollPage -> {
+                ReadBook.callBack?.upPageAnim()
+            }
+
+            PreferKey.optimizeRender -> {
+                ChapterProvider.upStyle()
+                ReadBook.callBack?.upPageAnim(true)
+                ReadBook.loadContent(false)
+            }
+
+            PreferKey.paddingDisplayCutouts -> {
+                postEvent(EventBus.UP_CONFIG, arrayListOf(2))
+            }
         }
     }
 
@@ -824,7 +1434,7 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     private fun showBottomPanel(tab: BottomTab) = binding.run {
-        if (tab == BottomTab.Search || tab == BottomTab.Toc) {
+        if (tab.usesPrimaryNavigation()) {
             if (bottomTabMode != BottomTabMode.Primary) {
                 switchBottomTabMode(BottomTabMode.Primary, animate = false)
             }
@@ -845,6 +1455,10 @@ class ReadMenu @JvmOverloads constructor(
                 loadTocPanel()
             }
 
+            BottomTab.Aloud -> updateAloudControls()
+
+            BottomTab.Settings -> loadSettingsPanel()
+
             BottomTab.Layout -> Unit
 
             BottomTab.PageTurn -> updatePageTurnControls()
@@ -854,6 +1468,8 @@ class ReadMenu @JvmOverloads constructor(
         }
         panelSearch.gone(tab != BottomTab.Search)
         panelToc.gone(tab != BottomTab.Toc)
+        taggedView("panel_aloud").gone(tab != BottomTab.Aloud)
+        taggedView("panel_settings").gone(tab != BottomTab.Settings)
         panelLayout.gone(tab != BottomTab.Layout)
         panelPageTurn.gone(tab != BottomTab.PageTurn)
         panelBackground.gone(tab != BottomTab.Background)
@@ -945,7 +1561,10 @@ class ReadMenu @JvmOverloads constructor(
         panelTheme.updateLayoutParams<FrameLayout.LayoutParams> {
             height = ViewGroup.LayoutParams.WRAP_CONTENT
         }
-        if (tab == BottomTab.Layout || tab == BottomTab.Theme) {
+        taggedView("panel_settings").updateLayoutParams<FrameLayout.LayoutParams> {
+            height = ViewGroup.LayoutParams.WRAP_CONTENT
+        }
+        if (tab == BottomTab.Layout || tab == BottomTab.Theme || tab == BottomTab.Settings) {
             applyAdaptivePanelHeight(tab, expandedPanelMaxHeight())
         }
     }
@@ -982,8 +1601,22 @@ class ReadMenu @JvmOverloads constructor(
                 }
             }
 
+            BottomTab.Settings -> {
+                val panelChromeHeight = 76.dpToPx()
+                val targetHeight = 520.dpToPx()
+                    .coerceAtMost(maxHeight)
+                    .coerceAtLeast(280.dpToPx().coerceAtMost(maxHeight))
+                taggedView("panel_settings").updateLayoutParams<FrameLayout.LayoutParams> {
+                    height = targetHeight
+                }
+                taggedView("panel_settings_scroll").updateLayoutParams<LinearLayout.LayoutParams> {
+                    height = (targetHeight - panelChromeHeight).coerceAtLeast(180.dpToPx())
+                }
+            }
+
             BottomTab.Search,
             BottomTab.Toc,
+            BottomTab.Aloud,
             BottomTab.PageTurn,
             BottomTab.Background -> Unit
         }
@@ -1047,6 +1680,13 @@ class ReadMenu @JvmOverloads constructor(
 
         panelToc.gone()
         panelSearch.gone()
+        taggedView("panel_aloud").visible()
+        val aloudHeight = measureBottomPanelHeight(taggedView("panel_aloud"), maxHeight)
+        taggedView("panel_aloud").gone()
+        taggedView("panel_settings").visible()
+        applyAdaptivePanelHeight(BottomTab.Settings, maxHeight)
+        val settingsHeight = measureBottomPanelHeight(taggedView("panel_settings"), maxHeight)
+        taggedView("panel_settings").gone()
         panelLayout.visible()
         panelTheme.gone()
         val layoutHeight = measureBottomPanelHeight(panelLayout, maxHeight)
@@ -1068,6 +1708,8 @@ class ReadMenu @JvmOverloads constructor(
 
         panelSearch.gone(currentBottomTab != BottomTab.Search)
         panelToc.gone(currentBottomTab != BottomTab.Toc)
+        taggedView("panel_aloud").gone(currentBottomTab != BottomTab.Aloud)
+        taggedView("panel_settings").gone(currentBottomTab != BottomTab.Settings)
         panelLayout.gone(currentBottomTab != BottomTab.Layout)
         panelPageTurn.gone(currentBottomTab != BottomTab.PageTurn)
         panelBackground.gone(currentBottomTab != BottomTab.Background)
@@ -1079,6 +1721,8 @@ class ReadMenu @JvmOverloads constructor(
             pageTurnHeight,
             backgroundHeight,
             themeHeight,
+            aloudHeight,
+            settingsHeight,
             searchHeight,
             tocHeight
         )
@@ -1089,6 +1733,8 @@ class ReadMenu @JvmOverloads constructor(
         return when (tab) {
             BottomTab.Search -> binding.panelSearch
             BottomTab.Toc -> binding.panelToc
+            BottomTab.Aloud -> taggedView("panel_aloud")
+            BottomTab.Settings -> taggedView("panel_settings")
             BottomTab.Layout -> binding.panelLayout
             BottomTab.PageTurn -> binding.panelPageTurn
             BottomTab.Background -> binding.panelBackground
@@ -1238,7 +1884,7 @@ class ReadMenu @JvmOverloads constructor(
             hideBottomTabIndicator()
             return@run
         }
-        if (tab == BottomTab.Toc) {
+        if (tab.usesPrimaryNavigation()) {
             showBottomTabIndicator(
                 nav = readBottomPrimaryNav,
                 itemId = tab.menuItemId(),
@@ -1278,16 +1924,24 @@ class ReadMenu @JvmOverloads constructor(
     private fun syncBottomNavigationSelection() = binding.run {
         setBottomNavigationSelection(
             readBottomPrimaryNav,
-            when {
-                activeBottomTab == BottomTab.Search -> R.id.menu_read_search
-                activeBottomTab == BottomTab.Toc -> R.id.menu_read_toc
-                bottomTabMode == BottomTabMode.Interface -> R.id.menu_read_interface
+            when (val tab = activeBottomTab) {
+                BottomTab.Search,
+                BottomTab.Toc,
+                BottomTab.Aloud,
+                BottomTab.Settings -> tab.menuItemId()
+
+                null -> if (bottomTabMode == BottomTabMode.Interface) {
+                    R.id.menu_read_interface
+                } else {
+                    null
+                }
+
                 else -> null
             }
         )
         setBottomNavigationSelection(
             readBottomInterfaceNav,
-            if (activeBottomTab == BottomTab.Toc) {
+            if (activeBottomTab?.usesPrimaryNavigation() == true) {
                 null
             } else {
                 activeBottomTab?.menuItemId()
@@ -1317,7 +1971,7 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     private fun flashBottomTabIndicator(nav: BottomNavigationView, itemId: Int) {
-        showBottomTabIndicator(nav, itemId, animate = true, autoHide = true)
+        showBottomTabIndicator(nav, itemId, animate = true, autoHide = false)
     }
 
     private fun showBottomTabIndicator(
@@ -1483,6 +2137,8 @@ class ReadMenu @JvmOverloads constructor(
         return when (this) {
             BottomTab.Search -> R.id.menu_read_search
             BottomTab.Toc -> R.id.menu_read_toc
+            BottomTab.Aloud -> R.id.menu_read_aloud
+            BottomTab.Settings -> R.id.menu_read_settings
             BottomTab.Layout -> R.id.menu_read_layout
             BottomTab.PageTurn -> R.id.menu_read_page_turn
             BottomTab.Background -> R.id.menu_read_background
@@ -1493,6 +2149,9 @@ class ReadMenu @JvmOverloads constructor(
     private fun Int.toBottomTab(): BottomTab? {
         return when (this) {
             R.id.menu_read_search -> BottomTab.Search
+            R.id.menu_read_toc -> BottomTab.Toc
+            R.id.menu_read_aloud -> BottomTab.Aloud
+            R.id.menu_read_settings -> BottomTab.Settings
             R.id.menu_read_layout -> BottomTab.Layout
             R.id.menu_read_page_turn -> BottomTab.PageTurn
             R.id.menu_read_background -> BottomTab.Background
@@ -1501,8 +2160,24 @@ class ReadMenu @JvmOverloads constructor(
         }
     }
 
+    private fun BottomTab.usesPrimaryNavigation(): Boolean {
+        return when (this) {
+            BottomTab.Search,
+            BottomTab.Toc,
+            BottomTab.Aloud,
+            BottomTab.Settings -> true
+
+            BottomTab.Layout,
+            BottomTab.PageTurn,
+            BottomTab.Background,
+            BottomTab.Theme -> false
+        }
+    }
+
     private fun tintLayoutPanel(color: Int) = binding.run {
         listOf(
+            tvLayoutBrightnessLabel,
+            tvLayoutBrightnessValue,
             tvLayoutFontTitle,
             tvLayoutTextSpacingTitle,
             tvLayoutPageMarginTitle,
@@ -1552,6 +2227,7 @@ class ReadMenu @JvmOverloads constructor(
             tvLayoutPaddingRightValue
         ).forEach { it.setTextColor(color) }
         listOf(
+            ivBrightnessAuto,
             ivLayoutHeaderTitle,
             ivLayoutFooterTitle,
             ivLayoutTextStyleEntry,
@@ -1586,12 +2262,7 @@ class ReadMenu @JvmOverloads constructor(
             )
         }
         layoutMarginAdjustPreview.setAccentColor(context.accentColor)
-        layoutMarginAdjustPanel.background = roundedRect(
-            ColorUtils.adjustAlpha(bgColor, 0.92f),
-            18f.dpToPx(),
-            1.dpToPx(),
-            ColorUtils.adjustAlpha(context.accentColor, 0.16f)
-        )
+        configureLayoutAdjustFrostedGlass()
         listOf(
             tvLayoutTitleModeLeft,
             tvLayoutTitleModeCenter,
@@ -1669,12 +2340,6 @@ class ReadMenu @JvmOverloads constructor(
         )
     }
 
-    private fun renderThemeTabs() = binding.run {
-        configureThemeTopTab(llThemeTabPreset, activeThemeTab == ThemeTab.Preset)
-        configureThemeTopTab(llThemeTabCustom, activeThemeTab == ThemeTab.Custom)
-        configureThemeTopTab(llThemeTabEye, activeThemeTab == ThemeTab.Eye)
-    }
-
     private fun renderLayoutPanel() = binding.run {
         tvPanelLayoutTitle.setText(
             R.string.compose_type
@@ -1682,16 +2347,6 @@ class ReadMenu @JvmOverloads constructor(
         panelLayoutFont.visible()
         panelLayoutSpacing.visible()
         panelLayoutStyle.visible()
-    }
-
-    private fun configureThemeTopTab(tab: TextView, selected: Boolean) {
-        tab.background = roundedRect(
-            if (selected) context.accentColor else Color.TRANSPARENT,
-            12f.dpToPx(),
-            1.dpToPx(),
-            if (selected) context.accentColor else ColorUtils.adjustAlpha(textColor, 0.12f)
-        )
-        tab.setTextColor(if (selected) Color.WHITE else textColor)
     }
 
     private fun updateLayoutControlsFromConfig() = binding.run {
@@ -1805,14 +2460,317 @@ class ReadMenu @JvmOverloads constructor(
         layoutMarginSpinboxBottom.visible(showVerticalSpinboxes)
         layoutMarginSpinboxLeft.visible(showHorizontal)
         layoutMarginSpinboxRight.visible(showHorizontal)
-        layoutTextStyleControls.visible(showTextStyleMode)
-        layoutMarginTitleSize.visible(showTitleMode)
-        llLayoutMarginTitleMode.visible(showTitleMode)
-        layoutTipControls.visible(showTipMode)
-        layoutTipHeaderControls.visible(showHeaderMode)
-        layoutTipFooterControls.visible(showFooterMode)
-        layoutTipHeaderPaddingControls.visible(showHeaderMode)
-        layoutTipFooterPaddingControls.visible(showFooterMode)
+        syncLayoutMarginSpinboxLayout(showHorizontal)
+        layoutTextStyleControls.gone(!showTextStyleMode)
+        layoutMarginTitleSize.gone(!showTitleMode)
+        llLayoutMarginTitleMode.gone(!showTitleMode)
+        layoutTipControls.gone(!showTipMode)
+        layoutTipHeaderControls.gone(!showHeaderMode)
+        layoutTipFooterControls.gone(!showFooterMode)
+        layoutTipHeaderPaddingControls.gone(!showHeaderMode)
+        layoutTipFooterPaddingControls.gone(!showFooterMode)
+        syncLayoutAdjustPopupMetrics()
+    }
+
+    private fun syncLayoutAdjustPopupMetrics() = binding.run {
+        syncLayoutAdjustPreviewBias()
+        setExactHeight(layoutMarginAdjustPreviewHost, layoutAdjustPreviewHostHeight())
+        val contentHeight = measureLayoutAdjustContentHeight()
+        setExactHeight(layoutMarginAdjustPanel, contentHeight)
+        setLayoutAdjustGlassLayerHeight(contentHeight)
+    }
+
+    private fun syncLayoutAdjustPreviewBias() = binding.run {
+        val targetBias = when (activeLayoutMarginAdjustMode) {
+            LayoutMarginAdjustMode.Body -> 0.50f
+            LayoutMarginAdjustMode.Header,
+            LayoutMarginAdjustMode.Footer -> 0f
+
+            else -> 0.08f
+        }
+        layoutMarginAdjustPreview.updateLayoutParams<ConstraintLayout.LayoutParams> {
+            verticalBias = targetBias
+        }
+    }
+
+    private fun syncLayoutMarginSpinboxLayout(useBodyCrossLayout: Boolean) = binding.run {
+        val unset = ConstraintLayout.LayoutParams.UNSET
+        val previewId = R.id.layout_margin_adjust_preview
+        if (useBodyCrossLayout) {
+            layoutMarginSpinboxTop.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                startToStart = previewId
+                endToEnd = previewId
+                topToTop = ConstraintSet.PARENT_ID
+                bottomToTop = R.id.layout_margin_adjust_preview
+                startToEnd = unset
+                endToStart = unset
+                topToBottom = unset
+                bottomToBottom = unset
+                horizontalBias = 0.5f
+                verticalBias = 1f
+                marginStart = 0
+                marginEnd = 0
+                topMargin = 0
+                bottomMargin = 8.dpToPx()
+            }
+            layoutMarginSpinboxBottom.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                startToStart = previewId
+                endToEnd = previewId
+                topToBottom = R.id.layout_margin_adjust_preview
+                bottomToBottom = ConstraintSet.PARENT_ID
+                startToEnd = unset
+                endToStart = unset
+                topToTop = unset
+                bottomToTop = unset
+                horizontalBias = 0.5f
+                verticalBias = 0f
+                marginStart = 0
+                marginEnd = 0
+                topMargin = 8.dpToPx()
+                bottomMargin = 0
+            }
+            layoutMarginSpinboxLeft.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                endToStart = R.id.layout_margin_adjust_preview
+                topToTop = previewId
+                bottomToBottom = previewId
+                startToStart = unset
+                startToEnd = unset
+                endToEnd = unset
+                topToBottom = unset
+                bottomToTop = unset
+                verticalBias = 0.5f
+                marginStart = 0
+                marginEnd = 10.dpToPx()
+                topMargin = 0
+                bottomMargin = 0
+            }
+            layoutMarginSpinboxRight.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                startToEnd = R.id.layout_margin_adjust_preview
+                topToTop = previewId
+                bottomToBottom = previewId
+                startToStart = unset
+                endToStart = unset
+                endToEnd = unset
+                topToBottom = unset
+                bottomToTop = unset
+                verticalBias = 0.5f
+                marginStart = 10.dpToPx()
+                marginEnd = 0
+                topMargin = 0
+                bottomMargin = 0
+            }
+        } else {
+            layoutMarginSpinboxTop.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                endToStart = previewId
+                topToTop = previewId
+                bottomToBottom = previewId
+                startToStart = unset
+                startToEnd = unset
+                endToEnd = unset
+                topToBottom = unset
+                bottomToTop = unset
+                verticalBias = 0.16f
+                marginStart = 0
+                marginEnd = 8.dpToPx()
+                topMargin = 0
+                bottomMargin = 0
+            }
+            layoutMarginSpinboxBottom.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                startToEnd = previewId
+                topToTop = previewId
+                bottomToBottom = previewId
+                startToStart = unset
+                endToStart = unset
+                endToEnd = unset
+                topToBottom = unset
+                bottomToTop = unset
+                verticalBias = 0.16f
+                marginStart = 8.dpToPx()
+                marginEnd = 0
+                topMargin = 0
+                bottomMargin = 0
+            }
+            layoutMarginSpinboxLeft.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                endToStart = previewId
+                topToTop = previewId
+                bottomToBottom = previewId
+                startToStart = unset
+                startToEnd = unset
+                endToEnd = unset
+                topToBottom = unset
+                bottomToTop = unset
+                verticalBias = 0.90f
+                marginStart = 0
+                marginEnd = 6.dpToPx()
+                topMargin = 0
+                bottomMargin = 0
+            }
+            layoutMarginSpinboxRight.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                startToEnd = previewId
+                topToTop = previewId
+                bottomToBottom = previewId
+                startToStart = unset
+                endToStart = unset
+                endToEnd = unset
+                topToBottom = unset
+                bottomToTop = unset
+                verticalBias = 0.90f
+                marginStart = 6.dpToPx()
+                marginEnd = 0
+                topMargin = 0
+                bottomMargin = 0
+            }
+        }
+    }
+
+    private fun layoutAdjustPreviewHostHeight(): Int = binding.run {
+        return when (activeLayoutMarginAdjustMode) {
+            LayoutMarginAdjustMode.Text -> measureLayoutAdjustChildHeight(layoutTextStyleControls)
+                .coerceAtLeast(1.dpToPx())
+
+            LayoutMarginAdjustMode.Body -> 300.dpToPx()
+            LayoutMarginAdjustMode.Title -> 220.dpToPx()
+            LayoutMarginAdjustMode.Header,
+            LayoutMarginAdjustMode.Footer -> {
+                val tipTopMargin = (layoutTipControls.layoutParams as? ViewGroup.MarginLayoutParams)
+                    ?.topMargin
+                    ?: 0
+                (layoutMarginAdjustPreview.layoutParams.height +
+                        tipTopMargin +
+                        measureLayoutAdjustChildHeight(layoutTipControls))
+                    .coerceAtLeast(220.dpToPx())
+            }
+        }
+    }
+
+    private fun measureLayoutAdjustContentHeight(): Int = binding.run {
+        val widthSpec = MeasureSpec.makeMeasureSpec(layoutAdjustPanelWidth(), MeasureSpec.EXACTLY)
+        val heightSpec = MeasureSpec.makeMeasureSpec(layoutAdjustMaxPanelHeight(), MeasureSpec.AT_MOST)
+        layoutMarginAdjustContent.measure(widthSpec, heightSpec)
+        return layoutMarginAdjustContent.measuredHeight.coerceAtLeast(0)
+    }
+
+    private fun measureLayoutAdjustChildHeight(view: View): Int {
+        val widthSpec = MeasureSpec.makeMeasureSpec(layoutAdjustPreviewContentWidth(), MeasureSpec.EXACTLY)
+        val heightSpec = MeasureSpec.makeMeasureSpec(layoutAdjustMaxPanelHeight(), MeasureSpec.AT_MOST)
+        view.measure(widthSpec, heightSpec)
+        return view.measuredHeight
+    }
+
+    private fun layoutAdjustPanelWidth(): Int = binding.run {
+        val overlayWidth = layoutMarginAdjustOverlay.width
+            .takeIf { it > 0 }
+            ?: resources.displayMetrics.widthPixels
+        return (overlayWidth - layoutMarginAdjustOverlay.paddingLeft - layoutMarginAdjustOverlay.paddingRight)
+            .coerceAtLeast(1)
+    }
+
+    private fun layoutAdjustPreviewContentWidth(): Int = binding.run {
+        return (layoutAdjustPanelWidth() -
+                layoutMarginAdjustContent.paddingLeft -
+                layoutMarginAdjustContent.paddingRight)
+            .coerceAtLeast(1)
+    }
+
+    private fun layoutAdjustMaxPanelHeight(): Int = binding.run {
+        val overlayHeight = layoutMarginAdjustOverlay.height
+            .takeIf { it > 0 }
+            ?: resources.displayMetrics.heightPixels
+        return (overlayHeight - layoutMarginAdjustOverlay.paddingTop - layoutMarginAdjustOverlay.paddingBottom)
+            .coerceAtLeast(1)
+    }
+
+    private fun setExactHeight(view: View, height: Int) {
+        val targetHeight = height.coerceAtLeast(0)
+        if (view.layoutParams?.height == targetHeight) {
+            return
+        }
+        view.updateLayoutParams<ViewGroup.LayoutParams> {
+            this.height = targetHeight
+        }
+    }
+
+    private fun setLayoutAdjustGlassLayerHeight(height: Int) = binding.run {
+        val targetHeight = height.coerceAtLeast(0)
+        if (layoutAdjustGlassLayerHeight == targetHeight) {
+            return@run
+        }
+        layoutAdjustGlassLayerHeight = targetHeight
+        setLayoutAdjustGlassLayerChildHeight(layoutMarginAdjustBlurBackdrop, targetHeight)
+        setLayoutAdjustGlassLayerChildHeight(layoutMarginAdjustGlassView, targetHeight)
+        setLayoutAdjustGlassLayerChildHeight(layoutMarginAdjustShellOverlay, targetHeight)
+    }
+
+    private fun setLayoutAdjustGlassLayerChildHeight(view: View, height: Int) {
+        view.updateLayoutParams<FrameLayout.LayoutParams> {
+            this.height = height
+        }
+    }
+
+    private fun captureLayoutAdjustBackdrop() = binding.run {
+        val target = parent as? View ?: vwMenuRoot.rootView ?: return@run
+        val targetWidth = target.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
+        val targetHeight = target.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
+        if (targetWidth <= 0 || targetHeight <= 0) {
+            return@run
+        }
+        clearLayoutAdjustBackdrop()
+        val scale = 0.35f
+        val bitmapWidth = (targetWidth * scale).roundToInt().coerceAtLeast(1)
+        val bitmapHeight = (targetHeight * scale).roundToInt().coerceAtLeast(1)
+        val source = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888)
+        Canvas(source).apply {
+            scale(scale, scale)
+            target.draw(this)
+        }
+        val blurred = source.stackBlur((24f * scale).roundToInt().coerceIn(4, 25))
+        if (blurred !== source) {
+            source.recycle()
+        }
+        layoutAdjustBackdropBitmap = blurred
+    }
+
+    private fun updateLayoutAdjustBlurBackdrop() = binding.run {
+        val backdrop = layoutAdjustBackdropBitmap ?: return@run
+        val target = parent as? View ?: vwMenuRoot.rootView ?: return@run
+        val targetWidth = target.width.takeIf { it > 0 } ?: return@run
+        val targetHeight = target.height.takeIf { it > 0 } ?: return@run
+        val panelWidth = layoutMarginAdjustPanel.width.takeIf { it > 0 } ?: return@run
+        val panelHeight = layoutMarginAdjustPanel.height.takeIf { it > 0 } ?: return@run
+        val targetLocation = IntArray(2)
+        val panelLocation = IntArray(2)
+        target.getLocationInWindow(targetLocation)
+        layoutMarginAdjustPanel.getLocationInWindow(panelLocation)
+        val scaleX = backdrop.width / targetWidth.toFloat()
+        val scaleY = backdrop.height / targetHeight.toFloat()
+        val left = ((panelLocation[0] - targetLocation[0]) * scaleX)
+            .roundToInt()
+            .coerceIn(0, backdrop.width - 1)
+        val top = ((panelLocation[1] - targetLocation[1]) * scaleY)
+            .roundToInt()
+            .coerceIn(0, backdrop.height - 1)
+        val cropWidth = (panelWidth * scaleX).roundToInt()
+            .coerceAtLeast(1)
+            .coerceAtMost(backdrop.width - left)
+        val cropHeight = (panelHeight * scaleY).roundToInt()
+            .coerceAtLeast(1)
+            .coerceAtMost(backdrop.height - top)
+        if (cropWidth <= 0 || cropHeight <= 0) {
+            return@run
+        }
+        val cropped = Bitmap.createBitmap(backdrop, left, top, cropWidth, cropHeight)
+        layoutAdjustBackdropCropBitmap?.recycle()
+        layoutAdjustBackdropCropBitmap = cropped
+        layoutMarginAdjustBlurBackdrop.scaleType = ImageView.ScaleType.FIT_XY
+        layoutMarginAdjustBlurBackdrop.setImageBitmap(cropped)
+    }
+
+    private fun clearLayoutAdjustBackdrop() = binding.run {
+        layoutMarginAdjustBlurBackdrop.setImageDrawable(null)
+        layoutAdjustBackdropCropBitmap?.recycle()
+        layoutAdjustBackdropCropBitmap = null
+        layoutAdjustBackdropBitmap?.recycle()
+        layoutAdjustBackdropBitmap = null
     }
 
     private fun updateLayoutMarginEntryValues() = binding.run {
@@ -1894,12 +2852,17 @@ class ReadMenu @JvmOverloads constructor(
         updateLayoutControlsFromConfig()
         hideExpandedPanel(anim = false)
         bottomMenu.gone()
+        captureLayoutAdjustBackdrop()
         layoutMarginAdjustOverlay.visible()
         layoutMarginAdjustOverlay.bringToFront()
+        layoutMarginAdjustPanel.post {
+            configureLayoutAdjustFrostedGlass()
+        }
     }
 
     private fun hideLayoutMarginAdjustOverlay() = binding.run {
         layoutMarginAdjustOverlay.gone()
+        clearLayoutAdjustBackdrop()
         bottomMenu.visible()
         switchBottomTabMode(BottomTabMode.Interface, animate = false)
         showBottomPanel(BottomTab.Layout)
@@ -1986,13 +2949,31 @@ class ReadMenu @JvmOverloads constructor(
     private fun taggedView(tag: String): View =
         binding.root.findViewWithTag(tag)
 
+    private fun taggedText(tag: String): TextView =
+        taggedView(tag) as TextView
+
+    private fun taggedImageButton(tag: String): AppCompatImageButton =
+        taggedView(tag) as AppCompatImageButton
+
+    private fun taggedLinear(tag: String): LinearLayout =
+        taggedView(tag) as LinearLayout
+
+    private fun taggedRecycler(tag: String): RecyclerView =
+        taggedView(tag) as RecyclerView
+
+    private fun taggedSeekBar(tag: String): SeekBar =
+        taggedView(tag) as SeekBar
+
+    private fun taggedSwitch(tag: String): ThemeSwitch =
+        taggedView(tag) as ThemeSwitch
+
     private fun renderTipDividerControls() = binding.run {
         val showHeaderMode = activeLayoutMarginAdjustMode == LayoutMarginAdjustMode.Header
         val showFooterMode = activeLayoutMarginAdjustMode == LayoutMarginAdjustMode.Footer
-        tvLayoutHeaderLineToggle.visible(showHeaderMode)
-        tvLayoutHeaderLineHide.visible(showHeaderMode)
-        tvLayoutFooterLineToggle.visible(showFooterMode)
-        tvLayoutFooterLineHide.visible(showFooterMode)
+        tvLayoutHeaderLineToggle.gone(!showHeaderMode)
+        tvLayoutHeaderLineHide.gone(!showHeaderMode)
+        tvLayoutFooterLineToggle.gone(!showFooterMode)
+        tvLayoutFooterLineHide.gone(!showFooterMode)
         configureOptionButton(tvLayoutHeaderLineToggle, ReadBookConfig.showHeaderLine)
         configureOptionButton(tvLayoutHeaderLineHide, !ReadBookConfig.showHeaderLine)
         configureOptionButton(tvLayoutFooterLineToggle, ReadBookConfig.showFooterLine)
@@ -2048,12 +3029,160 @@ class ReadMenu @JvmOverloads constructor(
         val currentBgType = ReadBookConfig.durConfig.curBgType()
         val currentBg = ReadBookConfig.durConfig.curBgStr()
         val currentText = ReadBookConfig.durConfig.curTextColor()
-        themeCardBindings.zip(themePresets).forEach { (card, preset) ->
-            val selected = currentBgType == preset.bgType &&
-                    currentBg.equals(preset.bgValue, ignoreCase = true) &&
-                    currentText == preset.textColor
-            bindThemePresetCard(card, preset, selected)
+        val currentSuite = ReadMenuThemeSuiteStore.captureCurrent(
+            context.getString(R.string.read_menu_theme_current)
+        )
+        val savedSuites = ReadMenuThemeSuiteStore.load(context)
+        val explicitSavedIndex = ReadMenuThemeSuiteStore.explicitSavedIndex(context, savedSuites)
+        val selectedPresetIndex = if (explicitSavedIndex == -1) {
+            themePresets.indexOfFirst { preset ->
+                isThemePresetSelected(preset, currentBgType, currentBg, currentText)
+            }
+        } else {
+            -1
         }
+        val selectedSavedIndex = when {
+            explicitSavedIndex != -1 -> explicitSavedIndex
+            selectedPresetIndex == -1 -> ReadMenuThemeSuiteStore.selectedSavedIndex(context, savedSuites)
+            else -> -1
+        }
+        val needsCurrentCard = selectedPresetIndex == -1 && selectedSavedIndex == -1
+        val suiteCards = savedSuites.mapIndexed { savedIndex, suite ->
+            ThemeSuiteCard(suite, savedIndex == selectedSavedIndex, true)
+        } +
+                listOfNotNull(currentSuite.takeIf { needsCurrentCard }?.let { ThemeSuiteCard(it, true, false) })
+        syncThemeSuiteCards(suiteCards.size)
+        themeCardBindings.zip(themePresets).forEachIndexed { presetIndex, (card, preset) ->
+            bindThemePresetCard(
+                card,
+                preset,
+                presetIndex == selectedPresetIndex
+            )
+        }
+        dynamicThemeCardBindings.zip(suiteCards).forEach { (card, item) ->
+            bindThemeSuiteCard(card, item.suite, item.selected, item.custom)
+        }
+        showSelectedThemeDeleteButton(
+            dynamicThemeCardBindings.getOrNull(selectedSavedIndex),
+            savedSuites.getOrNull(selectedSavedIndex)
+        )
+        bindThemeAddCard(binding.themeCardAdd)
+    }
+
+    private fun syncThemeSuiteCards(count: Int) = binding.run {
+        selectedThemeDeleteButtonAnimator?.cancel()
+        selectedThemeDeleteButtonAnimator = null
+        selectedThemeDeleteButton?.animate()?.cancel()
+        selectedThemeDeleteButton?.let { llThemePresetRow.removeView(it) }
+        selectedThemeDeleteButton = null
+        dynamicThemeCardBindings.forEach { llThemePresetRow.removeView(it.root) }
+        dynamicThemeCardBindings.clear()
+        repeat(count) {
+            val card = ViewReadThemeCardBinding.inflate(LayoutInflater.from(context), llThemePresetRow, false)
+            card.root.layoutParams = LinearLayout.LayoutParams(96.dpToPx(), ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                marginEnd = 8.dpToPx()
+            }
+            llThemePresetRow.addView(card.root, llThemePresetRow.childCount - 1)
+            dynamicThemeCardBindings.add(card)
+        }
+    }
+
+    private fun showSelectedThemeDeleteButton(
+        selectedCard: ViewReadThemeCardBinding?,
+        suite: ReadMenuThemeSuite?
+    ) = binding.run {
+        selectedThemeDeleteButtonAnimator?.cancel()
+        selectedThemeDeleteButtonAnimator = null
+        selectedThemeDeleteButton?.animate()?.cancel()
+        selectedThemeDeleteButton?.let { llThemePresetRow.removeView(it) }
+        selectedThemeDeleteButton = null
+        if (selectedCard == null || suite == null) {
+            return@run
+        }
+        val button = AppCompatImageButton(context).apply {
+            contentDescription = context.getString(R.string.delete)
+            setImageResource(R.drawable.ic_outline_delete)
+            imageTintList = ColorStateList.valueOf(context.getCompatColor(R.color.error))
+            background = roundedRect(
+                ColorUtils.adjustAlpha(textColor, 0.06f),
+                12f.dpToPx(),
+                1.dpToPx(),
+                ColorUtils.adjustAlpha(textColor, 0.12f)
+            )
+            scaleType = ImageView.ScaleType.CENTER
+            setPadding(10.dpToPx(), 10.dpToPx(), 10.dpToPx(), 10.dpToPx())
+            setOnClickListener { deleteThemeSuite(suite) }
+        }
+        button.alpha = 0f
+        button.isEnabled = false
+        button.layoutParams = LinearLayout.LayoutParams(0, 70.dpToPx()).apply {
+            marginEnd = 8.dpToPx()
+        }
+        llThemePresetRow.addView(button, llThemePresetRow.indexOfChild(selectedCard.root) + 1)
+        selectedThemeDeleteButton = button
+        animateThemeDeleteButtonReveal(button)
+    }
+
+    private fun animateThemeDeleteButtonReveal(button: AppCompatImageButton) = binding.run {
+        selectedThemeDeleteButtonAnimator = ValueAnimator.ofInt(0, 42.dpToPx()).apply {
+            duration = 180L
+            interpolator = DecelerateInterpolator(1.4f)
+            addUpdateListener { animator ->
+                button.updateLayoutParams<LinearLayout.LayoutParams> {
+                    width = animator.animatedValue as Int
+                }
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    selectedThemeDeleteButtonAnimator = null
+                    revealThemeDeleteIcon(button)
+                }
+            })
+            start()
+        }
+        hsvThemePresets.post {
+            val targetRight = button.left + 42.dpToPx()
+            val visibleRight = hsvThemePresets.scrollX + hsvThemePresets.width
+            if (button.right > visibleRight || targetRight > visibleRight) {
+                hsvThemePresets.smoothScrollTo(
+                    (targetRight - hsvThemePresets.width + 16.dpToPx()).coerceAtLeast(0),
+                    0
+                )
+            }
+        }
+    }
+
+    private fun revealThemeDeleteIcon(button: AppCompatImageButton) {
+        button.animate()
+            .alpha(1f)
+            .setDuration(110L)
+            .setInterpolator(DecelerateInterpolator(1.4f))
+            .withEndAction {
+                button.isEnabled = true
+            }
+            .start()
+    }
+
+    private fun isThemePresetSelected(
+        preset: ReadMenuThemePreset,
+        currentBgType: Int,
+        currentBg: String,
+        currentText: Int
+    ): Boolean {
+        return currentBgType == preset.bgType &&
+                currentBg.equals(preset.bgValue, ignoreCase = true) &&
+                currentText == preset.textColor &&
+                ReadBookConfig.textSize == preset.textSize &&
+                ReadBookConfig.textWeight == preset.textWeight &&
+                abs(ReadBookConfig.letterSpacing - preset.letterSpacing) < 0.01f &&
+                ReadBookConfig.lineSpacingExtra == preset.lineSpacingExtra &&
+                ReadBookConfig.paragraphSpacing == preset.paragraphSpacing &&
+                ReadBook.pageAnim() == preset.pageAnim &&
+                AppConfig.pageAnimationSpeed == preset.pageAnimationSpeed &&
+                ReadBookConfig.bgBrightness == preset.bgBrightness &&
+                ReadBookConfig.bgSaturation == preset.bgSaturation &&
+                ReadBookConfig.bgAlpha == preset.bgAlpha &&
+                ReadBookConfig.paperInkStrength == preset.paperInkStrength
     }
 
     private fun bindThemePresetCard(
@@ -2067,27 +3196,146 @@ class ReadMenu @JvmOverloads constructor(
             if (selected) 2.dpToPx() else 1.dpToPx(),
             if (selected) context.accentColor else ColorUtils.adjustAlpha(textColor, 0.12f)
         )
-        card.tvThemeCardTitle.text = preset.previewTitle
-        card.tvThemeCardBody.text = preset.previewBody
+        bindThemeCardPreviewText(card, preset.textColor)
         card.tvThemeCardLabel.setText(preset.labelRes)
-        card.tvThemeCardTitle.setTextColor(preset.textColor)
-        card.tvThemeCardBody.setTextColor(ColorUtils.adjustAlpha(preset.textColor, 0.72f))
         card.tvThemeCardLabel.setTextColor(if (selected) context.accentColor else textColor)
         card.ivThemeCardCheck.background = roundedRect(context.accentColor, 13f.dpToPx())
         card.ivThemeCardCheck.isVisible = selected
+        card.tvThemeCardBadge.isVisible = false
+    }
+
+    private fun bindThemeSuiteCard(
+        card: ViewReadThemeCardBinding,
+        suite: ReadMenuThemeSuite,
+        selected: Boolean,
+        custom: Boolean
+    ) {
+        card.themeCardPreview.background = roundedRect(
+            suite.backgroundColor.takeIf { it != Color.TRANSPARENT }
+                ?: ColorUtils.adjustAlpha(textColor, 0.06f),
+            12f.dpToPx(),
+            if (selected) 2.dpToPx() else 1.dpToPx(),
+            if (selected) context.accentColor else ColorUtils.adjustAlpha(textColor, 0.12f)
+        )
+        bindThemeCardPreviewText(card, suite.textColor)
+        card.tvThemeCardLabel.text = suite.name
+        card.tvThemeCardLabel.setTextColor(if (selected) context.accentColor else textColor)
+        card.ivThemeCardCheck.background = roundedRect(context.accentColor, 13f.dpToPx())
+        card.ivThemeCardCheck.isVisible = selected
+        card.tvThemeCardBadge.background = roundedRect(
+            ColorUtils.adjustAlpha(context.accentColor, 0.92f),
+            9f.dpToPx()
+        )
+        card.tvThemeCardBadge.isVisible = custom
+        card.root.setOnClickListener { applySavedThemeSuite(suite) }
+    }
+
+    private fun bindThemeCardPreviewText(card: ViewReadThemeCardBinding, previewTextColor: Int) {
+        card.tvThemeCardTitle.isVisible = true
+        card.tvThemeCardBody.isVisible = true
+        card.tvThemeCardTitle.gravity = Gravity.NO_GRAVITY
+        card.tvThemeCardTitle.textSize = 13f
+        card.tvThemeCardTitle.includeFontPadding = true
+        card.tvThemeCardTitle.text = ReadMenuThemePreset.DEFAULT_PREVIEW_TITLE
+        card.tvThemeCardBody.text = ReadMenuThemePreset.DEFAULT_PREVIEW_BODY
+        card.tvThemeCardTitle.setTextColor(previewTextColor)
+        card.tvThemeCardBody.setTextColor(ColorUtils.adjustAlpha(previewTextColor, 0.72f))
+    }
+
+    private fun bindThemeAddCard(card: ViewReadThemeCardBinding) {
+        card.themeCardPreview.background = roundedRect(
+            ColorUtils.adjustAlpha(textColor, 0.06f),
+            12f.dpToPx(),
+            1.dpToPx(),
+            ColorUtils.adjustAlpha(textColor, 0.14f)
+        )
+        card.tvThemeCardTitle.text = "+"
+        card.tvThemeCardBody.isGone = true
+        card.tvThemeCardLabel.setText(R.string.read_menu_theme_add)
+        card.tvThemeCardTitle.gravity = Gravity.CENTER
+        card.tvThemeCardTitle.textSize = 28f
+        card.tvThemeCardTitle.includeFontPadding = false
+        card.tvThemeCardTitle.setTextColor(context.accentColor)
+        card.tvThemeCardLabel.setTextColor(textColor)
+        card.ivThemeCardCheck.isVisible = false
+        card.tvThemeCardBadge.isVisible = false
+        card.root.setOnClickListener { saveCurrentThemeSuite() }
+    }
+
+    private fun deleteThemeSuite(suite: ReadMenuThemeSuite) {
+        ReadMenuThemeSuiteStore.delete(context, suite)
+        context.toastOnUi(R.string.delete_success)
+        updateThemePresetCards()
     }
 
     private fun applyThemePreset(preset: ReadMenuThemePreset) {
         ReadBookConfig.durConfig.setCurBg(preset.bgType, preset.bgValue)
         ReadBookConfig.durConfig.setCurTextColor(preset.textColor)
+        ReadBookConfig.textSize = preset.textSize
+        ReadBookConfig.textWeight = preset.textWeight
+        ReadBookConfig.letterSpacing = preset.letterSpacing
+        ReadBookConfig.lineSpacingExtra = preset.lineSpacingExtra
+        ReadBookConfig.paragraphSpacing = preset.paragraphSpacing
+        ReadBookConfig.pageAnim = preset.pageAnim
+        ReadBook.book?.setPageAnim(preset.pageAnim)
+        AppConfig.pageAnimationSpeed = preset.pageAnimationSpeed
+        ReadBookConfig.bgBrightness = preset.bgBrightness
+        ReadBookConfig.bgSaturation = preset.bgSaturation
+        ReadBookConfig.bgAlpha = preset.bgAlpha
+        ReadBookConfig.paperInkStrength = preset.paperInkStrength
+        ReadMenuThemeSuiteStore.clearSelection(context)
+        finishThemeSuiteApplied()
+    }
+
+    private fun applySavedThemeSuite(suite: ReadMenuThemeSuite) {
+        suite.applyToReader()
+        ReadMenuThemeSuiteStore.select(context, suite)
+        finishThemeSuiteApplied()
+    }
+
+    private fun finishThemeSuiteApplied() {
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(1, 2, 5, 6, 9, 11))
         if (AppConfig.readBarStyleFollowPage) {
             postEvent(EventBus.UPDATE_READ_ACTION_BAR, true)
         }
+        updateLayoutControlsFromConfig()
+        updatePageTurnControls()
+        updateThemeControlsFromConfig()
+        updateBackgroundControlsFromConfig()
+        updateBackgroundSampleCards()
+        updateThemePresetCards()
         reset()
         if (activeBottomTab != BottomTab.Theme) {
             showBottomPanel(BottomTab.Theme)
+        }
+    }
+
+    private fun saveCurrentThemeSuite() {
+        context.alert(R.string.read_menu_theme_save_current) {
+            val alertBinding = DialogEditTextBinding.inflate(LayoutInflater.from(context)).apply {
+                editView.hint = context.getString(R.string.read_menu_theme_save_name)
+                editView.setSingleLine()
+                editView.setText(
+                    context.getString(
+                        R.string.read_menu_theme_default_name,
+                        ReadMenuThemeSuiteStore.load(context).size + 1
+                    )
+                )
+            }
+            customView { alertBinding.root }
+            okButton {
+                val name = alertBinding.editView.text?.toString()?.trim().orEmpty()
+                if (name.isBlank()) {
+                    context.toastOnUi(R.string.read_menu_theme_empty_name)
+                    return@okButton
+                }
+                val suite = ReadMenuThemeSuiteStore.captureCurrent(name)
+                val selectedSuite = ReadMenuThemeSuiteStore.saveOrSelectExisting(context, suite)
+                context.toastOnUi(context.getString(R.string.read_menu_theme_saved, selectedSuite.name))
+                updateThemePresetCards()
+            }
+            cancelButton()
         }
     }
 
@@ -2150,11 +3398,42 @@ class ReadMenu @JvmOverloads constructor(
     private fun updateBackgroundSampleCards() {
         val currentBgType = ReadBookConfig.durConfig.curBgType()
         val currentBg = ReadBookConfig.durConfig.curBgStr()
+        bindBackgroundColorCard(currentBgType == 0)
         backgroundSampleBindings.forEach { sample ->
             bindBackgroundSampleCard(
                 sample,
                 currentBgType == 1 && currentBg.equals(sample.assetName, ignoreCase = true)
             )
+        }
+    }
+
+    private fun bindBackgroundColorCard(selected: Boolean) {
+        val card = backgroundColorCardBinding
+        val color = currentBackgroundColor()
+        card.ivBackgroundCardImage.setImageDrawable(null)
+        card.backgroundCardPreview.background = roundedRect(
+            color,
+            12f.dpToPx(),
+            1.dpToPx(),
+            ColorUtils.adjustAlpha(textColor, 0.14f)
+        )
+        card.backgroundCardScrim.setBackgroundColor(Color.TRANSPARENT)
+        card.tvBackgroundCardLabel.setText(R.string.background_color)
+        bindBackgroundCardSelectedState(card, selected)
+        card.root.setOnClickListener {
+            ReadBookConfig.durConfig.setCurBg(0, "#${color.hexString}")
+            ReadBookConfig.save()
+            postEvent(EventBus.UP_CONFIG, arrayListOf(1, 3, 5, 6, 9, 11))
+            if (AppConfig.readBarStyleFollowPage) {
+                postEvent(EventBus.UPDATE_READ_ACTION_BAR, true)
+            }
+            updateBackgroundSampleCards()
+            ColorPickerDialog.newBuilder()
+                .setColor(color)
+                .setShowAlphaSlider(false)
+                .setDialogType(ColorPickerDialog.TYPE_CUSTOM)
+                .setDialogId(BG_COLOR)
+                .show(activity)
         }
     }
 
@@ -2176,9 +3455,7 @@ class ReadMenu @JvmOverloads constructor(
             ColorUtils.adjustAlpha(Color.BLACK, if (selected) 0.10f else 0.20f)
         )
         card.tvBackgroundCardLabel.text = sample.assetName.substringBeforeLast(".")
-        card.tvBackgroundCardLabel.setTextColor(if (selected) context.accentColor else textColor)
-        card.ivBackgroundCardCheck.background = roundedRect(context.accentColor, 13f.dpToPx())
-        card.ivBackgroundCardCheck.isVisible = selected
+        bindBackgroundCardSelectedState(card, selected)
         card.root.setOnClickListener {
             ReadBookConfig.durConfig.setCurBg(1, sample.assetName)
             ReadBookConfig.save()
@@ -2187,6 +3464,33 @@ class ReadMenu @JvmOverloads constructor(
                 postEvent(EventBus.UPDATE_READ_ACTION_BAR, true)
             }
             updateBackgroundSampleCards()
+        }
+    }
+
+    private fun bindBackgroundCardSelectedState(
+        card: ViewReadBackgroundCardBinding,
+        selected: Boolean
+    ) {
+        card.backgroundCardSelectionBorder.background = roundedRect(
+            Color.TRANSPARENT,
+            12f.dpToPx(),
+            if (selected) 2.dpToPx() else 0,
+            if (selected) context.accentColor else Color.TRANSPARENT
+        )
+        card.backgroundCardSelectionBorder.isVisible = selected
+        card.tvBackgroundCardLabel.setTextColor(if (selected) context.accentColor else textColor)
+        card.ivBackgroundCardCheck.background = roundedRect(context.accentColor, 13f.dpToPx())
+        card.ivBackgroundCardCheck.isVisible = selected
+    }
+
+    private fun currentBackgroundColor(): Int {
+        return if (ReadBookConfig.durConfig.curBgType() == 0) {
+            kotlin.runCatching {
+                Color.parseColor(ReadBookConfig.durConfig.curBgStr())
+            }.getOrDefault(context.getCompatColor(R.color.background))
+        } else {
+            ReadBookConfig.bgMeanColor.takeIf { it != 0 }
+                ?: context.getCompatColor(R.color.background)
         }
     }
 
@@ -2385,6 +3689,13 @@ class ReadMenu @JvmOverloads constructor(
         view.setTextColor(if (selected) Color.WHITE else textColor)
     }
 
+    private fun configureTocHeaderTab(view: TextView, selected: Boolean) {
+        view.background = null
+        view.setTextColor(if (selected) textColor else ColorUtils.adjustAlpha(textColor, 0.54f))
+        view.typeface = Typeface.defaultFromStyle(if (selected) Typeface.BOLD else Typeface.NORMAL)
+        view.alpha = if (selected) 1f else 0.82f
+    }
+
     private fun roundedRect(
         color: Int,
         radius: Float,
@@ -2469,6 +3780,73 @@ class ReadMenu @JvmOverloads constructor(
         )
     }
 
+    private fun configureLayoutAdjustFrostedGlass() = binding.run {
+        syncLayoutAdjustPopupMetrics()
+        val cornerRadius = 28f.dpToPx()
+        layoutMarginAdjustPanel.clipToOutline = true
+        if (AppConfig.isEInkMode) {
+            val styleKey = "layout-eink:$bgColor:$textColor:${context.accentColor}"
+            if (layoutAdjustGlassStyleKey != styleKey) {
+                layoutMarginAdjustBlurBackdrop.gone()
+                layoutMarginAdjustGlassView.gone()
+                layoutMarginAdjustShellOverlay.gone()
+                layoutMarginAdjustPanel.background = roundedRect(
+                    bgColor,
+                    cornerRadius,
+                    1.dpToPx(),
+                    ColorUtils.adjustAlpha(textColor, 0.24f)
+                )
+                layoutAdjustGlassStyleKey = styleKey
+            }
+            return@run
+        }
+
+        val glassLevel = (AppConfig.frostedGlassLevel / 100f)
+            .coerceIn(0.45f, 1f)
+        val styleKey =
+            "layout-glass:${bottomTabUseDarkGlass()}:${context.accentColor}:${AppConfig.frostedGlassLevel}:$bgColor:$textColor"
+        if (layoutAdjustGlassStyleKey != styleKey) {
+            layoutMarginAdjustPanel.background = layoutAdjustGlassFallbackShell(glassLevel, cornerRadius)
+            layoutMarginAdjustBlurBackdrop.visible()
+            layoutMarginAdjustGlassView.visible()
+            layoutMarginAdjustShellOverlay.visible()
+            layoutMarginAdjustShellOverlay.background = layoutAdjustGlassShell(glassLevel, cornerRadius)
+            layoutAdjustGlassStyleKey = styleKey
+        } else {
+            if (!layoutMarginAdjustBlurBackdrop.isVisible) {
+                layoutMarginAdjustBlurBackdrop.visible()
+            }
+            if (!layoutMarginAdjustGlassView.isVisible) {
+                layoutMarginAdjustGlassView.visible()
+            }
+            if (!layoutMarginAdjustShellOverlay.isVisible) {
+                layoutMarginAdjustShellOverlay.visible()
+            }
+        }
+        layoutMarginAdjustPanel.doOnPreDraw {
+            updateLayoutAdjustBlurBackdrop()
+            setupLayoutAdjustFrostedGlassViews(glassLevel, cornerRadius)
+        }
+    }
+
+    private fun setupLayoutAdjustFrostedGlassViews(glassLevel: Float, cornerRadius: Float) = binding.run {
+        val target = bottomTabGlassTarget()
+        if (!target.isLaidOut || !layoutMarginAdjustPanel.isLaidOut || !layoutMarginAdjustGlassView.isLaidOut) {
+            return@run
+        }
+        setupBottomTabFrostedGlassView(
+            liquidGlassView = layoutMarginAdjustGlassView,
+            target = target,
+            cornerRadius = cornerRadius,
+            refractionHeight = (12f + glassLevel * 8f).dpToPx(),
+            refractionOffset = (34f + glassLevel * 18f).dpToPx(),
+            blurRadius = (22f + glassLevel * 30f).dpToPx(),
+            dispersion = (0.18f + glassLevel * 0.16f).coerceAtMost(0.42f),
+            tintAlpha = bottomTabGlassTintAlpha(glassLevel),
+            tintColor = bottomTabGlassTintColor()
+        )
+    }
+
     private fun bottomTabGlassTarget(): ViewGroup {
         val readView = activity?.findViewById<View>(R.id.read_view)
         return activity?.findViewById<ViewGroup>(R.id.read_content_container)
@@ -2509,6 +3887,10 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     private fun bottomTabGlassShell(glassLevel: Float): GradientDrawable {
+        return readBottomTabGlassShell(glassLevel, 28f.dpToPx())
+    }
+
+    private fun readBottomTabGlassShell(glassLevel: Float, cornerRadius: Float): GradientDrawable {
         val isDark = bottomTabUseDarkGlass()
         val surfaceColor = if (isDark) {
             bottomTabDarkGlassSurfaceColor()
@@ -2538,11 +3920,15 @@ class ReadMenu @JvmOverloads constructor(
                 ColorUtils.withAlpha(surfaceColor, bottomAlpha.coerceAtMost(if (isDark) 0.50f else 0.26f))
             )
         ).apply {
-            cornerRadius = 28f.dpToPx()
+            this.cornerRadius = cornerRadius
         }
     }
 
     private fun bottomTabGlassFallbackShell(glassLevel: Float): GradientDrawable {
+        return readBottomTabGlassFallbackShell(glassLevel, 28f.dpToPx())
+    }
+
+    private fun readBottomTabGlassFallbackShell(glassLevel: Float, cornerRadius: Float): GradientDrawable {
         val isDark = bottomTabUseDarkGlass()
         val surfaceColor = if (isDark) {
             bottomTabDarkGlassSurfaceColor()
@@ -2555,9 +3941,17 @@ class ReadMenu @JvmOverloads constructor(
             0.26f + glassLevel * 0.18f
         }
         return GradientDrawable().apply {
-            cornerRadius = 28f.dpToPx()
+            this.cornerRadius = cornerRadius
             setColor(ColorUtils.withAlpha(surfaceColor, alpha.coerceAtMost(if (isDark) 0.74f else 0.46f)))
         }
+    }
+
+    private fun layoutAdjustGlassShell(glassLevel: Float, cornerRadius: Float): GradientDrawable {
+        return readBottomTabGlassShell(glassLevel, cornerRadius)
+    }
+
+    private fun layoutAdjustGlassFallbackShell(glassLevel: Float, cornerRadius: Float): GradientDrawable {
+        return readBottomTabGlassFallbackShell(glassLevel, cornerRadius)
     }
 
     private fun bottomTabDarkGlassSurfaceColor(): Int {
@@ -2748,14 +4142,11 @@ class ReadMenu @JvmOverloads constructor(
                 }
 
                 R.id.menu_read_aloud -> {
-                    runMenuOut {
-                        callBack.showReadAloudDialog()
-                    }
-                    false
+                    toggleBottomTab(BottomTab.Aloud)
                 }
 
                 R.id.menu_read_interface -> {
-                    if (activeBottomTab == BottomTab.Toc) {
+                    if (activeBottomTab?.usesPrimaryNavigation() == true) {
                         hideExpandedPanel(anim = false)
                     }
                     switchBottomTabMode(BottomTabMode.Interface)
@@ -2763,10 +4154,7 @@ class ReadMenu @JvmOverloads constructor(
                 }
 
                 R.id.menu_read_settings -> {
-                    runMenuOut {
-                        callBack.showMoreSetting()
-                    }
-                    false
+                    toggleBottomTab(BottomTab.Settings)
                 }
 
                 else -> false
@@ -2777,6 +4165,8 @@ class ReadMenu @JvmOverloads constructor(
                 when (item.itemId) {
                     R.id.menu_read_search -> toggleBottomTab(BottomTab.Search)
                     R.id.menu_read_toc -> toggleBottomTab(BottomTab.Toc)
+                    R.id.menu_read_aloud -> toggleBottomTab(BottomTab.Aloud)
+                    R.id.menu_read_settings -> toggleBottomTab(BottomTab.Settings)
                     R.id.menu_read_interface -> {
                         flashBottomTabIndicator(readBottomPrimaryNav, item.itemId)
                         switchBottomTabMode(BottomTabMode.Interface)
@@ -2876,6 +4266,7 @@ class ReadMenu @JvmOverloads constructor(
         seekBrightness.setOnSeekBarChangeListener(object : SeekBarChangeListener {
 
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                updateBrightnessValue()
                 if (fromUser) {
                     setScreenBrightness(progress.toFloat())
                 }
@@ -2886,10 +4277,6 @@ class ReadMenu @JvmOverloads constructor(
             }
 
         })
-        vwBrightnessPosAdjust.setOnClickListener {
-            AppConfig.brightnessVwPos = !AppConfig.brightnessVwPos
-            upBrightnessVwPos()
-        }
         //目录
         setupBottomNavigationEvents()
 
@@ -2963,25 +4350,10 @@ class ReadMenu @JvmOverloads constructor(
         }
         themeCardBindings.zip(themePresets).forEach { (card, preset) ->
             card.root.setOnClickListener {
-                activeThemeTab = ThemeTab.Preset
                 applyThemePreset(preset)
             }
         }
-        llThemeTabPreset.setOnClickListener {
-            activeThemeTab = ThemeTab.Preset
-            renderThemeTabs()
-            panelTheme.smoothScrollTo(0, 0)
-        }
-        llThemeTabCustom.setOnClickListener {
-            activeThemeTab = ThemeTab.Custom
-            renderThemeTabs()
-            panelTheme.post { panelTheme.smoothScrollTo(0, hsvThemePresets.top) }
-        }
-        llThemeTabEye.setOnClickListener {
-            activeThemeTab = ThemeTab.Eye
-            renderThemeTabs()
-            themePresets.firstOrNull { it.key == "eye_green" }?.let(::applyThemePreset)
-        }
+        binding.themeCardAdd.root.setOnClickListener { saveCurrentThemeSuite() }
         fontSampleBindings.forEach { sample ->
             sample.binding.root.setOnClickListener { sample.onClick() }
         }
@@ -3240,20 +4612,6 @@ class ReadMenu @JvmOverloads constructor(
         configureOptionButton(panelPageAutoPage, autoPage)
     }
 
-    private fun upBrightnessVwPos() {
-        if (AppConfig.brightnessVwPos) {
-            binding.root.modifyBegin()
-                .clear(R.id.ll_brightness, ConstraintModify.Anchor.LEFT)
-                .rightToRightOf(R.id.ll_brightness, R.id.vw_menu_root)
-                .commit()
-        } else {
-            binding.root.modifyBegin()
-                .clear(R.id.ll_brightness, ConstraintModify.Anchor.RIGHT)
-                .leftToLeftOf(R.id.ll_brightness, R.id.vw_menu_root)
-                .commit()
-        }
-    }
-
     interface CallBack {
         fun autoPage()
         fun openReplaceRule()
@@ -3280,10 +4638,15 @@ class ReadMenu @JvmOverloads constructor(
     ) : RecyclerView.Adapter<ReadMenuTocAdapter.Holder>() {
 
         private val chapters = arrayListOf<BookChapter>()
+        private val downloadingChapters = mutableSetOf<Int>()
 
         fun submit(items: List<BookChapter>) {
             chapters.clear()
             chapters.addAll(items)
+            downloadingChapters.removeAll { index ->
+                val book = ReadBook.book ?: return@removeAll false
+                items.firstOrNull { it.index == index }?.let { BookHelp.hasContent(book, it) } == true
+            }
             notifyDataSetChanged()
         }
 
@@ -3352,6 +4715,10 @@ class ReadMenu @JvmOverloads constructor(
             val selected = chapter.index == ReadBook.durChapterIndex
             val book = ReadBook.book
             val downloaded = book != null && BookHelp.hasContent(book, chapter)
+            if (downloaded) {
+                downloadingChapters.remove(chapter.index)
+            }
+            val downloading = chapter.index in downloadingChapters
             holder.title.text = chapter.title
             holder.title.setTypeface(null, if (chapter.isVolume) Typeface.BOLD else Typeface.NORMAL)
             holder.title.setTextColor(
@@ -3361,7 +4728,7 @@ class ReadMenu @JvmOverloads constructor(
                     else -> ColorUtils.adjustAlpha(Color.BLACK, 0.82f)
                 }
             )
-            holder.meta.text = buildTocMeta(chapter, downloaded)
+            holder.meta.text = buildTocMeta(context, chapter, downloaded, downloading)
             holder.meta.setTextColor(
                 when {
                     selected -> ColorUtils.adjustAlpha(context.accentColor, 0.72f)
@@ -3369,18 +4736,18 @@ class ReadMenu @JvmOverloads constructor(
                     else -> ColorUtils.adjustAlpha(Color.BLACK, 0.48f)
                 }
             )
-            holder.download.isVisible = !chapter.isVolume && !downloaded
+            holder.download.isVisible = !chapter.isVolume && !downloaded && !downloading
             holder.download.setColorFilter(
                 if (selected) context.accentColor else holder.title.currentTextColor,
                 PorterDuff.Mode.SRC_IN
             )
             holder.download.setOnClickListener {
+                downloadingChapters.add(chapter.index)
+                notifyTocChapterChanged(chapter.index)
                 ReadBook.loadContent(chapter.index, upContent = false) {
                     holder.itemView.post {
-                        val adapterPosition = holder.bindingAdapterPosition
-                        if (adapterPosition != RecyclerView.NO_POSITION) {
-                            notifyItemChanged(adapterPosition)
-                        }
+                        downloadingChapters.remove(chapter.index)
+                        notifyTocChapterChanged(chapter.index)
                     }
                 }
             }
@@ -3391,11 +4758,26 @@ class ReadMenu @JvmOverloads constructor(
 
         override fun getItemCount(): Int = chapters.size
 
-        private fun buildTocMeta(chapter: BookChapter, downloaded: Boolean): String {
+        private fun notifyTocChapterChanged(chapterIndex: Int) {
+            val adapterPosition = chapters.indexOfFirst { it.index == chapterIndex }
+            if (adapterPosition != RecyclerView.NO_POSITION) {
+                notifyItemChanged(adapterPosition)
+            }
+        }
+
+        private fun buildTocMeta(
+            context: Context,
+            chapter: BookChapter,
+            downloaded: Boolean,
+            downloading: Boolean
+        ): String {
             val parts = arrayListOf<String>()
             chapter.tag?.takeIf { it.isNotBlank() }?.let(parts::add)
-            if (downloaded) {
+            when {
+                downloading -> parts.add(context.getString(R.string.downloading))
+                downloaded -> {
                 chapter.wordCount?.takeIf { it.isNotBlank() }?.let(parts::add)
+                }
             }
             return parts.joinToString("  ")
         }
@@ -3405,6 +4787,108 @@ class ReadMenu @JvmOverloads constructor(
             val title: TextView,
             val meta: TextView,
             val download: AppCompatImageButton
+        ) : RecyclerView.ViewHolder(itemView)
+    }
+
+    private class ReadMenuBookmarkAdapter(
+        private val onBookmarkClick: (Bookmark) -> Unit
+    ) : RecyclerView.Adapter<ReadMenuBookmarkAdapter.Holder>() {
+
+        private val bookmarks = arrayListOf<Bookmark>()
+
+        fun submit(items: List<Bookmark>) {
+            bookmarks.clear()
+            bookmarks.addAll(items)
+            notifyDataSetChanged()
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
+            val context = parent.context
+            val row = LinearLayout(context).apply {
+                layoutParams = RecyclerView.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                minimumHeight = 68.dpToPx()
+                orientation = LinearLayout.VERTICAL
+                setPadding(4.dpToPx(), 8.dpToPx(), 4.dpToPx(), 8.dpToPx())
+            }
+            val chapter = TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                includeFontPadding = false
+                isSingleLine = true
+                ellipsize = TextUtils.TruncateAt.END
+                textSize = 15f
+            }
+            val bookText = TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = 5.dpToPx()
+                }
+                includeFontPadding = false
+                isSingleLine = true
+                ellipsize = TextUtils.TruncateAt.END
+                textSize = 13f
+            }
+            val note = TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = 4.dpToPx()
+                }
+                includeFontPadding = false
+                isSingleLine = true
+                ellipsize = TextUtils.TruncateAt.END
+                textSize = 12f
+            }
+            row.addView(chapter)
+            row.addView(bookText)
+            row.addView(note)
+            return Holder(row, chapter, bookText, note)
+        }
+
+        override fun onBindViewHolder(holder: Holder, position: Int) {
+            val bookmark = bookmarks[position]
+            val context = holder.chapter.context
+            val selected = bookmark.chapterIndex == ReadBook.durChapterIndex
+            val primaryText = when {
+                selected -> context.accentColor
+                AppConfig.isNightTheme -> ColorUtils.adjustAlpha(Color.WHITE, 0.86f)
+                else -> ColorUtils.adjustAlpha(Color.BLACK, 0.82f)
+            }
+            val secondaryText = when {
+                selected -> ColorUtils.adjustAlpha(context.accentColor, 0.72f)
+                AppConfig.isNightTheme -> ColorUtils.adjustAlpha(Color.WHITE, 0.56f)
+                else -> ColorUtils.adjustAlpha(Color.BLACK, 0.50f)
+            }
+            holder.chapter.text = bookmark.chapterName.ifBlank {
+                context.getString(R.string.chapter)
+            }
+            holder.chapter.setTextColor(primaryText)
+            holder.bookText.text = bookmark.bookText.trim()
+            holder.bookText.setTextColor(secondaryText)
+            holder.bookText.isGone = bookmark.bookText.isBlank()
+            holder.note.text = bookmark.content.trim()
+            holder.note.setTextColor(secondaryText)
+            holder.note.isGone = bookmark.content.isBlank()
+            holder.itemView.setOnClickListener {
+                onBookmarkClick(bookmark)
+            }
+        }
+
+        override fun getItemCount(): Int = bookmarks.size
+
+        class Holder(
+            itemView: View,
+            val chapter: TextView,
+            val bookText: TextView,
+            val note: TextView
         ) : RecyclerView.ViewHolder(itemView)
     }
 
