@@ -975,6 +975,17 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun chapterLayoutKeyIncludesTypefaceInputs() {
+        val readBook = repoFile("app/src/main/java/io/legado/app/model/ReadBook.kt").readText()
+
+        assertTrue(readBook.contains("append(ReadBookConfig.textFont)"))
+        assertTrue(readBook.contains("append(AppConfig.systemTypefaces)"))
+        assertTrue(readBook.contains("append(ReadBookConfig.textWeight)"))
+        assertTrue(readBook.contains("append(paint.letterSpacing)"))
+        assertTrue(readBook.contains("append(titlePaint.letterSpacing)"))
+    }
+
+    @Test
     fun fontCardsUseTallerPreviewSizingThanThemeCards() {
         val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
 
