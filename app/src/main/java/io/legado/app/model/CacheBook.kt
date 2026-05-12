@@ -10,6 +10,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.exception.ConcurrentException
 import io.legado.app.help.book.BookHelp
+import io.legado.app.help.book.CacheManifestHelper
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.CompositeCoroutine
@@ -294,6 +295,12 @@ object CacheBook {
         @Synchronized
         private fun onFinally() {
             if (waitDownloadSet.isEmpty() && onDownloadSet.isEmpty()) {
+                kotlin.runCatching {
+                    CacheManifestHelper.write(
+                        book,
+                        appDb.bookChapterDao.getChapterList(book.bookUrl)
+                    ) { chapter -> BookHelp.hasContent(book, chapter) }
+                }
                 cacheBookMap.remove(book.bookUrl)
             }
             postEvent(EventBus.UP_DOWNLOAD, book.bookUrl)
@@ -407,7 +414,8 @@ object CacheBook {
             scope: CoroutineScope,
             chapter: BookChapter,
             semaphore: Semaphore?,
-            resetPageOffset: Boolean = false
+            resetPageOffset: Boolean = false,
+            finish: (() -> Unit)? = null
         ) {
             if (onDownloadSet.contains(chapter.index)) {
                 return
@@ -437,6 +445,7 @@ object CacheBook {
                 downloadFinish(chapter, "download canceled", resetPageOffset, true)
             }.onFinally {
                 postEvent(EventBus.UP_DOWNLOAD, book.bookUrl)
+                finish?.invoke()
             }.start()
         }
 

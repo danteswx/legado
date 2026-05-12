@@ -10,7 +10,6 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import io.legado.app.R
 import io.legado.app.help.config.AppConfig
-import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.dpToPx
 
 /**
@@ -74,16 +73,19 @@ val Context.bottomBackground: Int
     get() = ThemeStore.bottomBackground(this)
 
 val Context.primaryTextColor: Int
-    get() = getPrimaryTextColor(isDarkTheme)
+    get() = getPrimaryTextColor(!AppConfig.isNightTheme)
+
+val Context.transparentNavBar: Boolean
+    get() = ThemeStore.transparentNavBar(this)
 
 val Context.secondaryTextColor: Int
-    get() = getSecondaryTextColor(isDarkTheme)
+    get() = getSecondaryTextColor(!AppConfig.isNightTheme)
 
 val Context.primaryDisabledTextColor: Int
-    get() = getPrimaryDisabledTextColor(isDarkTheme)
+    get() = getPrimaryDisabledTextColor(!AppConfig.isNightTheme)
 
 val Context.secondaryDisabledTextColor: Int
-    get() = getSecondaryDisabledTextColor(isDarkTheme)
+    get() = getSecondaryDisabledTextColor(!AppConfig.isNightTheme)
 
 val Fragment.primaryColor: Int
     get() = ThemeStore.primaryColor(requireContext())
@@ -101,26 +103,26 @@ val Fragment.bottomBackground: Int
     get() = ThemeStore.bottomBackground(requireContext())
 
 val Fragment.primaryTextColor: Int
-    get() = requireContext().getPrimaryTextColor(isDarkTheme)
+    get() = requireContext().getPrimaryTextColor(!AppConfig.isNightTheme)
 
 val Fragment.secondaryTextColor: Int
-    get() = requireContext().getSecondaryTextColor(isDarkTheme)
+    get() = requireContext().getSecondaryTextColor(!AppConfig.isNightTheme)
 
 val Fragment.primaryDisabledTextColor: Int
-    get() = requireContext().getPrimaryDisabledTextColor(isDarkTheme)
+    get() = requireContext().getPrimaryDisabledTextColor(!AppConfig.isNightTheme)
 
 val Fragment.secondaryDisabledTextColor: Int
-    get() = requireContext().getSecondaryDisabledTextColor(isDarkTheme)
+    get() = requireContext().getSecondaryDisabledTextColor(!AppConfig.isNightTheme)
 
 val Context.buttonDisabledColor: Int
-    get() = if (isDarkTheme) {
+    get() = if (AppConfig.isNightTheme) {
         ContextCompat.getColor(this, R.color.md_dark_disabled)
     } else {
         ContextCompat.getColor(this, R.color.md_light_disabled)
     }
 
 val Context.isDarkTheme: Boolean
-    get() = ColorUtils.isColorLight(ThemeStore.primaryColor(this))
+    get() = AppConfig.isNightTheme
 
 val Fragment.isDarkTheme: Boolean
     get() = requireContext().isDarkTheme
@@ -141,8 +143,18 @@ val Context.elevation: Float
 
 val Context.filletBackground: GradientDrawable
     get() {
-        val background = GradientDrawable()
-        background.cornerRadius = 3f.dpToPx()
-        background.setColor(backgroundColor)
-        return background
+        return UiCorner.rounded(backgroundColor, UiCorner.panelRadius(this))
     }
+
+val Context.dialogSurfaceBackground: GradientDrawable
+    get() {
+        return UiCorner.opaqueRounded(ContextCompat.getColor(this, R.color.dialog_surface), UiCorner.panelRadius(this))
+    }
+
+fun Context.filletTopBackground(@ColorInt color: Int): GradientDrawable {
+    val radius = UiCorner.scaledDp(16f)
+    return GradientDrawable().apply {
+        cornerRadii = floatArrayOf(radius, radius, radius, radius, 0f, 0f, 0f, 0f)
+        setColor(UiCorner.surfaceColor(color))
+    }
+}

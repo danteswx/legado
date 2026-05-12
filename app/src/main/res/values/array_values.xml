@@ -9,6 +9,7 @@
         <item>launcher4</item>
         <item>launcher5</item>
         <item>launcher6</item>
+        <item>launcher7</item>
     </string-array>
 
     <string-array name="screen_time_out_value">
@@ -27,6 +28,15 @@
     </string-array>
 
     <string-array name="screen_direction_value">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+    </string-array>
+
+    <string-array name="click_image_way_value">
         <item>0</item>
         <item>1</item>
         <item>2</item>
@@ -51,6 +61,12 @@
         <item>zh</item>
         <item>tw</item>
         <item>en</item>
+    </string-array>
+
+    <string-array name="bottom_bar_effect_mode_values">
+        <item>solid</item>
+        <item>glass</item>
+        <item>frosted</item>
     </string-array>
 
 </resources>

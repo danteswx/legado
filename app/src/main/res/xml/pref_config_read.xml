@@ -89,6 +89,13 @@
 
     <io.legado.app.lib.prefs.SwitchPreference
         android:defaultValue="true"
+        android:key="adaptSpecialStyle"
+        android:title="@string/adapt_special_style"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:defaultValue="true"
         android:key="mouseWheelPage"
         android:title="@string/mouse_wheel_page"
         app:iconSpaceReserved="false"
@@ -122,6 +129,23 @@
         app:iconSpaceReserved="false"
         app:isBottomBackground="true" />
 
+    <io.legado.app.lib.prefs.Preference
+        android:key="pageTouchClick"
+        android:summary="@string/page_touch_click_summary"
+        android:title="@string/page_touch_click_title"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
+    <io.legado.app.lib.prefs.Preference
+        android:defaultValue="75"
+        android:key="readMenuAlpha"
+        android:summary="@string/read_menu_alpha_summary"
+        android:title="@string/read_menu_alpha"
+        app:allowDividerAbove="false"
+        app:allowDividerBelow="false"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
     <io.legado.app.lib.prefs.SwitchPreference
         android:defaultValue="true"
         android:key="autoChangeSource"
@@ -150,10 +174,12 @@
         app:iconSpaceReserved="false"
         app:isBottomBackground="true" />
 
-    <io.legado.app.lib.prefs.SwitchPreference
-        android:defaultValue="false"
-        android:key="previewImageByClick"
-        android:title="@string/preview_image_by_click"
+    <io.legado.app.lib.prefs.NameListPreference
+        android:defaultValue="0"
+        android:entries="@array/click_image_way_title"
+        android:entryValues="@array/click_image_way_value"
+        android:key="clickImgWay"
+        android:title="@string/click_image_way"
         app:iconSpaceReserved="false"
         app:isBottomBackground="true" />
 
@@ -187,6 +213,13 @@
         android:defaultValue="false"
         android:key="expandTextMenu"
         android:title="@string/expand_text_menu"
+        app:iconSpaceReserved="false"
+        app:isBottomBackground="true" />
+
+    <io.legado.app.lib.prefs.Preference
+        android:key="contentSelectMenuConfig"
+        android:summary="@string/content_select_menu_config_summary"
+        android:title="@string/content_select_menu_config"
         app:iconSpaceReserved="false"
         app:isBottomBackground="true" />
 

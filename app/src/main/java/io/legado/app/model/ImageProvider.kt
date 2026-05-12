@@ -18,17 +18,28 @@ import io.legado.app.model.localBook.EpubFile
 import io.legado.app.model.localBook.MobiFile
 import io.legado.app.model.localBook.PdfFile
 import io.legado.app.utils.BitmapUtils
+import io.legado.app.utils.decodeBase64DataUrlBytes
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.SvgUtils
+import io.legado.app.utils.isDataUrl
 import io.legado.app.utils.toastOnUi
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.Dispatchers.Main
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import splitties.init.appCtx
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.min
 
 object ImageProvider {
+
+    private val imageCacheScope = CoroutineScope(SupervisorJob() + IO)
+    private val inflightCacheKeys = ConcurrentHashMap.newKeySet<String>()
 
     private val errorBitmap: Bitmap by lazy {
         BitmapFactory.decodeResource(appCtx.resources, R.drawable.image_loading_error)
@@ -130,6 +141,7 @@ object ImageProvider {
             val vFile = BookHelp.getImage(book, src)
             if (!BookHelp.isImageExist(book, src)) {
                 val inputStream = when {
+                    src.isDataUrl() -> src.decodeBase64DataUrlBytes()?.let(::ByteArrayInputStream)
                     book.isEpub -> EpubFile.getImage(book, src)
                     book.isPdf -> PdfFile.getImage(book, src)
                     book.isMobi -> MobiFile.getImage(book, src)
@@ -149,6 +161,36 @@ object ImageProvider {
         }
     }
 
+    fun cacheImageAsync(
+        book: Book,
+        src: String,
+        bookSource: BookSource?,
+        width: Int? = null,
+        height: Int? = null,
+        cacheKeySuffix: String? = null,
+        onFinished: (() -> Unit)? = null
+    ) {
+        val key = "${book.bookUrl}|$src"
+        if (!inflightCacheKeys.add(key)) return
+        imageCacheScope.launch {
+            try {
+                cacheImage(book, src, bookSource)
+                if (width != null && width > 0) {
+                    getImage(book, src, width, height, cacheKeySuffix)
+                }
+            } catch (e: Exception) {
+                putDebug("ImageProvider async cache failed: $src\n${e.localizedMessage}")
+            } finally {
+                inflightCacheKeys.remove(key)
+                if (onFinished != null) {
+                    withContext(Main) {
+                        onFinished.invoke()
+                    }
+                }
+            }
+        }
+    }
+
     /**
      *获取图片宽度高度信息
      */
@@ -163,6 +205,17 @@ object ImageProvider {
         op.inJustDecodeBounds = true
         BitmapFactory.decodeFile(file.absolutePath, op)
         if (op.outWidth < 1 && op.outHeight < 1) {
+            if (src.isDataUrl()) {
+                src.decodeBase64DataUrlBytes()?.let { bytes ->
+                    val dataOptions = BitmapFactory.Options().apply {
+                        inJustDecodeBounds = true
+                    }
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, dataOptions)
+                    if (dataOptions.outWidth > 0 && dataOptions.outHeight > 0) {
+                        return Size(dataOptions.outWidth, dataOptions.outHeight)
+                    }
+                }
+            }
             //svg size
             val size = SvgUtils.getSize(file.absolutePath)
             if (size != null) return size
@@ -182,6 +235,27 @@ object ImageProvider {
         width: Int,
         height: Int? = null
     ): Bitmap {
+        return getImage(book, src, width, height, null)
+    }
+
+    fun getImageOrNull(
+        book: Book,
+        src: String,
+        width: Int,
+        height: Int? = null,
+        cacheKeySuffix: String? = null
+    ): Bitmap? {
+        val bitmap = getImage(book, src, width, height, cacheKeySuffix)
+        return bitmap.takeUnless { it == errorBitmap }
+    }
+
+    fun getImage(
+        book: Book,
+        src: String,
+        width: Int,
+        height: Int? = null,
+        cacheKeySuffix: String? = null
+    ): Bitmap {
         //src为空白时 可能被净化替换掉了 或者规则失效
         if (book.getUseReplaceRule() && src.isBlank()) {
             book.setUseReplaceRule(false)
@@ -191,17 +265,49 @@ object ImageProvider {
         if (!vFile.exists()) return errorBitmap
         //epub文件提供图片链接是相对链接，同时阅读多个epub文件，缓存命中错误
         //bitmapLruCache的key同一改成缓存文件的路径
-        val cacheBitmap = getNotRecycled(vFile.absolutePath)
+        val cacheKey = if (cacheKeySuffix.isNullOrBlank()) {
+            vFile.absolutePath
+        } else {
+            "${vFile.absolutePath}#$cacheKeySuffix"
+        }
+        val cacheBitmap = getNotRecycled(cacheKey)
         if (cacheBitmap != null) return cacheBitmap
+        if (!vFile.exists() && src.isDataUrl()) {
+            return kotlin.runCatching {
+                val dataBytes = src.decodeBase64DataUrlBytes()
+                    ?: throw NoStackTraceException(appCtx.getString(R.string.error_decode_bitmap))
+                val options = BitmapFactory.Options().apply {
+                    inJustDecodeBounds = true
+                }
+                BitmapFactory.decodeByteArray(dataBytes, 0, dataBytes.size, options)
+                options.inSampleSize = kotlin.run {
+                    val wRatio = if (width > 0) options.outWidth / width else -1
+                    val hRatio = height?.takeIf { it > 0 }?.let { options.outHeight / it } ?: -1
+                    when {
+                        wRatio > 1 && hRatio > 1 -> maxOf(wRatio, hRatio)
+                        wRatio > 1 -> wRatio
+                        hRatio > 1 -> hRatio
+                        else -> 1
+                    }
+                }
+                options.inJustDecodeBounds = false
+                val bitmap = BitmapFactory.decodeByteArray(dataBytes, 0, dataBytes.size, options)
+                    ?: throw NoStackTraceException(appCtx.getString(R.string.error_decode_bitmap))
+                put(cacheKey, bitmap)
+                bitmap
+            }.onFailure {
+                put(cacheKey, errorBitmap)
+            }.getOrDefault(errorBitmap)
+        }
         return kotlin.runCatching {
             val bitmap = BitmapUtils.decodeBitmap(vFile.absolutePath, width, height)
                 ?: SvgUtils.createBitmap(vFile.absolutePath, width, height)
                 ?: throw NoStackTraceException(appCtx.getString(R.string.error_decode_bitmap))
-            put(vFile.absolutePath, bitmap)
+            put(cacheKey, bitmap)
             bitmap
         }.onFailure {
             //错误图片占位,防止重复获取
-            put(vFile.absolutePath, errorBitmap)
+            put(cacheKey, errorBitmap)
         }.getOrDefault(errorBitmap)
     }
 

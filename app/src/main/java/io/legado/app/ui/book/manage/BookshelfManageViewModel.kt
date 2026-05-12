@@ -14,16 +14,15 @@ import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.removeType
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
-import io.legado.app.help.storage.Backup
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.webBook.WebBook
+import io.legado.app.model.SourceCallBack
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.stackTraceStr
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.writeToOutputStream
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
 import java.io.File
 
 
@@ -50,9 +49,6 @@ class BookshelfManageViewModel(application: Application) : BaseViewModel(applica
     fun updateBook(vararg book: Book) {
         execute {
             appDb.bookDao.update(*book)
-        }.onSuccess {
-            // 书籍信息变化（包括分组），触发自动备份
-            Backup.backupOnDataChange(context)
         }
     }
 
@@ -62,11 +58,11 @@ class BookshelfManageViewModel(application: Application) : BaseViewModel(applica
             books.forEach {
                 if (it.isLocal) {
                     LocalBook.deleteBook(it, deleteOriginal)
+                } else {
+                    val source = appDb.bookSourceDao.getBookSource(it.origin)
+                    SourceCallBack.callBackBook(SourceCallBack.DEL_BOOK_SHELF, source, it)
                 }
             }
-        }.onSuccess {
-            // 书籍删除，触发自动备份
-            Backup.backupOnDataChange(context)
         }
     }
 

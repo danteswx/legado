@@ -38,15 +38,19 @@ import androidx.preference.PreferenceManager
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import io.legado.app.R
 import io.legado.app.constant.AppConst
+import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.help.IntentHelp
 import io.legado.app.help.book.isAudio
 import io.legado.app.help.book.isImage
 import io.legado.app.help.book.isLocal
+import io.legado.app.help.book.isVideo
 import io.legado.app.help.config.AppConfig
 import io.legado.app.ui.book.audio.AudioPlayActivity
+import io.legado.app.ui.video.VideoPlayerActivity
 import io.legado.app.ui.book.manga.ReadMangaActivity
 import io.legado.app.ui.book.read.ReadBookActivity
+import io.legado.app.ui.book.toc.BookTocLoadingActivity
 import splitties.systemservices.clipboardManager
 import splitties.systemservices.connectivityManager
 import splitties.systemservices.uiModeManager
@@ -65,7 +69,17 @@ fun Context.startActivityForBook(
     book: Book,
     configIntent: Intent.() -> Unit = {},
 ) {
+    if (appDb.bookChapterDao.getChapterCount(book.bookUrl) <= 0) {
+        startActivity<BookTocLoadingActivity> {
+            putExtra("name", book.name)
+            putExtra("author", book.author)
+            putExtra("bookUrl", book.bookUrl)
+            apply(configIntent)
+        }
+        return
+    }
     val cls = when {
+        book.isVideo -> VideoPlayerActivity::class.java
         book.isAudio -> AudioPlayActivity::class.java
         !book.isLocal && book.isImage && AppConfig.showMangaUi -> ReadMangaActivity::class.java
         else -> ReadBookActivity::class.java

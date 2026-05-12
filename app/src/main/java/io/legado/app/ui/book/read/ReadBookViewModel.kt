@@ -27,6 +27,7 @@ import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.ImageProvider
 import io.legado.app.model.ReadAloud
 import io.legado.app.model.ReadBook
+import io.legado.app.model.SourceCallBack
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.BaseReadAloudService
@@ -91,11 +92,20 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
                 else -> appDb.bookDao.getBook(bookUrl)
             } ?: ReadBook.book
             when {
-                book != null -> initBook(book)
+                book != null -> {
+                    ReadBook.markRecentRead(book)
+                    initBook(book)
+                }
                 else -> {
                     ReadBook.upMsg(context.getString(R.string.no_book))
                     AppLog.put("未找到书籍\nbookUrl:$bookUrl")
                 }
+            }
+            val index = intent.getIntExtra("index", -1)
+            val chapterPos = intent.getIntExtra("chapterPos", -1)
+            if (index >= 0 && chapterPos >= 0) { //从书签打开的正文，有进度传递
+                ReadBook.saveCurrentBookProgress() //启用恢复进度提示
+                openChapter(index, chapterPos)
             }
         }.onSuccess {
             success?.invoke()
@@ -127,9 +137,17 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
         }
         ReadBook.upMsg(null)
         if (!isSameBook) {
-            ReadBook.loadContent(resetPageOffset = true)
+            ReadBook.loadContent(resetPageOffset = true) {
+                ReadBook.bookSource?.let {
+                    SourceCallBack.callBackBook(SourceCallBack.START_READ, it, book, ReadBook.curTextChapter?.chapter)
+                }
+            }
         } else {
-            ReadBook.loadOrUpContent()
+            ReadBook.loadOrUpContent {
+                ReadBook.bookSource?.let {
+                    SourceCallBack.callBackBook(SourceCallBack.START_READ, it, book, ReadBook.curTextChapter?.chapter)
+                }
+            }
         }
         if (ReadBook.chapterChanged) {
             // 有章节跳转不同步阅读进度
@@ -214,6 +232,8 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
                 val oldBook = book.copy()
                 WebBook.getChapterListAwait(it, book, true)
                     .onSuccess { cList ->
+                        val oldChapterList = appDb.bookChapterDao.getChapterList(oldBook.bookUrl)
+                        BookHelp.remapContentCache(oldBook, oldChapterList, cList)
                         if (oldBook.bookUrl == book.bookUrl) {
                             appDb.bookDao.update(book)
                         } else {
@@ -427,13 +447,22 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
         // calculate search result's pageIndex
         val pages = textChapter.pages
         val content = textChapter.getContent()
-        val queryLength = searchContentQuery.length
+        var queryLength = searchContentQuery.length
 
-        var count = 0
-        var index = content.indexOf(searchContentQuery)
-        while (count != searchResult.resultCountWithinChapter) {
-            index = content.indexOf(searchContentQuery, index + queryLength)
-            count += 1
+        var index: Int
+        if (searchResult.isRegex) {
+            val regex = Regex(searchContentQuery)
+            val matches = regex.findAll(content)
+            val match = matches.elementAtOrNull(searchResult.resultCountWithinChapter)
+            queryLength = match?.value?.length ?: 0
+            index = match?.range?.first ?: -1
+        } else {
+            var count = 0
+            index = content.indexOf(searchContentQuery)
+            while (count != searchResult.resultCountWithinChapter) {
+                index = content.indexOf(searchContentQuery, index + queryLength)
+                count += 1
+            }
         }
         val contentPosition = index
         var pageIndex = 0
@@ -476,7 +505,7 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
             addLine = -1
             charIndex2 = charIndex + queryLength - curLineLength - 1
         }
-        return arrayOf(pageIndex, lineIndex, charIndex, addLine, charIndex2)
+        return arrayOf(pageIndex, lineIndex, charIndex, addLine, charIndex2, queryLength)
     }
 
     /**

@@ -5,6 +5,13 @@
     tools:ignore="AlwaysShowAction">
 
     <item
+        android:id="@+id/menu_custom_btn"
+        android:icon="@drawable/ic_custom"
+        android:title="@string/custom_button"
+        android:visible="false"
+        app:showAsAction="ifRoom" />
+
+    <item
         android:id="@+id/menu_change_source"
         android:icon="@drawable/ic_exchange"
         android:title="@string/change_origin"
@@ -21,6 +28,11 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_play_mode"
+        android:title="@string/play_mode"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_edit_source"
         android:title="@string/edit_book_source"
         app:showAsAction="never" />
@@ -31,6 +43,10 @@
         android:checkable="true"
         app:showAsAction="never" />
 
+    <item
+        android:id="@+id/menu_skip_credits"
+        android:title="@string/skip_book_credits"
+        app:showAsAction="never" />
 
     <item
         android:id="@+id/menu_log"

@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">@color/md_light_blue_600</color>
-    <color name="primaryDark">@color/md_light_blue_700</color>
-    <color name="accent">@color/md_pink_800</color>
+    <color name="launcher_background">#FF4496D3</color>
+    <color name="primary">#3482FF</color>
+    <color name="primaryDark">#1F6FE5</color>
+    <color name="accent">#0A84FF</color>
 
     <color name="disabled">@color/md_light_disabled</color>
 
-    <color name="divider">#66666666</color>
+    <color name="divider">#1F000000</color>
 
     <color name="lightBlue_color">#FF578FCC</color>
 
@@ -15,10 +16,19 @@
 
     <color name="night_mask">#00000000</color>
 
-    <color name="background">@color/md_grey_50</color>
-    <color name="background_card">@color/md_grey_100</color>
-    <color name="background_menu">@color/md_grey_200</color>
-    <color name="background_prefs">#7fffffff</color>
+    <color name="background">#F7F7FA</color>
+    <color name="background_card">#FFFFFFFF</color>
+    <color name="background_menu">#F1F2F6</color>
+    <color name="dialog_surface">#FFFFFFFF</color>
+    <color name="book_info_frost">#DDF1F2F6</color>
+    <color name="background_prefs">#EFFFFFFF</color>
+    <color name="glass_bar">#A8D9E6F7</color>
+    <color name="glass_bar_shadow">#260A1D35</color>
+    <color name="glass_bar_highlight">#52FFFFFF</color>
+    <color name="glass_button">#B5E5EFFB</color>
+    <color name="glass_button_pressed">#D05C9DFF</color>
+    <color name="glass_overlay">#22FFFFFF</color>
+    <color name="glass_stroke">#668FA8C8</color>
 
     <color name="transparent">#00000000</color>
 
@@ -29,9 +39,12 @@
 
     <color name="highlight">#d3321b</color>
 
-    <color name="btn_bg_press">#63ACACAC</color>
-    <color name="btn_bg_press_2">#63858585</color>
+    <color name="btn_bg_press">#1A0A84FF</color>
+    <color name="btn_bg_press_2">#14000000</color>
     <color name="btn_bg_press_tp">#632C2C2C</color>
+
+    <color name="card_bg_water">#F2FFFFFF</color>
+    <color name="card_border_water">#14000000</color>
 
     <color name="tv_btn_normal_black">#737373</color>
     <color name="tv_btn_press_black">#adadad</color>
@@ -47,7 +60,7 @@
 
     <color name="light_translucent">#23000000</color>
     <color name="common_gray">#EEEEEE</color>
-    <color name="darker_gray">#aaaaaa</color>
+    <color name="darker_gray">#aaaaaaaa</color>
 
     <!-- 分格线背景色 -->
     <color name="bg_divider_line">#8fe0e0e0</color>

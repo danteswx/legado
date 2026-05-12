@@ -23,7 +23,10 @@
         android:id="@+id/recycler_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"
+        android:clipToPadding="false"
         android:overScrollMode="never"
+        android:paddingTop="8dp"
+        android:paddingBottom="10dp"
         app:layout_constraintBottom_toTopOf="@+id/ll_search_base_info"
         app:layout_constraintTop_toBottomOf="@id/refresh_progress_bar"
         tools:ignore="SpeakableTextPresentCheck" />
@@ -31,38 +34,40 @@
     <LinearLayout
         android:id="@+id/ll_search_base_info"
         android:layout_width="match_parent"
-        android:layout_height="36dp"
-        android:background="@color/background"
-        android:elevation="5dp"
+        android:layout_height="42dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_search_glass_panel"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingLeft="10dp"
-        android:paddingRight="10dp"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp"
         app:layout_constraintBottom_toBottomOf="parent">
 
         <TextView
             android:id="@+id/tv_current_search_info"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="32dp"
             android:layout_weight="1"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:background="@drawable/bg_popup_action_item"
             android:ellipsize="middle"
             android:gravity="center_vertical"
-            android:paddingLeft="10dp"
-            android:paddingRight="10dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
             android:singleLine="true"
             android:textColor="@color/primaryText"
-            android:textSize="12sp" />
+            android:textSize="13sp" />
 
         <Space
-            android:layout_width="20dp"
+            android:layout_width="10dp"
             android:layout_height="1dp" />
 
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/iv_search_content_top"
-            android:layout_width="36dp"
-            android:layout_height="match_parent"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="@drawable/bg_popup_action_item"
             android:contentDescription="@string/go_to_top"
             android:src="@drawable/ic_arrow_drop_up"
             android:tooltipText="@string/go_to_top"
@@ -71,9 +76,9 @@
 
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/iv_search_content_bottom"
-            android:layout_width="36dp"
-            android:layout_height="match_parent"
-            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="@drawable/bg_popup_action_item"
             android:contentDescription="@string/go_to_bottom"
             android:src="@drawable/ic_arrow_drop_down"
             android:tooltipText="@string/go_to_bottom"

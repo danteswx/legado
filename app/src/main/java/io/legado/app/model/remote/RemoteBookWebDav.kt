@@ -57,12 +57,12 @@ class RemoteBookWebDav(
     }
 
     override suspend fun downloadRemoteBook(remoteBook: RemoteBook): Uri {
-        val backupPath = AppConfig.backupPath
-            ?: throw NoStackTraceException("没有设置备份路径，无法保存远程书籍!")
+        AppConfig.defaultBookTreeUri
+            ?: throw NoStackTraceException("没有设置书籍保存位置!")
         if (!NetworkUtils.isAvailable()) throw NoStackTraceException("网络不可用")
         val webdav = WebDav(remoteBook.path, authorization)
         return webdav.downloadInputStream().let { inputStream ->
-            LocalBook.saveBookFile(inputStream, remoteBook.filename, backupPath, "remoteBooks")
+            LocalBook.saveBookFile(inputStream, remoteBook.filename)
         }
     }
 

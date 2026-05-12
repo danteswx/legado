@@ -8,8 +8,10 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Picture
+import android.graphics.Rect
 import android.os.Build
-import android.text.Html
+import android.text.Spanned
+import android.text.style.ImageSpan
 import android.view.MotionEvent
 import android.view.View
 import android.view.View.GONE
@@ -22,12 +24,11 @@ import android.widget.EdgeEffect
 import android.widget.EditText
 import android.widget.RadioGroup
 import android.widget.SeekBar
+import android.widget.Spinner
 import android.widget.TextView
 import androidx.annotation.ColorInt
 import androidx.annotation.DrawableRes
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.view.menu.MenuPopupHelper
-import androidx.appcompat.widget.PopupMenu
 import androidx.core.graphics.record
 import androidx.core.graphics.withTranslation
 import androidx.core.view.ViewCompat
@@ -37,6 +38,7 @@ import androidx.core.view.marginBottom
 import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager.widget.ViewPager
+import io.legado.app.help.GlideImageGetter
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.TintHelper
 import io.legado.app.utils.canvasrecorder.CanvasRecorder
@@ -44,8 +46,16 @@ import io.legado.app.utils.canvasrecorder.record
 import splitties.systemservices.inputMethodManager
 import splitties.views.bottomPadding
 import splitties.views.topPadding
-import java.lang.reflect.Field
-
+import androidx.core.graphics.createBitmap
+import androidx.core.text.HtmlCompat
+import androidx.core.view.isVisible
+import androidx.core.text.parseAsHtml
+import androidx.core.view.postDelayed
+import io.legado.app.R
+import io.legado.app.help.TextViewTagHandler
+import io.legado.app.model.analyzeRule.AnalyzeUrl.Companion.paramPattern
+import io.noties.markwon.Markwon
+import io.noties.markwon.image.AsyncDrawableSpan
 
 private tailrec fun getCompatActivity(context: Context?): AppCompatActivity? {
     return when (context) {
@@ -65,7 +75,7 @@ fun View.hideSoftInput() = run {
 
 fun EditText.showSoftInput() = run {
     requestFocus()
-    inputMethodManager.showSoftInput(this, InputMethodManager.RESULT_SHOWN)
+    inputMethodManager.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
 }
 
 fun View.disableAutoFill() = run {
@@ -148,7 +158,7 @@ fun View.visible() {
 fun View.visible(visible: Boolean) {
     if (visible && visibility != VISIBLE) {
         visibility = VISIBLE
-    } else if (!visible && visibility == VISIBLE) {
+    } else if (!visible && isVisible) {
         visibility = INVISIBLE
     }
 }
@@ -160,14 +170,13 @@ fun View.screenshot(bitmap: Bitmap? = null, canvas: Canvas? = null): Bitmap? {
             bitmap
         } else {
             bitmap?.recycle()
-            Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            createBitmap(width, height)
         }
         val c = canvas ?: Canvas()
         c.setBitmap(screenshot)
-        c.save()
-        c.translate(-scrollX.toFloat(), -scrollY.toFloat())
-        this.draw(c)
-        c.restore()
+        c.withTranslation(-scrollX.toFloat(), -scrollY.toFloat()) {
+            this@screenshot.draw(this)
+        }
         c.setBitmap(null)
         screenshot.prepareToDraw()
         screenshot
@@ -224,30 +233,191 @@ fun RadioGroup.checkByIndex(index: Int) {
     check(get(index).id)
 }
 
-@SuppressLint("ObsoleteSdkInt")
-fun TextView.setHtml(html: String) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-        text = Html.fromHtml(html, Html.FROM_HTML_MODE_COMPACT)
-    } else {
-        @Suppress("DEPRECATION")
-        text = Html.fromHtml(html)
+fun TextView.setHtml(html: String, imageGetter: GlideImageGetter? = null, textViewTagHandler: TextViewTagHandler? = null) {
+    text = html.parseAsHtml(HtmlCompat.FROM_HTML_MODE_COMPACT, imageGetter, textViewTagHandler)
+}
+
+fun TextView.setHtml(html: String, imageGetter: GlideImageGetter? = null, textViewTagHandler: TextViewTagHandler? = null, imgOnLongClickListener: (source: String) -> Unit, imgOnClickListener: (click: String) -> Unit) {
+    val spanned = html.parseAsHtml(HtmlCompat.FROM_HTML_MODE_COMPACT, imageGetter, textViewTagHandler)
+    val imageSpans = spanned.getSpans(0, spanned.length, ImageSpan::class.java)
+    val clickSpans = mutableListOf<Triple<Pair<Int, Int>, String, String?>>()
+    for (imageSpan in imageSpans) {
+        val start = spanned.getSpanStart(imageSpan)
+        val end = spanned.getSpanEnd(imageSpan)
+        if (start >= 0 && end >= 0) {
+            val source = imageSpan.source ?: continue
+            var click: String? = null
+            val urlMatcher = paramPattern.matcher(source)
+            if (urlMatcher.find()) {
+                val urlOptionStr = source.substring(urlMatcher.end())
+                GSON.fromJsonObject<Map<String, String>>(urlOptionStr).getOrNull()?.let {
+                    click = it["click"]
+                }
+            }
+            clickSpans.add(Triple((start to end),source, click))
+        }
     }
+    text = spanned
+    if (clickSpans.isNotEmpty()) {
+        movementMethod = object : android.text.method.LinkMovementMethod() {
+            private var lastClickTime = 0L
+            private var longClickRunnable: Runnable?= null
+            private var isLongClick = false
+            override fun onTouchEvent(
+                widget: TextView,
+                buffer: android.text.Spannable,
+                event: MotionEvent
+            ): Boolean {
+                var x = event.x.toInt()
+                var y = event.y.toInt()
+                x -= widget.totalPaddingLeft
+                y -= widget.totalPaddingTop
+                val line = widget.layout.getLineForVertical(y)
+                val off = widget.layout.getOffsetForHorizontal(line, x.toFloat())
+                var durClick: String? = null
+                var durSource: String? = null
+                for ((position, source, click) in clickSpans) {
+                    if (off in position.first..position.second) {
+                        durClick = click
+                        durSource = source
+                        break
+                    }
+                }
+                when(event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        cancelLongClick()
+                        if (durSource != null) {
+                            isLongClickable = false
+                            longClickRunnable = postDelayed(600) {
+                                isLongClick = true
+                                imgOnLongClickListener(durSource)
+                            }
+                            return true
+                        }
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        isLongClickable = true
+                        if (!isLongClick) {
+                            cancelLongClick()
+                            if (durClick != null) {
+                                val upTime = System.currentTimeMillis()
+                                if (upTime - lastClickTime > 200) {
+                                    lastClickTime = upTime
+                                    imgOnClickListener(durClick)
+                                }
+                                return true
+                            }
+                        }
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        if (durSource != null) {
+                            isLongClickable = false
+                            return true
+                        }
+                    }
+                    MotionEvent.ACTION_CANCEL -> {
+                        isLongClickable = true
+                        cancelLongClick()
+                        return true
+                    }
+                }
+                return super.onTouchEvent(widget, buffer, event)
+            }
+
+            private fun cancelLongClick() {
+                longClickRunnable?.let {
+                    removeCallbacks(it)
+                    longClickRunnable = null
+                }
+                isLongClick = false
+            }
+
+        }
+    }
+}
+
+fun TextView.setMarkdown(markwon: Markwon, spanned: Spanned, imgOnLongClickListener: (source: String) -> Unit) {
+    val imageSpans = spanned.getSpans(0, spanned.length, AsyncDrawableSpan::class.java)
+    val clickSpans = mutableListOf<Pair<Pair<Int, Int>, String>>()
+    for (imageSpan in imageSpans) {
+        val start = spanned.getSpanStart(imageSpan)
+        val end = spanned.getSpanEnd(imageSpan)
+        if (start >= 0 && end >= 0) {
+            val source = imageSpan.drawable.destination
+            clickSpans.add((start to end) to source)
+        }
+    }
+    if (clickSpans.isNotEmpty()) {
+        movementMethod = object : android.text.method.LinkMovementMethod() {
+            private var longClickRunnable: Runnable?= null
+            private var isLongClick = false
+            override fun onTouchEvent(
+                widget: TextView,
+                buffer: android.text.Spannable,
+                event: MotionEvent
+            ): Boolean {
+                isLongClickable = false
+                var x = event.x.toInt()
+                var y = event.y.toInt()
+                x -= widget.totalPaddingLeft
+                y -= widget.totalPaddingTop
+                val line = widget.layout.getLineForVertical(y)
+                val off = widget.layout.getOffsetForHorizontal(line, x.toFloat())
+                var durSource: String? = null
+                for ((position, source) in clickSpans) {
+                    if (off in position.first..position.second) {
+                        durSource = source
+                        break
+                    }
+                }
+                when(event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        cancelLongClick()
+                        if (durSource != null) {
+                            isLongClickable = false
+                            longClickRunnable = postDelayed(600) {
+                                isLongClick = true
+                                imgOnLongClickListener(durSource)
+                            }
+                            return true
+                        }
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        isLongClickable = true
+                        if (!isLongClick) {
+                            cancelLongClick()
+                        }
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        if (durSource != null) {
+                            isLongClickable = false
+                            return true
+                        }
+                    }
+                    MotionEvent.ACTION_CANCEL -> {
+                        isLongClickable = true
+                        cancelLongClick()
+                        return true
+                    }
+                }
+                return super.onTouchEvent(widget, buffer, event)
+            }
+
+            private fun cancelLongClick() {
+                longClickRunnable?.let {
+                    removeCallbacks(it)
+                    longClickRunnable = null
+                }
+                isLongClick = false
+            }
+        }
+    }
+    markwon.setParsedMarkdown(this, spanned)
 }
 
 fun TextView.setTextIfNotEqual(charSequence: CharSequence?) {
     if (text != charSequence) {
         text = charSequence
-    }
-}
-
-@SuppressLint("RestrictedApi")
-fun PopupMenu.show(x: Int, y: Int) {
-    kotlin.runCatching {
-        val field: Field = this.javaClass.getDeclaredField("mPopup")
-        field.isAccessible = true
-        (field.get(this) as MenuPopupHelper).show(x, y)
-    }.onFailure {
-        it.printOnDebug()
     }
 }
 
@@ -276,8 +446,52 @@ fun View.applyStatusBarPadding(withInitialPadding: Boolean = false) {
 fun View.applyNavigationBarPadding(withInitialPadding: Boolean = false) {
     val initialPadding = if (withInitialPadding) bottomPadding else 0
     setOnApplyWindowInsetsListenerCompat { _, windowInsets ->
-        bottomPadding = initialPadding + windowInsets.navigationBarHeight
+        val navigationBarHeight = windowInsets.navigationBarHeight
+        val extraPadding = if (navigationBarHeight > 0) 12.dpToPx() else 0
+        bottomPadding = initialPadding + navigationBarHeight + extraPadding
         windowInsets
+    }
+}
+
+fun View.applyMainBottomBarPadding(withInitialPadding: Boolean = false) {
+    val initialPadding = if (withInitialPadding) bottomPadding else 0
+    setOnApplyWindowInsetsListenerCompat { _, windowInsets ->
+        val bottomSpace = windowInsets.navigationBarHeight +
+                resources.getDimensionPixelSize(R.dimen.main_content_bottom_bar_padding)
+        if (this is RecyclerView) {
+            bottomPadding = initialPadding
+            updateMainBottomBarSpaceDecoration(bottomSpace)
+        } else {
+            bottomPadding = initialPadding + bottomSpace
+        }
+        windowInsets
+    }
+}
+
+private fun RecyclerView.updateMainBottomBarSpaceDecoration(bottomSpace: Int) {
+    (getTag(R.id.main_bottom_bar_space_decoration) as? MainBottomBarSpaceDecoration)?.let {
+        if (it.bottomSpace != bottomSpace) {
+            it.bottomSpace = bottomSpace
+            invalidateItemDecorations()
+        }
+        return
+    }
+    val decoration = MainBottomBarSpaceDecoration(bottomSpace)
+    addItemDecoration(decoration)
+    setTag(R.id.main_bottom_bar_space_decoration, decoration)
+}
+
+private class MainBottomBarSpaceDecoration(var bottomSpace: Int) : RecyclerView.ItemDecoration() {
+    override fun getItemOffsets(
+        outRect: Rect,
+        view: View,
+        parent: RecyclerView,
+        state: RecyclerView.State
+    ) {
+        val position = parent.getChildAdapterPosition(view)
+        if (position != RecyclerView.NO_POSITION && position == state.itemCount - 1) {
+            outRect.bottom = bottomSpace
+        }
     }
 }
 
@@ -319,3 +533,9 @@ fun View.setOnApplyWindowInsetsListenerCompat(listener: (View, WindowInsetsCompa
     }
 }
 
+fun Spinner.setSelectionSafely(position: Int) {
+    val count = adapter?.count ?: 0
+    if (count > 0) {
+        setSelection(position.coerceIn(0, count - 1))
+    }
+}

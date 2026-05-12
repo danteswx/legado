@@ -1,18 +1,27 @@
 package io.legado.app.utils
 
+import android.app.Activity
 import android.app.Dialog
+import android.os.Build
+import android.view.Gravity
+import android.view.View
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.view.WindowManager
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 import androidx.core.view.forEach
 import androidx.fragment.app.DialogFragment
 import io.legado.app.lib.theme.Selector
 import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.lib.theme.accentColor
-import io.legado.app.lib.theme.filletBackground
+import io.legado.app.lib.theme.dialogSurfaceBackground
 import splitties.systemservices.windowManager
 
 fun AlertDialog.applyTint(): AlertDialog {
-    window?.setBackgroundDrawable(context.filletBackground)
+    window?.setBackgroundDrawable(context.dialogSurfaceBackground)
     val colorStateList = Selector.colorBuild()
         .setDefaultColor(ThemeStore.accentColor(context))
         .setPressedColor(ColorUtils.darkenColor(ThemeStore.accentColor(context)))
@@ -30,6 +39,7 @@ fun AlertDialog.applyTint(): AlertDialog {
         listView?.forEach {
             it.applyTint(context.accentColor)
         }
+        applyMaxWidthIfFloating()
     }
     return this
 }
@@ -44,9 +54,10 @@ fun DialogFragment.setLayout(widthMix: Float, heightMix: Float) {
 
 fun Dialog.setLayout(widthMix: Float, heightMix: Float) {
     val dm = context.windowManager.windowSize
+    val height = (dm.heightPixels * heightMix).toInt()
     window?.setLayout(
-        (dm.widthPixels * widthMix).toInt(),
-        (dm.heightPixels * heightMix).toInt()
+        resolveFloatingDialogWidth((dm.widthPixels * widthMix).toInt(), height),
+        height
     )
 }
 
@@ -56,9 +67,10 @@ fun DialogFragment.setLayout(width: Int, heightMix: Float) {
 
 fun Dialog.setLayout(width: Int, heightMix: Float) {
     val dm = context.windowManager.windowSize
+    val height = (dm.heightPixels * heightMix).toInt()
     window?.setLayout(
-        width,
-        (dm.heightPixels * heightMix).toInt()
+        resolveFloatingDialogWidth(width, height),
+        height
     )
 }
 
@@ -69,7 +81,7 @@ fun DialogFragment.setLayout(widthMix: Float, height: Int) {
 fun Dialog.setLayout(widthMix: Float, height: Int) {
     val dm = context.windowManager.windowSize
     window?.setLayout(
-        (dm.widthPixels * widthMix).toInt(),
+        resolveFloatingDialogWidth((dm.widthPixels * widthMix).toInt(), height),
         height
     )
 }
@@ -79,5 +91,57 @@ fun DialogFragment.setLayout(width: Int, height: Int) {
 }
 
 fun Dialog.setLayout(width: Int, height: Int) {
-    window?.setLayout(width, height)
+    window?.setLayout(resolveFloatingDialogWidth(width, height), height)
+}
+
+private fun Dialog.applyMaxWidthIfFloating() {
+    val attrs = window?.attributes ?: return
+    val width = attrs.width
+    val height = attrs.height
+    if (width > 0 || width == WindowManager.LayoutParams.MATCH_PARENT) {
+        window?.setLayout(resolveFloatingDialogWidth(width, height), height)
+    }
+}
+
+private fun Dialog.resolveFloatingDialogWidth(width: Int, height: Int): Int {
+    val attrs = window?.attributes ?: return width
+    val isSheet = attrs.gravity and Gravity.BOTTOM == Gravity.BOTTOM ||
+            attrs.gravity and Gravity.TOP == Gravity.TOP
+    val isFullScreen = height == WindowManager.LayoutParams.MATCH_PARENT
+    if (isSheet || isFullScreen) return width
+    val dm = context.windowManager.windowSize
+    val maxWidth = minOf((dm.widthPixels * 0.88f).toInt(), 520.dpToPx())
+    return when {
+        width == WindowManager.LayoutParams.MATCH_PARENT -> maxWidth
+        width > maxWidth -> maxWidth
+        else -> width
+    }
+}
+
+fun Dialog.toggleSystemBar(show: Boolean) {
+    window?.let { window ->
+        WindowCompat.getInsetsController(window, window.decorView).run {
+            if (show) {
+                show(WindowInsetsCompat.Type.systemBars())
+                window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+            } else {
+                hide(WindowInsetsCompat.Type.systemBars())
+                systemBarsBehavior = BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+            }
+        }
+    }
+}
+
+fun Dialog.keepScreenOn(on: Boolean) {
+    window?.let { window ->
+        val isScreenOn =
+            (window.attributes.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) != 0
+        if (on == isScreenOn) return
+        if (on) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
 }

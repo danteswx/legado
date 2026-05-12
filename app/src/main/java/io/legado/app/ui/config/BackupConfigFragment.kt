@@ -127,6 +127,16 @@ class BackupConfigFragment : PreferenceFragment(),
                 editText.setSelection(editText.text.length)
             }
         }
+        findPreference<Preference>(PreferKey.syncThemePackages)?.let {
+            it.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _, newValue ->
+                if (newValue == true && !hasWebDavAccount()) {
+                    toastOnUi("请先填写 WebDAV 账号和密码")
+                    false
+                } else {
+                    true
+                }
+            }
+        }
         upPreferenceSummary(PreferKey.webDavUrl, getPrefString(PreferKey.webDavUrl))
         upPreferenceSummary(PreferKey.webDavAccount, getPrefString(PreferKey.webDavAccount))
         upPreferenceSummary(PreferKey.webDavPassword, getPrefString(PreferKey.webDavPassword))
@@ -186,6 +196,11 @@ class BackupConfigFragment : PreferenceFragment(),
 
             PreferKey.webDavDeviceName -> upPreferenceSummary(key, getPrefString(key))
         }
+    }
+
+    private fun hasWebDavAccount(): Boolean {
+        return !getPrefString(PreferKey.webDavAccount).isNullOrBlank()
+                && !getPrefString(PreferKey.webDavPassword).isNullOrBlank()
     }
 
     private fun upPreferenceSummary(preferenceKey: String, value: String?) {

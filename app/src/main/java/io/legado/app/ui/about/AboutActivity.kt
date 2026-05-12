@@ -6,11 +6,12 @@ import android.text.SpannableString
 import android.text.style.ForegroundColorSpan
 import android.view.Menu
 import android.view.MenuItem
+import androidx.core.content.ContextCompat
 import io.legado.app.R
 import io.legado.app.base.BaseActivity
 import io.legado.app.databinding.ActivityAboutBinding
+import io.legado.app.lib.theme.UiCorner
 import io.legado.app.lib.theme.accentColor
-import io.legado.app.lib.theme.filletBackground
 import io.legado.app.utils.openUrl
 import io.legado.app.utils.share
 import io.legado.app.utils.viewbindingdelegate.viewBinding
@@ -21,7 +22,10 @@ class AboutActivity : BaseActivity<ActivityAboutBinding>() {
     override val binding by viewBinding(ActivityAboutBinding::inflate)
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
-        binding.llAbout.background = filletBackground
+        binding.llAbout.background = UiCorner.opaqueRounded(
+            ContextCompat.getColor(this, R.color.background_card),
+            UiCorner.panelRadius(this)
+        )
         val fTag = "aboutFragment"
         var aboutFragment = supportFragmentManager.findFragmentByTag(fTag)
         if (aboutFragment == null) aboutFragment = AboutFragment()
@@ -52,7 +56,7 @@ class AboutActivity : BaseActivity<ActivityAboutBinding>() {
         when (item.itemId) {
             R.id.menu_scoring -> openUrl("market://details?id=$packageName")
             R.id.menu_share_it -> share(
-                getString(R.string.app_share_description),
+                getString(R.string.app_share_description_sigma),
                 getString(R.string.app_name)
             )
         }

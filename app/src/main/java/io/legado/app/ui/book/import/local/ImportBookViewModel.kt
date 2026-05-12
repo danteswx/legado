@@ -3,9 +3,9 @@ package io.legado.app.ui.book.import.local
 import android.app.Application
 import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppLog
-import io.legado.app.constant.AppPattern.archiveFileRegex
 import io.legado.app.constant.AppPattern.bookFileRegex
 import io.legado.app.constant.PreferKey
+import io.legado.app.exception.NoStackTraceException
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.utils.AlphanumComparator
 import io.legado.app.utils.FileDoc
@@ -24,11 +24,13 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.withContext
 import java.util.Collections
+import kotlin.math.max
 
 class ImportBookViewModel(application: Application) : BaseViewModel(application) {
     var rootDoc: FileDoc? = null
@@ -37,6 +39,8 @@ class ImportBookViewModel(application: Application) : BaseViewModel(application)
     var dataCallback: DataCallback? = null
     var dataFlowStart: (() -> Unit)? = null
     var filterKey: String? = null
+    val scanProgressFlow = MutableStateFlow<ScanProgress?>(null)
+    val importProgressFlow = MutableStateFlow<ImportProgress?>(null)
     val dataFlow = callbackFlow<List<ImportBook>> {
 
         val list = Collections.synchronizedList(ArrayList<ImportBook>())
@@ -65,6 +69,22 @@ class ImportBookViewModel(application: Application) : BaseViewModel(application)
 
             override fun upAdapter() {
                 trySend(list)
+            }
+
+            override fun onScanStart() {
+                scanProgressFlow.value = ScanProgress(
+                    pendingDirs = 1,
+                    scannedDirs = 0,
+                    foundBooks = 0
+                )
+            }
+
+            override fun onScanProgress(progress: ScanProgress) {
+                scanProgressFlow.value = progress
+            }
+
+            override fun onScanFinish() {
+                scanProgressFlow.value = null
             }
         }
 
@@ -106,6 +126,77 @@ class ImportBookViewModel(application: Application) : BaseViewModel(application)
         }
     }
 
+    fun addToBookshelfWithProgress(
+        bookList: HashSet<ImportBook>,
+        onProgress: (ImportProgress) -> Unit,
+        finally: () -> Unit
+    ) {
+        execute {
+            val total = bookList.size.coerceAtLeast(1)
+            var processed = 0
+            var imported = 0
+            var failed = 0
+            val initialProgress = ImportProgress(total, processed, imported, failed)
+            importProgressFlow.value = initialProgress
+            onProgress(initialProgress)
+            bookList.forEach { item ->
+                kotlin.runCatching {
+                    val books = LocalBook.importFiles(item.file.uri)
+                    books.forEach { book ->
+                        var lastEmitTime = 0L
+                        LocalBook.prepareImportedBookCache(book) { stage, stageProcessed, stageTotal, title ->
+                            val now = System.currentTimeMillis()
+                            val shouldEmit = stageProcessed >= stageTotal || now - lastEmitTime >= 120L
+                            if (shouldEmit) {
+                                lastEmitTime = now
+                                val stageName = when (stage) {
+                                    "index" -> "索引构建"
+                                    "layout" -> "排版缓存"
+                                    else -> "正文解码"
+                                }
+                                val decodeProgress = ImportProgress(
+                                    total = max(stageTotal, 1),
+                                    processed = stageProcessed.coerceIn(0, max(stageTotal, 1)),
+                                    imported = imported,
+                                    failed = failed,
+                                    message = "$stageName ${book.name}: $title"
+                                )
+                                importProgressFlow.value = decodeProgress
+                                onProgress(decodeProgress)
+                            }
+                        }
+                    }
+                }.onSuccess {
+                    imported += 1
+                }.onFailure {
+                    failed += 1
+                    AppLog.put("导入失败: ${item.name}\n${it.localizedMessage}", it)
+                }
+                processed += 1
+                val progress = ImportProgress(
+                    total = total,
+                    processed = processed,
+                    imported = imported,
+                    failed = failed,
+                    message = "导入 ${item.name}"
+                )
+                importProgressFlow.value = progress
+                onProgress(progress)
+            }
+            if (processed == failed) {
+                throw NoStackTraceException("ImportFiles Error:\nAll input files occur error")
+            }
+        }.onError {
+            context.toastOnUi("添加书架失败，请尝试重新选择文件夹")
+            AppLog.put("添加书架失败\n${it.localizedMessage}", it)
+        }.onSuccess {
+            context.toastOnUi("添加书架成功")
+        }.onFinally {
+            importProgressFlow.value = null
+            finally.invoke()
+        }
+    }
+
     fun deleteDoc(bookList: HashSet<ImportBook>, finally: () -> Unit) {
         execute {
             bookList.forEach {
@@ -119,11 +210,7 @@ class ImportBookViewModel(application: Application) : BaseViewModel(application)
     fun loadDoc(fileDoc: FileDoc) {
         execute {
             val docList = fileDoc.list { item ->
-                when {
-                    item.name.startsWith(".") -> false
-                    item.isDir -> true
-                    else -> item.name.matches(bookFileRegex) || item.name.matches(archiveFileRegex)
-                }
+                item.isVisibleImportBookItem()
             }
             dataCallback?.setItems(docList!!)
         }.onError {
@@ -133,32 +220,46 @@ class ImportBookViewModel(application: Application) : BaseViewModel(application)
 
     suspend fun scanDoc(fileDoc: FileDoc) {
         dataCallback?.clear()
-        val channel = Channel<FileDoc>(UNLIMITED)
-        var n = 1
-        channel.trySend(fileDoc)
-        val list = arrayListOf<FileDoc>()
-        channel.consumeAsFlow()
-            .mapParallel(16) { fileDoc ->
-                fileDoc.list()!!
-            }.onEach { fileDocs ->
-                n--
-                list.clear()
-                fileDocs.forEach {
-                    if (it.isDir) {
-                        n++
-                        channel.trySend(it)
-                    } else if (it.name.matches(bookFileRegex)
-                        || it.name.matches(archiveFileRegex)
-                    ) {
-                        list.add(it)
+        dataCallback?.onScanStart()
+        try {
+            val channel = Channel<FileDoc>(UNLIMITED)
+            var n = 1
+            var scannedDirCount = 0
+            var foundBookCount = 0
+            channel.trySend(fileDoc)
+            val list = arrayListOf<FileDoc>()
+            channel.consumeAsFlow()
+                .mapParallel(16) { fileDoc ->
+                    fileDoc.list()!!
+                }.onEach { fileDocs ->
+                    n--
+                    scannedDirCount += 1
+                    list.clear()
+                    fileDocs.forEach {
+                        if (it.isDir) {
+                            n++
+                            channel.trySend(it)
+                        } else if (it.isVisibleImportBookItem()) {
+                            list.add(it)
+                            foundBookCount += 1
+                        }
                     }
-                }
-                dataCallback?.addItems(list)
-            }.takeWhile {
-                n > 0
-            }.catch {
-                context.toastOnUi("扫描文件夹出错\n${it.localizedMessage}")
-            }.collect()
+                    dataCallback?.addItems(list)
+                    dataCallback?.onScanProgress(
+                        ScanProgress(
+                            pendingDirs = n.coerceAtLeast(0),
+                            scannedDirs = scannedDirCount,
+                            foundBooks = foundBookCount
+                        )
+                    )
+                }.takeWhile {
+                    n > 0
+                }.catch {
+                    context.toastOnUi("扫描文件夹出错\n${it.localizedMessage}")
+                }.collect()
+        } finally {
+            dataCallback?.onScanFinish()
+        }
     }
 
     fun updateCallBackFlow(filterKey: String?) {
@@ -176,6 +277,34 @@ class ImportBookViewModel(application: Application) : BaseViewModel(application)
 
         fun upAdapter()
 
+        fun onScanStart() {}
+
+        fun onScanProgress(progress: ScanProgress) {}
+
+        fun onScanFinish() {}
+
+    }
+
+    data class ScanProgress(
+        val pendingDirs: Int,
+        val scannedDirs: Int,
+        val foundBooks: Int
+    )
+
+    data class ImportProgress(
+        val total: Int,
+        val processed: Int,
+        val imported: Int,
+        val failed: Int,
+        val message: String = ""
+    )
+
+    private fun FileDoc.isVisibleImportBookItem(): Boolean {
+        return when {
+            name.startsWith(".") -> false
+            isDir -> true
+            else -> name.matches(bookFileRegex)
+        }
     }
 
 }

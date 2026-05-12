@@ -7,6 +7,7 @@ import io.legado.app.base.BaseViewModel
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.ConcurrentRateLimiter.Companion.concurrentRecordMap
 import io.legado.app.help.RuleComplete
 import io.legado.app.help.config.SourceConfig
 import io.legado.app.help.http.CookieStore
@@ -14,7 +15,6 @@ import io.legado.app.help.http.newCallStrResponse
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.source.SourceHelp
 import io.legado.app.help.source.clearExploreKindsCache
-import io.legado.app.help.storage.Backup
 import io.legado.app.help.storage.ImportOldData
 import io.legado.app.model.SharedJsScope
 import io.legado.app.utils.GSON
@@ -74,10 +74,9 @@ class BookSourceEditViewModel(application: Application) : BaseViewModel(applicat
             }
             appDb.bookSourceDao.insert(source)
             bookSource = source
+            concurrentRecordMap.remove(source.bookSourceUrl) //删除并发限制缓存
             source
         }.onSuccess {
-            // 书源保存，触发自动备份
-            Backup.backupOnDataChange(context)
             success?.invoke(it)
         }.onError {
             context.toastOnUi(it.localizedMessage)

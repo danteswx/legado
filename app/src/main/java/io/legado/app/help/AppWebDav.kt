@@ -42,7 +42,8 @@ object AppWebDav {
     private val bookProgressUrl get() = "${rootWebDavUrl}bookProgress/"
     private val exportsWebDavUrl get() = "${rootWebDavUrl}books/"
     private val bgWebDavUrl get() = "${rootWebDavUrl}background/"
-    private val dataChangeTimeUrl get() = "${rootWebDavUrl}dataChangeTime.txt"
+    private val themesWebDavUrl get() = "${rootWebDavUrl}themes/"
+    private val navigationBarsWebDavUrl get() = "${rootWebDavUrl}navigationBars/"
 
     var authorization: Authorization? = null
         private set
@@ -85,6 +86,8 @@ object AppWebDav {
                 WebDav(bookProgressUrl, mAuthorization).makeAsDir()
                 WebDav(exportsWebDavUrl, mAuthorization).makeAsDir()
                 WebDav(bgWebDavUrl, mAuthorization).makeAsDir()
+                WebDav(themesWebDavUrl, mAuthorization).makeAsDir()
+                WebDav(navigationBarsWebDavUrl, mAuthorization).makeAsDir()
                 val rootBooksUrl = "${rootWebDavUrl}books/"
                 defaultBookWebDav = RemoteBookWebDav(rootBooksUrl, mAuthorization)
                 authorization = mAuthorization
@@ -157,74 +160,6 @@ object AppWebDav {
     }
 
     /**
-     * 上传数据变化时间戳到 WebDAV
-     * 仅在真正的数据变化（backupOnDataChange）时调用
-     */
-    suspend fun uploadDataChangeTime(timestamp: Long) {
-        authorization?.let {
-            WebDav(dataChangeTimeUrl, it).upload(
-                timestamp.toString().toByteArray(),
-                "text/plain"
-            )
-        }
-    }
-
-    /**
-     * 读取远端数据变化时间戳
-     * 用于判断远端是否有真正的数据变化（区别于定时备份）
-     */
-    suspend fun getRemoteDataChangeTime(): Long {
-        return kotlin.runCatching {
-            authorization?.let {
-                val bytes = WebDav(dataChangeTimeUrl, it).download()
-                String(bytes).trim().toLongOrNull() ?: 0L
-            } ?: 0L
-        }.getOrDefault(0L)
-    }
-
-    /**
-     * 获取 WebDAV 上最新的备份（基于文件名中的时间戳）
-     */
-    suspend fun getLatestBackupByTimestamp(): WebDavFile? {
-        return kotlin.runCatching {
-            authorization?.let {
-                val backupFiles = WebDav(rootWebDavUrl, it).listFiles()
-                    .filter { it.displayName.matches(Regex("backup_[^_]+_(\\d{4}_\\d{2}_\\d{2}_\\d{2}_\\d{2})\\.zip")) }
-
-                backupFiles.maxByOrNull { file ->
-                    Backup.getTimestampFromFileName(file.displayName)
-                }
-            }
-        }.getOrNull()
-    }
-
-    /**
-     * 删除 WebDAV 上的旧备份文件，只保留最新的
-     */
-    suspend fun deleteOldBackups() {
-        kotlin.runCatching {
-            authorization?.let { auth ->
-                val backupFiles = WebDav(rootWebDavUrl, auth).listFiles()
-                    .filter { it.displayName.matches(Regex("backup_[^_]+_(\\d{4}_\\d{2}_\\d{2}_\\d{2}_\\d{2})\\.zip")) }
-                    .sortedByDescending { Backup.getTimestampFromFileName(it.displayName) }
-
-                // 保留最新的，删除其他所有旧备份
-                backupFiles.drop(1).forEach { file ->
-                    try {
-                        val fileUrl = "$rootWebDavUrl${file.displayName}"
-                        WebDav(fileUrl, auth).delete()
-                        AppLog.put("删除旧备份: ${file.displayName}")
-                    } catch (e: Exception) {
-                        AppLog.put("删除旧备份失败: ${file.displayName}\n${e.localizedMessage}")
-                    }
-                }
-            }
-        }.onFailure {
-            AppLog.put("清理旧备份失败\n${it.localizedMessage}")
-        }
-    }
-
-    /**
      * webDav备份
      * @param fileName 备份文件名
      */
@@ -235,6 +170,93 @@ object AppWebDav {
             val putUrl = "$rootWebDavUrl$fileName"
             WebDav(putUrl, it).upload(Backup.zipFilePath)
         }
+    }
+
+    suspend fun listThemePackages(isNightTheme: Boolean): List<WebDavFile> {
+        val authorization = authorization ?: return emptyList()
+        if (!NetworkUtils.isAvailable()) return emptyList()
+        val dirUrl = getThemeTypeUrl(isNightTheme)
+        WebDav(dirUrl, authorization).makeAsDir()
+        return WebDav(dirUrl, authorization).listFiles()
+            .filter { !it.isDir && it.displayName.endsWith(".zip", ignoreCase = true) }
+    }
+
+    suspend fun uploadThemePackage(isNightTheme: Boolean, remoteDirName: String, zipFile: File) {
+        val authorization = authorization ?: throw NoStackTraceException("webDav未配置")
+        if (!NetworkUtils.isAvailable()) throw NoStackTraceException("网络未连接")
+        val fileName = "${remoteDirName.trimEnd('/').removeSuffix(".zip")}.zip"
+        val typeUrl = getThemeTypeUrl(isNightTheme)
+        WebDav(typeUrl, authorization).makeAsDir()
+        WebDav(typeUrl + fileName, authorization).upload(zipFile)
+    }
+
+    suspend fun uploadCachePackage(fileName: String, zipFile: File) {
+        val authorization = authorization ?: throw NoStackTraceException("webDav未配置")
+        if (!NetworkUtils.isAvailable()) throw NoStackTraceException("网络未连接")
+        val safeFileName = UrlUtil.replaceReservedChar(
+            fileName.trimEnd('/').removeSuffix(".zip").normalizeFileName()
+        ).ifBlank { "cache_${System.currentTimeMillis()}" }
+        WebDav(exportsWebDavUrl, authorization).makeAsDir()
+        WebDav(exportsWebDavUrl + safeFileName + ".zip", authorization)
+            .upload(zipFile, "application/zip")
+    }
+
+    suspend fun downloadThemePackage(isNightTheme: Boolean, remoteDirName: String, zipFile: File) {
+        val authorization = authorization ?: throw NoStackTraceException("webDav未配置")
+        if (!NetworkUtils.isAvailable()) throw NoStackTraceException("网络未连接")
+        val fileName = "${remoteDirName.trimEnd('/').removeSuffix(".zip")}.zip"
+        zipFile.parentFile?.mkdirs()
+        WebDav(getThemeTypeUrl(isNightTheme) + fileName, authorization)
+            .downloadTo(zipFile.absolutePath, true)
+    }
+
+    suspend fun deleteThemePackage(isNightTheme: Boolean, remoteDirName: String) {
+        val authorization = authorization ?: throw NoStackTraceException("webDav未配置")
+        if (!NetworkUtils.isAvailable()) throw NoStackTraceException("网络未连接")
+        val fileName = "${remoteDirName.trimEnd('/').removeSuffix(".zip")}.zip"
+        WebDav(getThemeTypeUrl(isNightTheme) + fileName, authorization).delete()
+    }
+
+    suspend fun listNavigationBarPackages(isNightTheme: Boolean): List<WebDavFile> {
+        val authorization = authorization ?: return emptyList()
+        if (!NetworkUtils.isAvailable()) return emptyList()
+        val dirUrl = getNavigationBarTypeUrl(isNightTheme)
+        WebDav(dirUrl, authorization).makeAsDir()
+        return WebDav(dirUrl, authorization).listFiles()
+            .filter { !it.isDir && it.displayName.endsWith(".zip", ignoreCase = true) }
+    }
+
+    suspend fun uploadNavigationBarPackage(isNightTheme: Boolean, remoteDirName: String, zipFile: File) {
+        val authorization = authorization ?: throw NoStackTraceException("webDav未配置")
+        if (!NetworkUtils.isAvailable()) throw NoStackTraceException("网络未连接")
+        val fileName = "${remoteDirName.trimEnd('/').removeSuffix(".zip")}.zip"
+        val typeUrl = getNavigationBarTypeUrl(isNightTheme)
+        WebDav(typeUrl, authorization).makeAsDir()
+        WebDav(typeUrl + fileName, authorization).upload(zipFile)
+    }
+
+    suspend fun downloadNavigationBarPackage(isNightTheme: Boolean, remoteDirName: String, zipFile: File) {
+        val authorization = authorization ?: throw NoStackTraceException("webDav未配置")
+        if (!NetworkUtils.isAvailable()) throw NoStackTraceException("网络未连接")
+        val fileName = "${remoteDirName.trimEnd('/').removeSuffix(".zip")}.zip"
+        zipFile.parentFile?.mkdirs()
+        WebDav(getNavigationBarTypeUrl(isNightTheme) + fileName, authorization)
+            .downloadTo(zipFile.absolutePath, true)
+    }
+
+    suspend fun deleteNavigationBarPackage(isNightTheme: Boolean, remoteDirName: String) {
+        val authorization = authorization ?: throw NoStackTraceException("webDav未配置")
+        if (!NetworkUtils.isAvailable()) throw NoStackTraceException("网络未连接")
+        val fileName = "${remoteDirName.trimEnd('/').removeSuffix(".zip")}.zip"
+        WebDav(getNavigationBarTypeUrl(isNightTheme) + fileName, authorization).delete()
+    }
+
+    private fun getThemeTypeUrl(isNightTheme: Boolean): String {
+        return themesWebDavUrl + if (isNightTheme) "night/" else "day/"
+    }
+
+    private fun getNavigationBarTypeUrl(isNightTheme: Boolean): String {
+        return navigationBarsWebDavUrl + if (isNightTheme) "night/" else "day/"
     }
 
     /**
@@ -383,10 +405,10 @@ object AppWebDav {
         appDb.bookDao.all.forEach { book ->
             val progressFileName = getProgressFileName(book.name, book.author)
             val webDavFile = map[progressFileName]
-            webDavFile ?: return@forEach
+            webDavFile ?: return
             if (webDavFile.lastModify <= book.syncTime) {
                 //本地同步时间大于上传时间不用同步
-                return@forEach
+                return
             }
             getBookProgress(book)?.let { bookProgress ->
                 if (bookProgress.durChapterIndex > book.durChapterIndex

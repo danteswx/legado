@@ -4,7 +4,7 @@ import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
-import android.widget.PopupMenu
+import android.widget.PopupWindow
 import androidx.activity.addCallback
 import androidx.activity.viewModels
 import androidx.appcompat.widget.SearchView
@@ -21,6 +21,7 @@ import io.legado.app.databinding.ItemFileBinding
 import io.legado.app.databinding.ItemPathPickerBinding
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.ui.file.utils.FilePickerIcon
+import io.legado.app.ui.widget.ModernActionPopup
 import io.legado.app.ui.widget.recycler.VerticalDivider
 import io.legado.app.utils.ConvertUtils
 import io.legado.app.utils.applyNavigationBarPadding
@@ -33,6 +34,7 @@ class FileManageActivity : VMBaseActivity<ActivityFileManageBinding, FileManageV
 
     override val binding by viewBinding(ActivityFileManageBinding::inflate)
     override val viewModel by viewModels<FileManageViewModel>()
+    private var modernMenuPopup: PopupWindow? = null
     private val dirParent = ".."
     private val searchView: SearchView by lazy {
         binding.titleBar.findViewById(R.id.search_view)
@@ -216,15 +218,16 @@ class FileManageActivity : VMBaseActivity<ActivityFileManageBinding, FileManageV
         }
 
         private fun showFileMenu(view: View, file: File) {
-            val popupMenu = PopupMenu(context, view)
-            popupMenu.inflate(R.menu.file_long_click)
-            popupMenu.setOnMenuItemClickListener {
+            modernMenuPopup = ModernActionPopup.showFromMenu(
+                view,
+                R.menu.file_long_click,
+                modernMenuPopup
+            ) {
                 when (it.itemId) {
                     R.id.menu_del -> viewModel.delFile(file)
                 }
                 true
             }
-            popupMenu.show()
         }
 
     }

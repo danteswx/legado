@@ -4,28 +4,51 @@ import android.content.SharedPreferences
 import android.os.Build
 import io.legado.app.BuildConfig
 import io.legado.app.constant.AppConst
+import io.legado.app.constant.AppLog
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
+import io.legado.app.utils.GSON
 import io.legado.app.utils.canvasrecorder.CanvasRecorderFactory
+import io.legado.app.utils.fromJsonArray
+import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getPrefInt
 import io.legado.app.utils.getPrefLong
 import io.legado.app.utils.getPrefString
+import io.legado.app.utils.getPrefStringSet
 import io.legado.app.utils.isNightMode
+import io.legado.app.utils.parseIpsFromString
 import io.legado.app.utils.putPrefBoolean
 import io.legado.app.utils.putPrefInt
 import io.legado.app.utils.putPrefLong
 import io.legado.app.utils.putPrefString
+import io.legado.app.utils.putPrefStringSet
 import io.legado.app.utils.removePref
 import io.legado.app.utils.sysConfiguration
 import io.legado.app.utils.toastOnUi
+import io.legado.app.ui.main.ai.AiChatSession
+import io.legado.app.ui.main.ai.AiMcpServerConfig
+import io.legado.app.ui.main.ai.AiModelConfig
+import io.legado.app.ui.main.ai.AiProviderConfig
+import io.legado.app.ui.main.ai.AiSkillConfig
+import io.legado.app.ui.book.read.ReadAiBookHistory
 import splitties.init.appCtx
+import java.net.InetAddress
+import java.net.URI
 
 @Suppress("MemberVisibilityCanBePrivate", "ConstPropertyName")
 object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
+    const val DEFAULT_AI_SYSTEM_PROMPT =
+        "你是阅读应用内的 AI 助手。回答直接、准确、简洁。需要真实应用数据时必须优先调用工具，工具返回的数据优先级高于你的记忆，不允许编造工具未返回的结果。用户询问书架、书籍、作者、阅读记录、书籍简介、书源、分组、标签、分类方案时，必须先调用 query_bookshelf、get_bookshelf_book_info、manage_bookshelf_group 或 manage_bookshelf_tag，不要只说“我先看看”却不调用工具。用户要求创建、修改或调试书源时，你要像一个小型书源 agent 一样闭环执行：新建书源先调用 create_book_source(save=false) 生成草稿；修改已有书源先调用 get_book_source 读取完整 JSON；缺少页面结构时调用 fetch_source_html 获取搜索页、详情页、目录页或正文页 HTML；每次调试失败后都调用 update_book_source(save=false) 按日志和 HTML 修正规则，可传 patch，也可直接传 ruleToc/ruleContent/searchUrl 等字段；再调用 debug_book_source 调试，优先使用用户给出的详情页 URL、目录 URL、正文 URL 或关键词；最多循环 3 次。不要在第一次调试前询问“是否继续”，也不要只输出未经调试的 JSON。只有搜索、详情、目录、正文主要链路通过，或达到 3 次仍失败时，才给出最终结果和剩余失败点。只有用户明确要求保存、导入或完成时，才调用 update_book_source(save=true) 或 create_book_source(save=true) 写入本地书源库。用户要求整理书架时，顶层书架使用分组，分组内的小分类使用书籍标签；未分标签的书按“全部”处理。批量设置标签、重命名标签、移动分组或删除分组前，先查询书架并给出方案，用户确认后再调用写入工具。任何情况下都不允许删除书籍。"
+
     val isCronet = appCtx.getPrefBoolean(PreferKey.cronet)
     var useAntiAlias = appCtx.getPrefBoolean(PreferKey.antiAlias)
+    var useHighRefreshRate = appCtx.getPrefBoolean(PreferKey.highBrush, true)
     var userAgent: String = getPrefUserAgent()
+    var customHosts = appCtx.getPrefString(PreferKey.customHosts)
+    var editTheme = appCtx.getPrefInt(PreferKey.editTheme, 0)
+    var editThemeDark = appCtx.getPrefInt(PreferKey.editThemeDark, 0)
+    var editTemeAuto = appCtx.getPrefBoolean(PreferKey.editTemeAuto)
     var isEInkMode = appCtx.getPrefString(PreferKey.themeMode) == "3"
     var clickActionTL = appCtx.getPrefInt(PreferKey.clickActionTL, 2)
     var clickActionTC = appCtx.getPrefInt(PreferKey.clickActionTC, 2)
@@ -38,12 +61,26 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     var clickActionBR = appCtx.getPrefInt(PreferKey.clickActionBR, 1)
     var themeMode = appCtx.getPrefString(PreferKey.themeMode, "0")
     var useDefaultCover = appCtx.getPrefBoolean(PreferKey.useDefaultCover, false)
+    var loadCoverHighQuality = appCtx.getPrefBoolean(PreferKey.loadCoverHighQuality, false)
     var optimizeRender = CanvasRecorderFactory.isSupport
             && appCtx.getPrefBoolean(PreferKey.optimizeRender, false)
     var recordLog = appCtx.getPrefBoolean(PreferKey.recordLog)
+    var editFontScale = appCtx.getPrefInt(PreferKey.editFontScale, 16)
+    var editNonPrintable = appCtx.getPrefInt(PreferKey.editNonPrintable, 0)
+    var editAutoWrap = appCtx.getPrefBoolean(PreferKey.editAutoWrap, true)
+    var editAutoComplete = appCtx.getPrefBoolean(PreferKey.editAutoComplete, true)
+    var showBoardLine = appCtx.getPrefInt(PreferKey.showBoardLine, 1)
+    var adaptSpecialStyle = appCtx.getPrefBoolean(PreferKey.adaptSpecialStyle, true)
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
         when (key) {
+            PreferKey.editFontScale -> editFontScale = appCtx.getPrefInt(PreferKey.editFontScale, 16)
+            PreferKey.editNonPrintable -> editNonPrintable = appCtx.getPrefInt(PreferKey.editNonPrintable, 0)
+            PreferKey.editAutoWrap -> editAutoWrap = appCtx.getPrefBoolean(PreferKey.editAutoWrap, true)
+            PreferKey.editAutoComplete -> editAutoComplete = appCtx.getPrefBoolean(PreferKey.editAutoComplete, true)
+            PreferKey.showBoardLine -> showBoardLine = appCtx.getPrefInt(PreferKey.showBoardLine, 1)
+            PreferKey.adaptSpecialStyle -> adaptSpecialStyle = appCtx.getPrefBoolean(PreferKey.adaptSpecialStyle, true)
+
             PreferKey.themeMode -> {
                 themeMode = appCtx.getPrefString(PreferKey.themeMode, "0")
                 isEInkMode = themeMode == "3"
@@ -84,10 +121,29 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
             PreferKey.userAgent -> userAgent = getPrefUserAgent()
 
+            PreferKey.customHosts -> {
+                customHosts = appCtx.getPrefString(PreferKey.customHosts)
+                _hostMap = null
+                _addressCache = null
+            }
+
+            PreferKey.editTheme -> editTheme = appCtx.getPrefInt(PreferKey.editTheme, 0)
+
+            PreferKey.editThemeDark -> editThemeDark = appCtx.getPrefInt(PreferKey.editThemeDark, 0)
+
+            PreferKey.editTemeAuto -> editTemeAuto = appCtx.getPrefBoolean(PreferKey.editTemeAuto)
+
             PreferKey.antiAlias -> useAntiAlias = appCtx.getPrefBoolean(PreferKey.antiAlias)
+
+            PreferKey.highBrush -> {
+                useHighRefreshRate = appCtx.getPrefBoolean(PreferKey.highBrush, true)
+            }
 
             PreferKey.useDefaultCover -> useDefaultCover =
                 appCtx.getPrefBoolean(PreferKey.useDefaultCover, false)
+
+            PreferKey.loadCoverHighQuality -> loadCoverHighQuality =
+                appCtx.getPrefBoolean(PreferKey.loadCoverHighQuality, false)
 
             PreferKey.optimizeRender -> optimizeRender = CanvasRecorderFactory.isSupport
                     && appCtx.getPrefBoolean(PreferKey.optimizeRender, false)
@@ -96,6 +152,35 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
         }
     }
+
+    //dns配置
+    private var _hostMap: Map<String, Any?>? = null
+    val hostMap: Map<String, Any?>
+        get() = _hostMap ?: run {
+            val cache = GSON.fromJsonObject<Map<String, Any?>>(customHosts).getOrNull() ?: emptyMap()
+            _hostMap = cache
+            cache
+        }
+    private var _addressCache: Map<String, List<InetAddress>>? = null
+    val addressCache: Map<String, List<InetAddress>>
+        get() = _addressCache ?: run {
+            val cache = hostMap.mapNotNull { (host, ipValue) ->
+                val addresses = when (ipValue) {
+                    is String -> ipValue.parseIpsFromString()
+                    is List<*> -> ipValue.parseIpsFromList()
+                    else -> null
+                }
+                addresses?.let { host to it }
+            }.toMap()
+            _addressCache = cache
+            cache
+        }
+    private fun List<*>.parseIpsFromList(): List<InetAddress> =
+        mapNotNull { element ->
+            (element as? String)?.trim()?.takeIf { it.isNotEmpty() }
+                ?.runCatching { InetAddress.getByName(this) }
+                ?.getOrNull()
+        }
 
     var isNightTheme: Boolean
         get() = when (themeMode) {
@@ -112,6 +197,16 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
                     appCtx.putPrefString(PreferKey.themeMode, "1")
                 }
             }
+        }
+    var showBookname: Int
+        get() = appCtx.getPrefInt(PreferKey.showBooknameLayout, 0)
+        set(value) {
+            appCtx.putPrefInt(PreferKey.showBooknameLayout, value)
+        }
+    var bookshelfMargin: Int
+        get() = appCtx.getPrefInt(PreferKey.bookshelfMargin, 12)
+        set(value) {
+            appCtx.putPrefInt(PreferKey.bookshelfMargin, value)
         }
 
     var showUnread: Boolean
@@ -150,7 +245,10 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefBoolean(PreferKey.textSelectAble, true)
 
     val isTransparentStatusBar: Boolean
-        get() = appCtx.getPrefBoolean(PreferKey.transparentStatusBar, true)
+        get() = true
+
+    val isMainTransparentStatusBar: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.mainTransparentStatusBar, false)
 
     val immNavigationBar: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.immNavigationBar, true)
@@ -219,11 +317,712 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val showDiscovery: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.showDiscovery, true)
 
+    val modernDiscoveryPage: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.modernDiscoveryPage, true)
+
+    val modernRssPage: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.modernRssPage, true)
+
+    val mergeDiscoveryRss: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.mergeDiscoveryRss, false)
+
+    var mergedDiscoveryRssTarget: String
+        get() = appCtx.getPrefString(PreferKey.mergedDiscoveryRssTarget, "explore") ?: "explore"
+        set(value) = appCtx.putPrefString(PreferKey.mergedDiscoveryRssTarget, value)
+
+    var modernDiscoverySourceUrl: String?
+        get() = appCtx.getPrefString(PreferKey.modernDiscoverySourceUrl)
+        set(value) {
+            if (value.isNullOrBlank()) {
+                appCtx.removePref(PreferKey.modernDiscoverySourceUrl)
+            } else {
+                appCtx.putPrefString(PreferKey.modernDiscoverySourceUrl, value)
+            }
+        }
+
+    var modernDiscoveryLayout: Int
+        get() = appCtx.getPrefInt(PreferKey.modernDiscoveryLayout, 0).coerceIn(0, 2)
+        set(value) = appCtx.putPrefInt(PreferKey.modernDiscoveryLayout, value.coerceIn(0, 2))
+
+    var modernDiscoveryGridColumns: Int
+        get() = appCtx.getPrefInt(PreferKey.modernDiscoveryGridColumns, 2).coerceIn(2, 4)
+        set(value) = appCtx.putPrefInt(PreferKey.modernDiscoveryGridColumns, value.coerceIn(2, 4))
+
+    var modernRssSourceUrl: String?
+        get() = appCtx.getPrefString(PreferKey.modernRssSourceUrl)
+        set(value) {
+            if (value.isNullOrBlank()) {
+                appCtx.removePref(PreferKey.modernRssSourceUrl)
+            } else {
+                appCtx.putPrefString(PreferKey.modernRssSourceUrl, value)
+            }
+        }
+
     val showRSS: Boolean
-        get() = appCtx.getPrefBoolean(PreferKey.showRss, true)
+        get() = appCtx.getPrefBoolean(PreferKey.showRss, false)
+
+    val showReadRecord: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.showReadRecord, true)
+
+    var bookshelfHiddenTags: Map<Long, Set<String>>
+        get() {
+            val rawMap = GSON.fromJsonObject<Map<String, List<String>>>(
+                appCtx.getPrefString(PreferKey.bookshelfHiddenTags)
+            ).getOrDefault(emptyMap())
+            return rawMap.mapNotNull { (key, value) ->
+                key.toLongOrNull()?.let { groupId ->
+                    groupId to value.map { it.trim() }
+                        .filter { it.isNotBlank() }
+                        .toSet()
+                }
+            }.toMap()
+        }
+        set(value) {
+            val normalized = value
+                .mapValues { (_, tags) -> tags.map { it.trim() }.filter { it.isNotBlank() }.distinct() }
+                .filterValues { it.isNotEmpty() }
+                .mapKeys { it.key.toString() }
+            if (normalized.isEmpty()) {
+                appCtx.removePref(PreferKey.bookshelfHiddenTags)
+            } else {
+                appCtx.putPrefString(PreferKey.bookshelfHiddenTags, GSON.toJson(normalized))
+            }
+        }
+
+    var bookshelfGroupTags: Map<Long, List<String>>
+        get() {
+            val rawMap = GSON.fromJsonObject<Map<String, List<String>>>(
+                appCtx.getPrefString(PreferKey.bookshelfGroupTags)
+            ).getOrDefault(emptyMap())
+            return rawMap.mapNotNull { (key, value) ->
+                key.toLongOrNull()?.let { groupId ->
+                    groupId to value.map { it.trim() }
+                        .filter { it.isNotBlank() }
+                        .distinct()
+                }
+            }.filter { it.second.isNotEmpty() }.toMap()
+        }
+        set(value) {
+            val normalized = value
+                .mapValues { (_, tags) -> tags.map { it.trim() }.filter { it.isNotBlank() }.distinct() }
+                .filterValues { it.isNotEmpty() }
+                .mapKeys { it.key.toString() }
+            if (normalized.isEmpty()) {
+                appCtx.removePref(PreferKey.bookshelfGroupTags)
+            } else {
+                appCtx.putPrefString(PreferKey.bookshelfGroupTags, GSON.toJson(normalized))
+            }
+        }
+
+    var aiAssistantEnabled: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.aiAssistantEnabled, false) && aiCurrentModelConfig != null
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.aiAssistantEnabled, value && aiCurrentModelConfig != null)
+        }
+
+    var aiProviderList: List<AiProviderConfig>
+        get() {
+            val providers = readAiProviders()
+            syncAiState(providers, readAiModels(providers.map { it.id }.toSet()))
+            return providers
+        }
+        set(value) {
+            val providers = normalizeAiProviders(value)
+            persistAiProviders(providers)
+            val models = normalizeAiModels(
+                readAiModelsRaw(),
+                providers.map { it.id }.toSet()
+            )
+            persistAiModels(models)
+            syncAiState(providers, models)
+        }
+
+    var aiCurrentProviderId: String?
+        get() {
+            val providers = readAiProviders()
+            val models = readAiModels(providers.map { it.id }.toSet())
+            syncAiState(providers, models)
+            return appCtx.getPrefString(PreferKey.aiCurrentProviderId)
+        }
+        set(value) {
+            val providers = readAiProviders()
+            val providerId = providers.firstOrNull { it.id == value }?.id
+            if (providerId.isNullOrBlank()) {
+                appCtx.removePref(PreferKey.aiCurrentProviderId)
+                appCtx.removePref(PreferKey.aiCurrentModelId)
+            } else {
+                appCtx.putPrefString(PreferKey.aiCurrentProviderId, providerId)
+            }
+            syncAiState(providers, readAiModels(providers.map { it.id }.toSet()))
+        }
+
+    val aiCurrentProvider: AiProviderConfig?
+        get() = aiProviderList.firstOrNull { it.id == aiCurrentProviderId }
+
+    var aiModelConfigList: List<AiModelConfig>
+        get() {
+            val providers = readAiProviders()
+            val models = readAiModels(providers.map { it.id }.toSet())
+            syncAiState(providers, models)
+            return models
+        }
+        set(value) {
+            val providers = readAiProviders()
+            val models = normalizeAiModels(value, providers.map { it.id }.toSet())
+            persistAiModels(models)
+            syncAiState(providers, models)
+        }
+
+    var aiCurrentModelId: String?
+        get() {
+            val providers = readAiProviders()
+            val models = readAiModels(providers.map { it.id }.toSet())
+            syncAiState(providers, models)
+            return appCtx.getPrefString(PreferKey.aiCurrentModelId)
+        }
+        set(value) {
+            val providers = readAiProviders()
+            val models = readAiModels(providers.map { it.id }.toSet())
+            val model = models.firstOrNull { it.id == value }
+            if (model == null) {
+                appCtx.removePref(PreferKey.aiCurrentModelId)
+            } else {
+                appCtx.putPrefString(PreferKey.aiCurrentModelId, model.id)
+                appCtx.putPrefString(PreferKey.aiCurrentProviderId, model.providerId)
+            }
+            syncAiState(providers, models)
+        }
+
+    val aiCurrentModelConfig: AiModelConfig?
+        get() = aiModelConfigList.firstOrNull { it.id == aiCurrentModelId }
+
+    var aiMcpServerList: List<AiMcpServerConfig>
+        get() = readAiMcpServers()
+        set(value) {
+            persistAiMcpServers(normalizeAiMcpServers(value))
+        }
+
+    val aiEnabledMcpServers: List<AiMcpServerConfig>
+        get() = aiMcpServerList.filter { it.enabled }
+
+    var aiChatSessionList: List<AiChatSession>
+        get() = runCatching {
+            GSON.fromJsonArray<AiChatSession>(appCtx.getPrefString(PreferKey.aiChatSessionList))
+                .getOrDefault(emptyList())
+                .filter { session ->
+                    session.id.isNotBlank() &&
+                            session.title.isNotBlank() &&
+                            session.messages.all { it.content.isNotBlank() }
+                }
+                .map { session ->
+                    session.copy(
+                        messages = session.messages.map { message ->
+                            message.copy(
+                                kind = message.kind ?: io.legado.app.ui.main.ai.AiChatMessage.Kind.TEXT,
+                                statusName = message.statusName,
+                                statusStage = message.statusStage,
+                                statusSuccess = message.statusSuccess
+                            )
+                        }
+                    )
+                }
+                .sortedByDescending { it.updatedAt }
+        }.getOrElse {
+            AppLog.put("读取 AI 聊天历史失败, 已清理历史\n${it.localizedMessage}", it)
+            appCtx.removePref(PreferKey.aiChatSessionList)
+            appCtx.removePref(PreferKey.aiCurrentChatSessionId)
+            emptyList()
+        }
+        set(value) {
+            val sessions = value.distinctBy { it.id }
+                .mapNotNull { session ->
+                    val title = session.title.trim()
+                    val normalizedMessages = session.messages
+                        .filter { it.content.isNotBlank() }
+                        .map { it.copy(pending = false) }
+                    if (session.id.isBlank() || title.isBlank() || normalizedMessages.isEmpty()) {
+                        null
+                    } else {
+                        session.copy(
+                            id = session.id.trim(),
+                            title = title,
+                            messages = normalizedMessages
+                        )
+                    }
+                }
+                .sortedByDescending { it.updatedAt }
+                .take(30)
+            if (sessions.isEmpty()) {
+                appCtx.removePref(PreferKey.aiChatSessionList)
+            } else {
+                appCtx.putPrefString(PreferKey.aiChatSessionList, GSON.toJson(sessions))
+            }
+            val currentId = appCtx.getPrefString(PreferKey.aiCurrentChatSessionId)
+            if (currentId != null && sessions.none { it.id == currentId }) {
+                appCtx.removePref(PreferKey.aiCurrentChatSessionId)
+            }
+        }
+
+    var aiReadHistoryList: List<ReadAiBookHistory>
+        get() = runCatching {
+            readAiReadHistories()
+                .filter { it.bookUrl.isNotBlank() && it.sessions.isNotEmpty() }
+                .map { history ->
+                    val sessions = history.sessions
+                        .filter { it.id.isNotBlank() && it.messages.any { message -> message.content.isNotBlank() } }
+                        .map { session ->
+                            session.copy(
+                                messages = session.messages.filter { it.content.isNotBlank() }
+                            )
+                        }
+                        .sortedByDescending { it.updatedAt }
+                        .take(20)
+                    history.copy(
+                        bookUrl = history.bookUrl.trim(),
+                        bookName = history.bookName.trim(),
+                        currentSessionId = history.currentSessionId.takeIf { id -> sessions.any { it.id == id } }
+                            ?: sessions.firstOrNull()?.id.orEmpty(),
+                        sessions = sessions
+                    )
+                }
+                .filter { it.sessions.isNotEmpty() }
+                .sortedByDescending { it.updatedAt }
+                .take(200)
+        }.getOrElse {
+            AppLog.put("读取阅读问 AI 历史失败, 已清理历史\n${it.localizedMessage}", it)
+            appCtx.removePref(PreferKey.aiReadHistoryList)
+            emptyList()
+        }
+        set(value) {
+            val histories = value.distinctBy { it.bookUrl }
+                .mapNotNull { history ->
+                    val bookUrl = history.bookUrl.trim()
+                    val sessions = history.sessions
+                        .filter { it.id.isNotBlank() && it.messages.any { message -> message.content.isNotBlank() } }
+                        .map { session ->
+                            session.copy(
+                                messages = session.messages.filter { it.content.isNotBlank() }.takeLast(80)
+                            )
+                        }
+                        .sortedByDescending { it.updatedAt }
+                        .take(20)
+                    if (bookUrl.isBlank() || sessions.isEmpty()) {
+                        null
+                    } else {
+                        history.copy(
+                            bookUrl = bookUrl,
+                            bookName = history.bookName.trim(),
+                            updatedAt = history.updatedAt,
+                            currentSessionId = history.currentSessionId.takeIf { id -> sessions.any { it.id == id } }
+                                ?: sessions.first().id,
+                            sessions = sessions
+                        )
+                    }
+                }
+                .sortedByDescending { it.updatedAt }
+                .take(200)
+            if (histories.isEmpty()) {
+                appCtx.removePref(PreferKey.aiReadHistoryList)
+            } else {
+                appCtx.putPrefString(PreferKey.aiReadHistoryList, GSON.toJson(histories))
+            }
+        }
+
+    private fun readAiReadHistories(): List<ReadAiBookHistory> {
+        val raw = appCtx.getPrefString(PreferKey.aiReadHistoryList).orEmpty()
+        val histories = GSON.fromJsonArray<ReadAiBookHistory>(raw).getOrDefault(emptyList())
+        if (histories.any { it.sessions.isNotEmpty() }) {
+            return histories
+        }
+        return migrateLegacyReadAiHistories(raw)
+    }
+
+    private fun migrateLegacyReadAiHistories(raw: String): List<ReadAiBookHistory> {
+        return runCatching {
+            org.json.JSONArray(raw).let { array ->
+                buildList {
+                    for (index in 0 until array.length()) {
+                        val item = array.optJSONObject(index) ?: continue
+                        val records = item.optJSONArray("records") ?: continue
+                        val sessions = buildList {
+                            for (recordIndex in 0 until records.length()) {
+                                val record = records.optJSONObject(recordIndex) ?: continue
+                                val question = record.optString("question")
+                                val answer = record.optString("answer")
+                                if (question.isBlank() || answer.isBlank()) continue
+                                val createdAt = record.optLong("createdAt", System.currentTimeMillis())
+                                add(
+                                    io.legado.app.ui.book.read.ReadAiSession(
+                                        id = record.optString("id").ifBlank { java.util.UUID.randomUUID().toString() },
+                                        title = question.lineSequence().firstOrNull().orEmpty().take(24),
+                                        chapterTitle = record.optString("chapterTitle"),
+                                        chapterIndex = record.optInt("chapterIndex", -1),
+                                        createdAt = createdAt,
+                                        updatedAt = createdAt,
+                                        messages = listOf(
+                                            io.legado.app.ui.book.read.ReadAiMessage(
+                                                role = io.legado.app.ui.book.read.ReadAiMessage.Role.USER,
+                                                content = question,
+                                                createdAt = createdAt
+                                            ),
+                                            io.legado.app.ui.book.read.ReadAiMessage(
+                                                role = io.legado.app.ui.book.read.ReadAiMessage.Role.ASSISTANT,
+                                                content = answer,
+                                                createdAt = createdAt
+                                            )
+                                        )
+                                    )
+                                )
+                            }
+                        }
+                        if (sessions.isNotEmpty()) {
+                            add(
+                                ReadAiBookHistory(
+                                    bookUrl = item.optString("bookUrl"),
+                                    bookName = item.optString("bookName"),
+                                    updatedAt = item.optLong("updatedAt", sessions.maxOf { it.updatedAt }),
+                                    currentSessionId = sessions.first().id,
+                                    sessions = sessions
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    var aiCurrentChatSessionId: String?
+        get() = appCtx.getPrefString(PreferKey.aiCurrentChatSessionId)
+        set(value) {
+            if (value.isNullOrBlank()) {
+                appCtx.removePref(PreferKey.aiCurrentChatSessionId)
+            } else {
+                appCtx.putPrefString(PreferKey.aiCurrentChatSessionId, value.trim())
+            }
+        }
+
+    var aiSystemPrompt: String
+        get() = appCtx.getPrefString(PreferKey.aiSystemPrompt, DEFAULT_AI_SYSTEM_PROMPT)
+            ?: DEFAULT_AI_SYSTEM_PROMPT
+        set(value) {
+            val prompt = value.trim()
+            if (prompt.isBlank() || prompt == DEFAULT_AI_SYSTEM_PROMPT) {
+                appCtx.removePref(PreferKey.aiSystemPrompt)
+            } else {
+                appCtx.putPrefString(PreferKey.aiSystemPrompt, prompt)
+            }
+        }
+
+    var aiSkillPrompt: String
+        get() = appCtx.getPrefString(PreferKey.aiSkillPrompt).orEmpty()
+        set(value) {
+            val prompt = value.trim()
+            if (prompt.isBlank()) {
+                appCtx.removePref(PreferKey.aiSkillPrompt)
+            } else {
+                appCtx.putPrefString(PreferKey.aiSkillPrompt, prompt)
+            }
+        }
+
+    var aiSkillList: List<AiSkillConfig>
+        get() = readAiSkills()
+        set(value) {
+            persistAiSkills(normalizeAiSkills(value))
+        }
+
+    var aiTavilyEnabled: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.aiTavilyEnabled, false)
+        set(value) = appCtx.putPrefBoolean(PreferKey.aiTavilyEnabled, value)
+
+    var aiShowToolSummary: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.aiShowToolSummary, false)
+        set(value) = appCtx.putPrefBoolean(PreferKey.aiShowToolSummary, value)
+
+    var aiEnterToSend: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.aiEnterToSend, true)
+        set(value) = appCtx.putPrefBoolean(PreferKey.aiEnterToSend, value)
+
+    var aiEnabledToolNames: Set<String>
+        get() = appCtx.getPrefStringSet(PreferKey.aiEnabledToolNames, mutableSetOf())
+            ?.filter { it.isNotBlank() }
+            ?.toSet()
+            ?: emptySet<String>()
+        set(value) = appCtx.putPrefStringSet(
+            PreferKey.aiEnabledToolNames,
+            value.filter { it.isNotBlank() }.toMutableSet()
+        )
+
+    var aiTavilyApiKey: String
+        get() = appCtx.getPrefString(PreferKey.aiTavilyApiKey).orEmpty()
+        set(value) {
+            val key = value.trim()
+            if (key.isBlank()) appCtx.removePref(PreferKey.aiTavilyApiKey)
+            else appCtx.putPrefString(PreferKey.aiTavilyApiKey, key)
+        }
+
+    var aiTavilyBaseUrl: String
+        get() = appCtx.getPrefString(PreferKey.aiTavilyBaseUrl, "https://api.tavily.com/search")
+            ?: "https://api.tavily.com/search"
+        set(value) {
+            val url = value.trim().ifBlank { "https://api.tavily.com/search" }
+            appCtx.putPrefString(PreferKey.aiTavilyBaseUrl, url)
+        }
+
+    var aiTavilySearchDepth: String
+        get() = appCtx.getPrefString(PreferKey.aiTavilySearchDepth, "basic") ?: "basic"
+        set(value) = appCtx.putPrefString(PreferKey.aiTavilySearchDepth, value.trim().ifBlank { "basic" })
+
+    var aiTavilyTopic: String
+        get() = appCtx.getPrefString(PreferKey.aiTavilyTopic, "general") ?: "general"
+        set(value) = appCtx.putPrefString(PreferKey.aiTavilyTopic, value.trim().ifBlank { "general" })
+
+    var aiTavilyMaxResults: Int
+        get() = appCtx.getPrefInt(PreferKey.aiTavilyMaxResults, 5).coerceIn(1, 10)
+        set(value) = appCtx.putPrefInt(PreferKey.aiTavilyMaxResults, value.coerceIn(1, 10))
+
+    val aiEnabledSkills: List<AiSkillConfig>
+        get() = aiSkillList.filter { it.enabled }
+
+    private fun readAiProviders(): List<AiProviderConfig> {
+        migrateLegacyAiConfigIfNeeded()
+        return normalizeAiProviders(
+            GSON.fromJsonArray<AiProviderConfig>(appCtx.getPrefString(PreferKey.aiProviderList))
+                .getOrDefault(emptyList())
+        )
+    }
+
+    private fun readAiModels(validProviderIds: Set<String>): List<AiModelConfig> {
+        migrateLegacyAiConfigIfNeeded()
+        return normalizeAiModels(readAiModelsRaw(), validProviderIds)
+    }
+
+    private fun readAiModelsRaw(): List<AiModelConfig> {
+        return GSON.fromJsonArray<AiModelConfig>(appCtx.getPrefString(PreferKey.aiModelConfigList))
+            .getOrDefault(emptyList())
+    }
+
+    private fun normalizeAiProviders(value: List<AiProviderConfig>): List<AiProviderConfig> {
+        return value.mapNotNull { provider ->
+            val name = provider.name.trim()
+            val id = provider.id.trim()
+            if (name.isEmpty() || id.isEmpty()) {
+                null
+            } else {
+                provider.copy(
+                    id = id,
+                    name = name,
+                    baseUrl = provider.baseUrl.trim(),
+                    apiKey = provider.apiKey.trim(),
+                    headers = provider.headers?.trim().orEmpty()
+                )
+            }
+        }.distinctBy { it.id }
+    }
+
+    private fun normalizeAiModels(
+        value: List<AiModelConfig>,
+        validProviderIds: Set<String>
+    ): List<AiModelConfig> {
+        return value.mapNotNull { model ->
+            val id = model.id.trim()
+            val providerId = model.providerId.trim()
+            val modelId = model.modelId.trim()
+            if (id.isEmpty() || providerId !in validProviderIds || modelId.isEmpty()) {
+                null
+            } else {
+                model.copy(id = id, providerId = providerId, modelId = modelId)
+            }
+        }.distinctBy { "${it.providerId}|${it.modelId}" }
+    }
+
+    private fun persistAiProviders(providers: List<AiProviderConfig>) {
+        if (providers.isEmpty()) {
+            appCtx.removePref(PreferKey.aiProviderList)
+        } else {
+            appCtx.putPrefString(PreferKey.aiProviderList, GSON.toJson(providers))
+        }
+    }
+
+    private fun persistAiModels(models: List<AiModelConfig>) {
+        if (models.isEmpty()) {
+            appCtx.removePref(PreferKey.aiModelConfigList)
+        } else {
+            appCtx.putPrefString(PreferKey.aiModelConfigList, GSON.toJson(models))
+        }
+    }
+
+    private fun readAiMcpServers(): List<AiMcpServerConfig> {
+        return normalizeAiMcpServers(
+            GSON.fromJsonArray<AiMcpServerConfig>(appCtx.getPrefString(PreferKey.aiMcpServerList))
+                .getOrDefault(emptyList())
+        )
+    }
+
+    private fun normalizeAiMcpServers(value: List<AiMcpServerConfig>): List<AiMcpServerConfig> {
+        return value.mapNotNull { server ->
+            val id = server.id.trim()
+            val name = server.name.trim()
+            val endpoint = server.endpoint.trim()
+            if (id.isEmpty() || name.isEmpty() || endpoint.isEmpty()) {
+                null
+            } else {
+                server.copy(
+                    id = id,
+                    name = name,
+                    endpoint = endpoint,
+                    apiKey = server.apiKey.trim()
+                )
+            }
+        }.distinctBy { it.id }
+    }
+
+    private fun persistAiMcpServers(servers: List<AiMcpServerConfig>) {
+        if (servers.isEmpty()) {
+            appCtx.removePref(PreferKey.aiMcpServerList)
+        } else {
+            appCtx.putPrefString(PreferKey.aiMcpServerList, GSON.toJson(servers))
+        }
+    }
+
+    private fun readAiSkills(): List<AiSkillConfig> {
+        migrateLegacyAiSkillIfNeeded()
+        return normalizeAiSkills(
+            GSON.fromJsonArray<AiSkillConfig>(appCtx.getPrefString(PreferKey.aiSkillList))
+                .getOrDefault(emptyList())
+        )
+    }
+
+    private fun normalizeAiSkills(value: List<AiSkillConfig>): List<AiSkillConfig> {
+        return value.mapNotNull { skill ->
+            val id = skill.id.trim()
+            val name = skill.name.trim()
+            val content = skill.content.trim()
+            if (id.isEmpty() || name.isEmpty() || content.isEmpty()) {
+                null
+            } else {
+                skill.copy(
+                    id = id,
+                    name = name,
+                    description = skill.description.trim(),
+                    content = content,
+                    sourceUrl = skill.sourceUrl.trim()
+                )
+            }
+        }.distinctBy { it.id }
+    }
+
+    private fun persistAiSkills(skills: List<AiSkillConfig>) {
+        if (skills.isEmpty()) {
+            appCtx.removePref(PreferKey.aiSkillList)
+        } else {
+            appCtx.putPrefString(PreferKey.aiSkillList, GSON.toJson(skills))
+        }
+    }
+
+    private fun migrateLegacyAiSkillIfNeeded() {
+        if (!appCtx.getPrefString(PreferKey.aiSkillList).isNullOrBlank()) {
+            return
+        }
+        val prompt = appCtx.getPrefString(PreferKey.aiSkillPrompt).orEmpty().trim()
+        if (prompt.isBlank()) {
+            return
+        }
+        persistAiSkills(
+            listOf(
+                AiSkillConfig(
+                    name = "Legado Skill",
+                    description = "从旧版单文本 Skill 配置迁移",
+                    content = prompt
+                )
+            )
+        )
+        appCtx.removePref(PreferKey.aiSkillPrompt)
+    }
+
+    private fun syncAiState(
+        providers: List<AiProviderConfig>,
+        models: List<AiModelConfig>
+    ) {
+        val providerId = providers.firstOrNull {
+            it.id == appCtx.getPrefString(PreferKey.aiCurrentProviderId)
+        }?.id ?: providers.firstOrNull()?.id
+
+        if (providerId.isNullOrBlank()) {
+            appCtx.removePref(PreferKey.aiCurrentProviderId)
+            appCtx.removePref(PreferKey.aiCurrentModelId)
+            appCtx.putPrefBoolean(PreferKey.aiAssistantEnabled, false)
+            return
+        }
+
+        if (providerId != appCtx.getPrefString(PreferKey.aiCurrentProviderId)) {
+            appCtx.putPrefString(PreferKey.aiCurrentProviderId, providerId)
+        }
+
+        val providerModels = models.filter { it.providerId == providerId }
+        val currentModelId = providerModels.firstOrNull {
+            it.id == appCtx.getPrefString(PreferKey.aiCurrentModelId)
+        }?.id ?: providerModels.firstOrNull()?.id
+
+        if (currentModelId.isNullOrBlank()) {
+            appCtx.removePref(PreferKey.aiCurrentModelId)
+            appCtx.putPrefBoolean(PreferKey.aiAssistantEnabled, false)
+        } else if (currentModelId != appCtx.getPrefString(PreferKey.aiCurrentModelId)) {
+            appCtx.putPrefString(PreferKey.aiCurrentModelId, currentModelId)
+        }
+    }
+
+    private fun migrateLegacyAiConfigIfNeeded() {
+        if (!appCtx.getPrefString(PreferKey.aiProviderList).isNullOrBlank()
+            || !appCtx.getPrefString(PreferKey.aiModelConfigList).isNullOrBlank()
+        ) {
+            return
+        }
+        val legacyBaseUrl = appCtx.getPrefString(PreferKey.aiBaseUrl, "")?.trim().orEmpty()
+        val legacyApiKey = appCtx.getPrefString(PreferKey.aiApiKey, "")?.trim().orEmpty()
+        val legacyModels = GSON.fromJsonArray<String>(appCtx.getPrefString(PreferKey.aiModelList))
+            .getOrDefault(emptyList())
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+        if (legacyBaseUrl.isBlank() && legacyApiKey.isBlank() && legacyModels.isEmpty()) {
+            return
+        }
+        val provider = AiProviderConfig(
+            name = resolveAiProviderName(legacyBaseUrl),
+            baseUrl = legacyBaseUrl,
+            apiKey = legacyApiKey
+        )
+        val models = legacyModels.map { modelId ->
+            AiModelConfig(providerId = provider.id, modelId = modelId)
+        }
+        persistAiProviders(listOf(provider))
+        if (models.isNotEmpty()) {
+            persistAiModels(models)
+        }
+        appCtx.putPrefString(PreferKey.aiCurrentProviderId, provider.id)
+        val legacyCurrentModel = appCtx.getPrefString(PreferKey.aiCurrentModel)?.trim().orEmpty()
+        val currentModel = models.firstOrNull { it.modelId == legacyCurrentModel } ?: models.firstOrNull()
+        if (currentModel == null) {
+            appCtx.removePref(PreferKey.aiCurrentModelId)
+            appCtx.putPrefBoolean(PreferKey.aiAssistantEnabled, false)
+        } else {
+            appCtx.putPrefString(PreferKey.aiCurrentModelId, currentModel.id)
+        }
+    }
+
+    private fun resolveAiProviderName(baseUrl: String): String {
+        if (baseUrl.isBlank()) return "Provider 1"
+        return runCatching {
+            URI(baseUrl).host?.removePrefix("www.")
+        }.getOrNull()?.takeIf { it.isNotBlank() } ?: "Provider 1"
+    }
 
     val autoRefreshBook: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.autoRefresh)
+
+    val onlyUpdateRead: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.onlyUpdateRead)
 
     var enableReview: Boolean
         get() = BuildConfig.DEBUG && appCtx.getPrefBoolean(PreferKey.enableReview, false)
@@ -291,6 +1090,18 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefInt(PreferKey.systemTypefaces, value)
         }
 
+    var uiFontPath: String
+        get() = appCtx.getPrefString(PreferKey.uiFontPath).orEmpty()
+        set(value) {
+            appCtx.putPrefString(PreferKey.uiFontPath, value)
+        }
+
+    var titleFontPath: String
+        get() = appCtx.getPrefString(PreferKey.titleFontPath).orEmpty()
+        set(value) {
+            appCtx.putPrefString(PreferKey.titleFontPath, value)
+        }
+
     var elevation: Int
         get() = if (isEInkMode) 0 else appCtx.getPrefInt(
             PreferKey.barElevation,
@@ -300,11 +1111,102 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefInt(PreferKey.barElevation, value)
         }
 
+    var frostedGlassLevel: Int
+        get() = appCtx.getPrefInt(PreferKey.frostedGlassLevel, 70).coerceIn(0, 100)
+        set(value) {
+            appCtx.putPrefInt(PreferKey.frostedGlassLevel, value.coerceIn(0, 100))
+        }
+
+    var uiCornerScale: Float
+        get() = appCtx.getPrefString(PreferKey.uiCornerScale, "1")
+            ?.toFloatOrNull()
+            ?.coerceIn(0f, 3f)
+            ?: 1f
+        set(value) {
+            appCtx.putPrefString(PreferKey.uiCornerScale, value.coerceIn(0f, 3f).toPlainScale())
+        }
+
+    var uiLayoutAlpha: Int
+        get() = appCtx.getPrefInt(
+            PreferKey.uiLayoutAlpha,
+            appCtx.getPrefInt(PreferKey.uiCornerEffectLevel, 100)
+        ).coerceIn(0, 100)
+        set(value) {
+            appCtx.putPrefInt(PreferKey.uiLayoutAlpha, value.coerceIn(0, 100))
+        }
+
+    @Deprecated("Use uiLayoutAlpha")
+    var uiCornerEffectMode: String
+        get() = "solid"
+        set(value) {
+            appCtx.putPrefString(PreferKey.uiCornerEffectMode, value)
+        }
+
+    @Deprecated("Use uiLayoutAlpha")
+    var uiCornerEffectLevel: Int
+        get() = uiLayoutAlpha
+        set(value) {
+            uiLayoutAlpha = value
+        }
+
+    val uiCornerSearchFollow: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.uiCornerSearchFollow, false)
+
+    val uiCornerReplyFollow: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.uiCornerReplyFollow, false)
+
+    var liquidGlassLevel: Int
+        get() = appCtx.getPrefInt(PreferKey.liquidGlassLevel, 68).coerceIn(0, 100)
+        set(value) {
+            appCtx.putPrefInt(PreferKey.liquidGlassLevel, value.coerceIn(0, 100))
+        }
+
+    var bottomBarEffectMode: String
+        get() = appCtx.getPrefString(PreferKey.bottomBarEffectMode, "glass")
+            ?.takeIf { it in setOf("glass", "frosted", "solid") }
+            ?: "glass"
+        set(value) {
+            appCtx.putPrefString(
+                PreferKey.bottomBarEffectMode,
+                value.takeIf { it in setOf("glass", "frosted", "solid") } ?: "glass"
+            )
+        }
+
+    var bottomBarLayoutMode: String
+        get() = appCtx.getPrefString(PreferKey.bottomBarLayoutMode, "floating")
+            ?.takeIf { it in setOf("floating", "sidebar") }
+            ?: "floating"
+        set(value) {
+            appCtx.putPrefString(
+                PreferKey.bottomBarLayoutMode,
+                value.takeIf { it in setOf("floating", "sidebar") } ?: "floating"
+            )
+        }
+
+    var bottomBarSidebarGravity: String
+        get() = appCtx.getPrefString(PreferKey.bottomBarSidebarGravity, "start")
+            ?.takeIf { it in setOf("start", "end") }
+            ?: "start"
+        set(value) {
+            appCtx.putPrefString(
+                PreferKey.bottomBarSidebarGravity,
+                value.takeIf { it in setOf("start", "end") } ?: "start"
+            )
+        }
+
     var readUrlInBrowser: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.readUrlOpenInBrowser)
         set(value) {
             appCtx.putPrefBoolean(PreferKey.readUrlOpenInBrowser, value)
         }
+
+    private fun Float.toPlainScale(): String {
+        return if (this % 1f == 0f) {
+            this.toInt().toString()
+        } else {
+            String.format(java.util.Locale.US, "%.2f", this).trimEnd('0').trimEnd('.')
+        }
+    }
 
     var exportCharset: String
         get() {
@@ -447,12 +1349,14 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         set(value) {
             appCtx.putPrefBoolean(PreferKey.importKeepEnable, value)
         }
-
-    var previewImageByClick: Boolean
-        get() = appCtx.getPrefBoolean(PreferKey.previewImageByClick, false)
+    var importShowComment: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.importShowComment, false)
         set(value) {
-            appCtx.putPrefBoolean(PreferKey.previewImageByClick, value)
+            appCtx.putPrefBoolean(PreferKey.importShowComment, value)
         }
+
+    val clickImgWay: String?
+        get() = appCtx.getPrefString(PreferKey.clickImgWay)
 
     var preDownloadNum
         get() = appCtx.getPrefInt(PreferKey.preDownloadNum, 10)
@@ -475,6 +1379,10 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     val webDavDeviceName get() = appCtx.getPrefString(PreferKey.webDavDeviceName, Build.MODEL)
 
+    var syncThemePackages
+        get() = appCtx.getPrefBoolean(PreferKey.syncThemePackages, false)
+        set(value) = appCtx.putPrefBoolean(PreferKey.syncThemePackages, value)
+
     val recordHeapDump get() = appCtx.getPrefBoolean(PreferKey.recordHeapDump, false)
 
     val loadCoverOnlyWifi get() = appCtx.getPrefBoolean(PreferKey.loadCoverOnlyWifi, false)
@@ -492,8 +1400,6 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val autoCheckNewBackup get() = appCtx.getPrefBoolean(PreferKey.autoCheckNewBackup, true)
 
     val defaultHomePage get() = appCtx.getPrefString(PreferKey.defaultHomePage, "bookshelf")
-
-    val updateToVariant get() = appCtx.getPrefString(PreferKey.updateToVariant, "default_version")
 
     val streamReadAloudAudio get() = appCtx.getPrefBoolean(PreferKey.streamReadAloudAudio, false)
 
@@ -536,6 +1442,18 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefInt(PreferKey.pageTouchSlop, value)
         }
 
+    var pageTouchClick: Int
+        get() = appCtx.getPrefInt(PreferKey.pageTouchClick, 0)
+        set(value) {
+            appCtx.putPrefInt(PreferKey.pageTouchClick, value)
+        }
+
+    var pageAnimationSpeed: Int
+        get() = appCtx.getPrefInt(PreferKey.pageAnimationSpeed, 300).coerceIn(0, 2000)
+        set(value) {
+            appCtx.putPrefInt(PreferKey.pageAnimationSpeed, value.coerceIn(0, 2000))
+        }
+
     var bookshelfSort: Int
         get() = appCtx.getPrefInt(PreferKey.bookshelfSort, 0)
         set(value) {
@@ -576,6 +1494,16 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefBoolean(PreferKey.readBarStyleFollowPage, false)
         set(value) {
             appCtx.putPrefBoolean(PreferKey.readBarStyleFollowPage, value)
+        }
+    var readScrollFollowBackground: Boolean
+        get() = ReadBookConfig.durConfig.curReadScrollFollowBackground()
+        set(value) {
+            ReadBookConfig.durConfig.setCurReadScrollFollowBackground(value)
+        }
+    var readMenuAlpha: Int
+        get() = appCtx.getPrefInt(PreferKey.readMenuAlpha, 100).coerceIn(35, 100)
+        set(value) {
+            appCtx.putPrefInt(PreferKey.readMenuAlpha, value.coerceIn(35, 100))
         }
 
     var sourceEditMaxLine: Int
@@ -739,4 +1667,3 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         }
 
 }
-

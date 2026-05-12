@@ -4,10 +4,17 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <io.legado.app.ui.book.read.page.ReadView
-        android:id="@+id/read_view"
+    <FrameLayout
+        android:id="@+id/read_content_container"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent">
+
+        <io.legado.app.ui.book.read.page.ReadView
+            android:id="@+id/read_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    </FrameLayout>
 
     <View
         android:id="@+id/text_menu_position"
@@ -43,11 +50,16 @@
         android:layout_height="match_parent"
         android:visibility="gone" />
 
+    <io.legado.app.ui.book.read.ReadAiFloatingPanel
+        android:id="@+id/read_ai_panel"
+        android:layout_width="320dp"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
     <View
         android:id="@+id/navigation_bar"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:background="@color/background_menu"
         android:layout_gravity="bottom" />
 
 </FrameLayout>

@@ -4,7 +4,7 @@ import android.content.Context
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
-import android.widget.PopupMenu
+import android.widget.PopupWindow
 import androidx.core.os.bundleOf
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
@@ -13,10 +13,9 @@ import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.databinding.ItemReplaceRuleBinding
-import io.legado.app.lib.theme.backgroundColor
+import io.legado.app.ui.widget.ModernActionPopup
 import io.legado.app.ui.widget.recycler.DragSelectTouchHelper
 import io.legado.app.ui.widget.recycler.ItemTouchCallback
-import io.legado.app.utils.ColorUtils
 
 
 class ReplaceRuleAdapter(context: Context, var callBack: CallBack) :
@@ -24,6 +23,7 @@ class ReplaceRuleAdapter(context: Context, var callBack: CallBack) :
     ItemTouchCallback.Callback {
 
     private val selected = linkedSetOf<ReplaceRule>()
+    private var modernMenuPopup: PopupWindow? = null
 
     val selection: List<ReplaceRule>
         get() {
@@ -104,7 +104,6 @@ class ReplaceRuleAdapter(context: Context, var callBack: CallBack) :
     ) {
         binding.run {
             if (payloads.isEmpty()) {
-                root.setBackgroundColor(ColorUtils.withAlpha(context.backgroundColor, 0.5f))
                 cbName.text = item.getDisplayNameGroup()
                 swtEnabled.isChecked = item.isEnabled
                 cbName.isChecked = selected.contains(item)
@@ -154,9 +153,11 @@ class ReplaceRuleAdapter(context: Context, var callBack: CallBack) :
 
     private fun showMenu(view: View, position: Int) {
         val item = getItem(position) ?: return
-        val popupMenu = PopupMenu(context, view)
-        popupMenu.inflate(R.menu.replace_rule_item)
-        popupMenu.setOnMenuItemClickListener { menuItem ->
+        modernMenuPopup = ModernActionPopup.showFromMenu(
+            view,
+            R.menu.replace_rule_item,
+            modernMenuPopup
+        ) { menuItem ->
             when (menuItem.itemId) {
                 R.id.menu_top -> callBack.toTop(item)
                 R.id.menu_bottom -> callBack.toBottom(item)
@@ -167,7 +168,6 @@ class ReplaceRuleAdapter(context: Context, var callBack: CallBack) :
             }
             true
         }
-        popupMenu.show()
     }
 
     override fun swap(srcPosition: Int, targetPosition: Int): Boolean {

@@ -80,10 +80,22 @@ data class SearchBook(
     @delegate:Transient
     @delegate:Ignore
     @IgnoredOnParcel
-    val origins: LinkedHashSet<String> by lazy { linkedSetOf(origin) }
+    val origins: LinkedHashSet<String> by lazy { linkedSetOf(originBookUrl()) }
 
     fun addOrigin(origin: String) {
-        origins.add(origin)
+        addOrigin(origin, "")
+    }
+
+    fun addOrigin(origin: String, bookUrl: String) {
+        origins.add(originBookUrl(origin, bookUrl))
+    }
+
+    fun originBookUrl(): String {
+        return originBookUrl(origin, bookUrl)
+    }
+
+    fun originBookUrls(): List<String> {
+        return origins.map { it.substringAfter(ORIGIN_BOOK_URL_SEPARATOR, it) }
     }
 
     fun getDisplayLastChapterTitle(): String {
@@ -135,5 +147,13 @@ data class SearchBook(
     ).apply {
         this.infoHtml = this@SearchBook.infoHtml
         this.tocHtml = this@SearchBook.tocHtml
+    }
+
+    companion object {
+        private const val ORIGIN_BOOK_URL_SEPARATOR = "\t"
+
+        fun originBookUrl(origin: String, bookUrl: String): String {
+            return "$origin$ORIGIN_BOOK_URL_SEPARATOR$bookUrl"
+        }
     }
 }

@@ -1,39 +1,44 @@
 [versions]
 
-kotlin = "2.3.0"
-ksp = "2.3.4"
-agp = "8.13.2"
+kotlin = "2.3.21"
+ksp = "2.3.7"
+agp = "9.2.1"
 appcompat = "1.7.1"
 colorpicker = "1.1.0"
 constraintlayout = "2.2.1"
-core = "1.17.0"
+core = "1.18.0"
+liquidglass = "1.0.3"
+lottie = "6.6.6"
 flexbox = "3.0.0"
 fragment = "1.8.9"
 documentfile = "1.1.0"
 
 libarchive = "1.1.6"
-glide = "5.0.5"
-gson = "2.13.2"
-jsonPath = "2.10.0"
+lyricViewx = "1.3.2"
+soraEditor = "0.24.4"
+glide = "5.0.7"
+gson = "2.14.0"
+jsonPath = "3.0.0"
 jsoupxpath = "2.5.3"
-coroutines = "1.10.2"
+coroutines = "1.11.0"
 liveeventbus = "1.8.14"
 markwon = "4.6.2"
 material = "1.13.0"
-media = "1.7.1"
+media = "1.8.0"
+danmaku = "0.9.25"
 nanoHttpd = "2.3.1"
 okhttp = "5.3.2"
 preference = "1.2.1"
-quickChineseTransfer = "0.2.16"
+quickChineseTransfer = "0.2.17"
 
 splitties = "3.0.0"
 desugar = "2.1.5"
 
 #kotlinxSerialization = "1.8.0"
 swiperefreshlayout = "1.2.0"
-collection = "1.5.0"
+collection = "1.6.0"
 
-zxingLite = "3.3.0"
+zxingLite = "3.4.1"
 
 #不要更新版本
 #noinspection NewerVersionAvailable
@@ -56,52 +61,54 @@ commonsText = "1.13.1"
 rhino = "1.8.1"
 
 #noinspection GradleDependency,NewerVersionAvailable
-media3 = "1.8.0"
+media3 = "1.10.0"
+#noinspection GradleDependency
+gsyvideoplayer = "11.3.0"
 
 #noinspection GradleDependency
-webkit = "1.14.0"
+webkit = "1.16.0"
 #noinspection GradleDependency
-activity = "1.11.0"
+activity = "1.13.0"
 #noinspection GradleDependency
-lifecycle = "2.9.4"
+lifecycle = "2.10.0"
 #noinspection GradleDependency
-room = "2.7.1"
+room = "2.8.4"
 #noinspection GradleDependency
-recyclerview = "1.2.0"
+recyclerview = "1.4.0"
 #noinspection GradleDependency
-viewpager2 = "1.0.0"
+viewpager2 = "1.1.0"
 #noinspection GradleDependency
-firebaseBom = "33.2.0"
-
+firebaseBom = "34.13.0"
 [libraries]
 
 activity-activity = { module = "androidx.activity:activity", version.ref = "activity" }
 activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity" }
 activity-ktx = { module = "androidx.activity:activity-ktx", version.ref = "activity" }
 
-androidx-annotation = { group = "androidx.annotation", name = "annotation", version = "1.9.1" }
+androidx-annotation = { group = "androidx.annotation", name = "annotation", version = "1.10.0" }
 #androidx-annotation-experimental = { group = "androidx.annotation", name = "annotation-experimental", version = "1.3.1" }
 
 androidx-collection = { module = "androidx.collection:collection", version.ref = "collection" }
 appcompat-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 androidx-constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayout" }
+liquidglass = { module = "com.qmdeve.liquidglass:core", version.ref = "liquidglass" }
+lottie = { module = "com.airbnb.android:lottie", version.ref = "lottie" }
 
 
 core-core = { module = "androidx.core:core", version.ref = "core" }
 core-ktx = { module = "androidx.core:core-ktx", version.ref = "core" }
 
-androidx-espresso-core = { module = "androidx.test.espresso:espresso-core", version = "3.6.1" }
+androidx-espresso-core = { module = "androidx.test.espresso:espresso-core", version = "3.7.0" }
 
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
 firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
 firebase-perf = { module = "com.google.firebase:firebase-perf" }
 
-
 fragment-fragment = { module = "androidx.fragment:fragment", version.ref = "fragment" }
 fragment-ktx = { module = "androidx.fragment:fragment-ktx", version.ref = "fragment" }
 fragment-testing = { module = "androidx.fragment:fragment-testing", version.ref = "fragment" }
 
-androidx-junit = { module = "androidx.test.ext:junit", version = "1.2.1" }
+androidx-junit = { module = "androidx.test.ext:junit", version = "1.3.0" }
 
 hutool-crypto = { module = "cn.hutool:hutool-crypto", version.ref = "hutool" }
 
@@ -109,15 +116,27 @@ libarchive = { module = "me.zhanghai.android.libarchive:library", version.ref = 
 lifecycle-common-java8 = { module = "androidx.lifecycle:lifecycle-common-java8", version.ref = "lifecycle" }
 lifecycle-service = { module = "androidx.lifecycle:lifecycle-service", version.ref = "lifecycle" }
 
+lyricViewx = { module = "com.github.Moriafly:LyricViewX", version.ref = "lyricViewx" }
+
+
 media-media = { module = "androidx.media:media", version.ref = "media" }
 media3-datasource-okhttp = { module = "androidx.media3:media3-datasource-okhttp", version.ref = "media3" }
 media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3" }
+media3-exoplayer-hls = { module = "androidx.media3:media3-exoplayer-hls", version.ref = "media3" }
+media3-ui = { module = "androidx.media3:media3-ui", version.ref = "media3" }
 media3-session = { module = "androidx.media3:media3-session", version.ref = "media3" }
+
+gsyVideoPlayer-java = { module = "io.github.carguo:gsyvideoplayer-java", version.ref = "gsyvideoplayer" }
+gsyVideoPlayer-exo2 = { module = "io.github.carguo:gsyvideoplayer-exo2", version.ref = "gsyvideoplayer" }
+danmakuFlameMaster = { module = "com.github.CarGuo.DanmakuFlameMaster:DanmakuFlameMaster", version.ref = "danmaku" }
 
 markwon-core = { module = "io.noties.markwon:core", version.ref = "markwon" }
 markwon-image-glide = { module = "io.noties.markwon:image-glide", version.ref = "markwon" }
 markwon-ext-tables = { module = "io.noties.markwon:ext-tables", version.ref = "markwon" }
+markwon-ext-strikethrough = { module = "io.noties.markwon:ext-strikethrough", version.ref = "markwon" }
+markwon-ext-tasklist = { module = "io.noties.markwon:ext-tasklist", version.ref = "markwon" }
 markwon-html = { module = "io.noties.markwon:html", version.ref = "markwon" }
+markwon-linkify = { module = "io.noties.markwon:linkify", version.ref = "markwon" }
 
 
 nanohttpd-nanohttpd = { module = "org.nanohttpd:nanohttpd", version.ref = "nanoHttpd" }
@@ -141,19 +160,21 @@ glide-glide = { module = "com.github.bumptech.glide:glide", version.ref = "glide
 glide-okhttp = { module = "com.github.bumptech.glide:okhttp3-integration", version.ref = "glide" }
 glide-recyclerview = { module = "com.github.bumptech.glide:recyclerview-integration", version.ref = "glide" }
 glide-compiler = { module = "com.github.bumptech.glide:compiler", version.ref = "glide" }
-glide-compose = { module = "com.github.bumptech.glide:compose", version = "1.0.0-beta01" }
 glide-ksp = { module = "com.github.bumptech.glide:ksp", version.ref = "glide" }
 glide-avif = { module = "com.github.bumptech.glide:avif-integration", version.ref = "glide" }
 avif = { module = "org.aomedia.avif.android:avif", version = "1.1.1.14d8e3c4" }
 glide-svg = { module = "com.github.qoqa:glide-svg", version = "4.0.2" }
 androidsvg = { module = "com.caverock:androidsvg-aar", version = "1.4" }
 
+soraEditor-bom = { module = "io.github.rosemoe:editor-bom", version.ref = "soraEditor" }
+soraEditor-core = { module = "io.github.rosemoe:editor" }
+soraEditor-language-textmate = { module = "io.github.rosemoe:language-textmate" }
 splitties-appctx = { module = "com.louiscad.splitties:splitties-appctx", version.ref = "splitties" }
 splitties-activities = { module = "com.louiscad.splitties:splitties-activities", version.ref = "splitties" }
 splitties-systemservices = { module = "com.louiscad.splitties:splitties-systemservices", version.ref = "splitties" }
 splitties-views = { module = "com.louiscad.splitties:splitties-views", version.ref = "splitties" }
 
-androidx-runner = { module = "androidx.test:runner", version = "1.6.2" }
+androidx-runner = { module = "androidx.test:runner", version = "1.7.0" }
 androidx-swiperefreshlayout = { module = "androidx.swiperefreshlayout:swiperefreshlayout", version.ref = "swiperefreshlayout" }
 androidx-recyclerview = { module = "androidx.recyclerview:recyclerview", version.ref = "recyclerview" }
 androidx-viewpager2 = { module = "androidx.viewpager2:viewpager2", version.ref = "viewpager2" }
@@ -208,11 +229,11 @@ kotlin-sam = { id = "org.jetbrains.kotlin.plugin.sam.with.receiver", version.ref
 kotlin-lombok = { id = "org.jetbrains.kotlin.plugin.lombok", version.ref = "kotlin" }
 kotlin-parcelize = { id = "org.jetbrains.kotlin.plugin.parcelize", version.ref = "kotlin" }
 
-google-services = { id = "com.google.gms.google-services", version = "4.4.2" }
+google-services = { id = "com.google.gms.google-services", version = "4.4.4" }
 
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 room = { id = "androidx.room", version.ref = "room" }
 
 #protobuf = { id = "com.google.protobuf", version = "0.9.4" }
 
-download = { id = "de.undercouch.download", version = "5.6.0" }
+download = { id = "de.undercouch.download", version = "5.7.0" }

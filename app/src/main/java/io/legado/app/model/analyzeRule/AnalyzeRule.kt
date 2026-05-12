@@ -2,10 +2,12 @@ package io.legado.app.model.analyzeRule
 
 import android.text.TextUtils
 import androidx.annotation.Keep
+import com.google.gson.internal.LinkedTreeMap
 import com.script.CompiledScript
 import com.script.buildScriptBindings
 import com.script.rhino.RhinoScriptEngine
 import io.legado.app.constant.AppPattern.JS_PATTERN
+import io.legado.app.constant.AppPattern.WebJS_PATTERN
 import io.legado.app.data.entities.BaseBook
 import io.legado.app.data.entities.BaseSource
 import io.legado.app.data.entities.Book
@@ -15,6 +17,7 @@ import io.legado.app.data.entities.RssArticle
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.CacheManager
 import io.legado.app.help.JsExtensions
+import io.legado.app.help.http.BackstageWebView
 import io.legado.app.help.http.CookieStore
 import io.legado.app.help.source.getShareScope
 import io.legado.app.model.Debug
@@ -22,10 +25,12 @@ import io.legado.app.model.webBook.WebBook
 import io.legado.app.utils.GSON
 import io.legado.app.utils.GSONStrict
 import io.legado.app.utils.NetworkUtils
+import io.legado.app.utils.fromJsonArray
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.getOrPutLimit
 import io.legado.app.utils.isDataUrl
 import io.legado.app.utils.isJson
+import io.legado.app.utils.isMainThread
 import io.legado.app.utils.printOnDebug
 import io.legado.app.utils.splitNotBlank
 import io.legado.app.utils.stackTraceStr
@@ -52,7 +57,8 @@ import kotlin.coroutines.EmptyCoroutineContext
 class AnalyzeRule(
     private var ruleData: RuleDataInterface? = null,
     private val source: BaseSource? = null,
-    private val preUpdateJs: Boolean = false
+    private val preUpdateJs: Boolean = false,
+    private var isFromBookInfo : Boolean = false
 ) : JsExtensions {
 
     private val book get() = ruleData as? BaseBook
@@ -79,6 +85,12 @@ class AnalyzeRule(
     private var coroutineContext: CoroutineContext = EmptyCoroutineContext
 
     private var loggedNonStandardJSON = false
+    private var ruleName: String? = null
+    fun setRuleName(name: String) {
+        if (name.isNotBlank()) {
+            ruleName = name
+        }
+    }
 
     @JvmOverloads
     fun setContent(content: Any?, baseUrl: String? = null): AnalyzeRule {
@@ -157,6 +169,28 @@ class AnalyzeRule(
     }
 
     /**
+     * 获取webJs结果
+     */
+    private fun getWebJsResult(jsStr: String, result: Any): String {
+        if (isMainThread) {
+            error("webJs must be called on a background thread")
+        }
+        return runBlocking {
+            BackstageWebView(
+                url = baseUrl,
+                html = content.toString(),
+                javaScript = jsStr,
+                headerMap = getSource()?.getHeaderMap(true),
+                tag = getSource()?.getKey(),
+                cacheFirst = true,
+                timeout = 10000,
+                result = GSON.toJson(result),
+                isRule = true
+            ).getStrResponse().body.toString()
+        }
+    }
+
+    /**
      * 获取文本列表
      */
     @JvmOverloads
@@ -196,6 +230,9 @@ class AnalyzeRule(
                         result = replaceRegex(result.toString(), sourceRule)
                     }
                 }
+            } else if (result is LinkedTreeMap<*, *>) {
+                // 键值直接访问
+                result = result[ruleList.first().rule]
             } else {
                 for (sourceRule in ruleList) {
                     putRule(sourceRule.putMap)
@@ -204,6 +241,9 @@ class AnalyzeRule(
                     val rule = sourceRule.rule
                     if (rule.isNotEmpty()) {
                         result = when (sourceRule.mode) {
+                            Mode.WebJs -> getWebJsResult(rule, result).let{
+                                GSON.fromJsonArray<String>(it).getOrNull() ?: it
+                            }
                             Mode.Js -> evalJS(rule, result)
                             Mode.Json -> getAnalyzeByJSonPath(result).getStringList(rule)
                             Mode.XPath -> getAnalyzeByXPath(result).getStringList(rule)
@@ -283,6 +323,9 @@ class AnalyzeRule(
                 }?.let {
                     replaceRegex(it, sourceRule)
                 }
+            } else if (result is LinkedTreeMap<*, *>) {
+                // 键值直接访问
+                result = result[ruleList.first().rule]?.toString()
             } else {
                 for (sourceRule in ruleList) {
                     putRule(sourceRule.putMap)
@@ -291,6 +334,7 @@ class AnalyzeRule(
                     val rule = sourceRule.rule
                     if (rule.isNotBlank() || sourceRule.replaceRegex.isEmpty()) {
                         result = when (sourceRule.mode) {
+                            Mode.WebJs -> getWebJsResult(rule, result)
                             Mode.Js -> evalJS(rule, result)
                             Mode.Json -> getAnalyzeByJSonPath(result).getString(rule)
                             Mode.XPath -> getAnalyzeByXPath(result).getString(rule)
@@ -347,6 +391,7 @@ class AnalyzeRule(
                         rule.splitNotBlank("&&")
                     )
 
+                    Mode.WebJs -> GSON.fromJsonObject<Map<String, Any?>>(getWebJsResult(rule, result)).getOrNull()
                     Mode.Js -> evalJS(rule, result)
                     Mode.Json -> getAnalyzeByJSonPath(result).getObject(rule)
                     Mode.XPath -> getAnalyzeByXPath(result).getElements(rule)
@@ -380,6 +425,7 @@ class AnalyzeRule(
                         rule.splitNotBlank("&&")
                     )
 
+                    Mode.WebJs -> GSON.fromJsonArray<Map<String, Any?>>(getWebJsResult(rule, result)).getOrNull()
                     Mode.Js -> evalJS(rule, result)
                     Mode.Json -> getAnalyzeByJSonPath(result).getList(rule)
                     Mode.XPath -> getAnalyzeByXPath(result).getElements(rule)
@@ -507,14 +553,23 @@ class AnalyzeRule(
             ruleList.add(SourceRule(jsMatcher.group(2) ?: jsMatcher.group(1), Mode.Js))
             start = jsMatcher.end()
         }
-
+        val webJsMatcher = WebJS_PATTERN.matcher(ruleStr)
+        while (webJsMatcher.find()) {
+            if (webJsMatcher.start() > start) {
+                tmp = ruleStr.substring(start, webJsMatcher.start()).trim { it <= ' ' }
+                if (tmp.isNotEmpty()) {
+                    ruleList.add(SourceRule(tmp, mMode))
+                }
+            }
+            ruleList.add(SourceRule(webJsMatcher.group(1) ?: "", Mode.WebJs))
+            start = webJsMatcher.end()
+        }
         if (ruleStr.length > start) {
             tmp = ruleStr.substring(start).trim { it <= ' ' }
             if (tmp.isNotEmpty()) {
                 ruleList.add(SourceRule(tmp, mMode))
             }
         }
-
         return ruleList
     }
 
@@ -681,11 +736,10 @@ class AnalyzeRule(
                                     infoVal.insert(0, it)
                                 }
                             } else {
-                                val jsEval: Any? = evalJS(ruleParam[index], result)
-                                when {
-                                    jsEval == null -> Unit
-                                    jsEval is String -> infoVal.insert(0, jsEval)
-                                    jsEval is Double && jsEval % 1.0 == 0.0 -> infoVal.insert(
+                                when (val jsEval: Any? = evalJS(ruleParam[index], result)) {
+                                    null -> Unit
+                                    is String -> infoVal.insert(0, jsEval)
+                                    is Double if jsEval % 1.0 == 0.0 -> infoVal.insert(
                                         0,
                                         String.format(Locale.ROOT, "%.0f", jsEval)
                                     )
@@ -731,7 +785,7 @@ class AnalyzeRule(
     }
 
     enum class Mode {
-        XPath, Json, Default, Js, Regex
+        XPath, Json, Default, Js, Regex, WebJs
     }
 
     /**
@@ -785,6 +839,7 @@ class AnalyzeRule(
             bindings["src"] = content
             bindings["nextChapterUrl"] = nextChapterUrl
             bindings["rssArticle"] = rssArticle
+            bindings["fromBookInfo"] = isFromBookInfo
         }
         val topScope = source?.getShareScope(coroutineContext) ?: topScopeRef?.get()
         val scope = if (topScope == null) {
@@ -811,6 +866,10 @@ class AnalyzeRule(
 
     override fun getSource(): BaseSource? {
         return source
+    }
+
+    override fun getTag(): String? {
+        return source?.getTag() ?: ruleName
     }
 
     /**
@@ -844,6 +903,9 @@ class AnalyzeRule(
      */
     fun reGetBook() {
         if (!preUpdateJs) throw NoStackTraceException("只能在 preUpdateJs 中调用")
+        if (isFromBookInfo) {
+            log("重新获取book")
+        }
         val bookSource = source as? BookSource
         val book = book as? Book
         if (bookSource == null || book == null) return
@@ -866,6 +928,10 @@ class AnalyzeRule(
      */
     fun refreshTocUrl() {
         if (!preUpdateJs) throw NoStackTraceException("只能在 preUpdateJs 中调用")
+        if (isFromBookInfo) {
+            log("已跳过重复加载详情页，请优化代码")
+            return
+        }
         val bookSource = source as? BookSource
         val book = book as? Book
         if (bookSource == null || book == null) return

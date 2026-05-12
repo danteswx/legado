@@ -2,7 +2,7 @@ package io.legado.app.ui.book.read
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.drawable.GradientDrawable
+import android.graphics.Color
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.animation.Animation
@@ -16,19 +16,18 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.source.getSourceType
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.bottomBackground
+import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.model.ReadBook
 import io.legado.app.model.ReadManga
 import io.legado.app.ui.browser.WebViewActivity
 import io.legado.app.ui.widget.seekbar.SeekBarChangeListener
 import io.legado.app.utils.ColorUtils
-import io.legado.app.utils.ConstraintModify
+import io.legado.app.utils.applyStatusBarPadding
 import io.legado.app.utils.activity
 import io.legado.app.utils.applyNavigationBarPadding
-import io.legado.app.utils.dpToPx
 import io.legado.app.utils.gone
 import io.legado.app.utils.invisible
 import io.legado.app.utils.loadAnimation
-import io.legado.app.utils.modifyBegin
 import io.legado.app.utils.openUrl
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.visible
@@ -91,45 +90,43 @@ class MangaMenu @JvmOverloads constructor(
     }
 
     init {
+        binding.titleBar.applyStatusBarPadding(withInitialPadding = true)
         initView()
         bindEvent()
     }
 
     private fun initView() = binding.run {
         initAnimation()
-        val brightnessBackground = GradientDrawable()
-        brightnessBackground.cornerRadius = 5F.dpToPx()
-        brightnessBackground.setColor(ColorUtils.adjustAlpha(bgColor, 0.5f))
+        val textColor = context.getPrimaryTextColor(ColorUtils.isColorLight(bgColor))
+        val secondaryTextColor = ColorUtils.withAlpha(textColor, 0.78f)
+        titleBar.setTextColor(textColor)
+        titleBar.setColorFilter(textColor)
+        tvChapterName.setTextColor(secondaryTextColor)
+        tvChapterUrl.setTextColor(secondaryTextColor)
+        tvPre.setTextColor(textColor)
+        tvNext.setTextColor(textColor)
         if (AppConfig.isEInkMode) {
             titleBar.setBackgroundResource(R.drawable.bg_eink_border_bottom)
+            titleBar.toolbar.background = null
+            titleBarAddition.background = null
+            llTitleInfo.background = null
             bottomMenu.setBackgroundResource(R.drawable.bg_eink_border_top)
         } else {
-            bottomMenu.setBackgroundColor(bgColor)
+            titleBar.setBackgroundColor(ColorUtils.withAlpha(bgColor, 0.75f))
+            titleBar.toolbar.background = null
+            titleBarAddition.background = null
+            llTitleInfo.background = null
+            bottomMenu.setBackgroundColor(Color.TRANSPARENT)
         }
         if (AppConfig.showReadTitleBarAddition) {
             titleBarAddition.visible()
         } else {
             titleBarAddition.gone()
         }
-        upBrightnessVwPos()
         /**
          * 确保视图不被导航栏遮挡
          */
         bottomMenu.applyNavigationBarPadding()
-    }
-
-    private fun upBrightnessVwPos() {
-        if (AppConfig.brightnessVwPos) {
-            binding.root.modifyBegin()
-                .clear(R.id.ll_brightness, ConstraintModify.Anchor.LEFT)
-                .rightToRightOf(R.id.ll_brightness, R.id.vw_menu_root)
-                .commit()
-        } else {
-            binding.root.modifyBegin()
-                .clear(R.id.ll_brightness, ConstraintModify.Anchor.RIGHT)
-                .leftToLeftOf(R.id.ll_brightness, R.id.vw_menu_root)
-                .commit()
-        }
     }
 
     private fun initAnimation() {
@@ -172,28 +169,26 @@ class MangaMenu @JvmOverloads constructor(
             callBack.openBookInfoActivity()
         }
         val chapterViewClickListener = OnClickListener {
-            if (AppConfig.readUrlInBrowser) {
-                context.openUrl(tvChapterUrl.text.toString().substringBefore(",{"))
-            } else {
-                context.startActivity<WebViewActivity> {
-                    val url = tvChapterUrl.text.toString()
-                    val bookSource = ReadBook.bookSource
-                    putExtra("title", tvChapterName.text)
-                    putExtra("url", url)
-                    putExtra("sourceOrigin", bookSource?.bookSourceUrl)
-                    putExtra("sourceName", bookSource?.bookSourceName)
-                    putExtra("sourceType", bookSource?.getSourceType())
-                }
+            val url = tvChapterUrl.text.toString().trim()
+            if (url.isBlank()) return@OnClickListener
+            context.startActivity<WebViewActivity> {
+                val bookSource = ReadBook.bookSource
+                putExtra("title", tvChapterName.text)
+                putExtra("url", url)
+                putExtra("sourceOrigin", bookSource?.bookSourceUrl)
+                putExtra("sourceName", bookSource?.bookSourceName)
+                putExtra("sourceType", bookSource?.getSourceType())
             }
         }
         val chapterViewLongClickListener = OnLongClickListener {
-            context.alert(R.string.open_fun) {
-                setMessage(R.string.use_browser_open)
-                okButton {
-                    AppConfig.readUrlInBrowser = true
-                }
-                noButton {
-                    AppConfig.readUrlInBrowser = false
+            val url = tvChapterUrl.text.toString().trim()
+            if (url.isNotBlank()) {
+                context.alert(R.string.open_fun) {
+                    setMessage(R.string.use_browser_open)
+                    okButton {
+                        context.openUrl(url)
+                    }
+                    noButton()
                 }
             }
             true
@@ -209,7 +204,6 @@ class MangaMenu @JvmOverloads constructor(
         tvPre.setOnClickListener {
             ReadManga.moveToPrevChapter(true)
         }
-
         seekReadPage.setOnSeekBarChangeListener(object : SeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
@@ -231,6 +225,20 @@ class MangaMenu @JvmOverloads constructor(
         binding.seekReadPage.apply {
             max = count.minus(1)
             progress = value
+        }
+    }
+
+    fun upBookView() = binding.run {
+        titleBar.title = ReadManga.book?.name
+        ReadManga.curMangaChapter?.let {
+            tvChapterName.text = it.chapter.title
+            tvChapterName.visible()
+            tvChapterUrl.gone()
+            tvPre.isEnabled = ReadManga.durChapterIndex != 0
+            tvNext.isEnabled = ReadManga.durChapterIndex != ReadManga.simulatedChapterSize - 1
+        } ?: let {
+            tvChapterName.gone()
+            tvChapterUrl.gone()
         }
     }
 

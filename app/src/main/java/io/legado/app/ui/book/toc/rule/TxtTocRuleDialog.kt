@@ -26,6 +26,7 @@ import io.legado.app.databinding.ItemTocRegexBinding
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryColor
+import io.legado.app.model.localBook.TextFile
 import io.legado.app.ui.association.ImportTxtTocRuleDialog
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.qrcode.QrCodeResult
@@ -104,7 +105,7 @@ class TxtTocRuleDialog() : BaseDialogFragment(R.layout.dialog_toc_regex),
             adapter.getItems().forEach { tocRule ->
                 if (selectedName == tocRule.name) {
                     val callBack = activity as? CallBack
-                    callBack?.onTocRegexDialogResult(tocRule.rule)
+                    callBack?.onTocRegexDialogResult(tocRule.rule + TextFile.spaceChars + tocRule.replacement)
                     dismissAllowingStateLoss()
                     return@setOnClickListener
                 }
@@ -123,10 +124,20 @@ class TxtTocRuleDialog() : BaseDialogFragment(R.layout.dialog_toc_regex),
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        adapter.upResumed(true)
+    }
+
+    override fun onPause() {
+        adapter.upResumed(false)
+        super.onPause()
+    }
+
     private fun initSelectedName(tocRules: List<TxtTocRule>) {
         if (selectedName == null && durRegex != null) {
             tocRules.forEach {
-                if (durRegex == it.rule) {
+                if (durRegex == it.rule + TextFile.spaceChars + it.replacement) {
                     selectedName = it.name
                     return@forEach
                 }

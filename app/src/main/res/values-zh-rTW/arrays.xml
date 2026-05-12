@@ -46,6 +46,7 @@
         <item>@string/screen_landscape</item>
         <item>@string/screen_sensor</item>
         <item>反向直向</item>
+        <item>@string/screen_landscape_reversed</item>
     </string-array>
 
     <string-array name="double_page_title">
@@ -68,6 +69,7 @@
         <item>icon4</item>
         <item>icon5</item>
         <item>icon6</item>
+        <item>icon7</item>
     </string-array>
 
     <string-array name="chinese_mode">

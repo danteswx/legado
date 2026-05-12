@@ -6,13 +6,28 @@ import java.util.regex.Pattern
 object AppPattern {
     val JS_PATTERN: Pattern =
         Pattern.compile("<js>([\\w\\W]*?)</js>|@js:([\\w\\W]*)", Pattern.CASE_INSENSITIVE)
+    val WebJS_PATTERN: Pattern =
+        Pattern.compile("@webjs:([\\w\\W]{5,})", Pattern.CASE_INSENSITIVE)
     val EXP_PATTERN: Pattern = Pattern.compile("\\{\\{([\\w\\W]*?)\\}\\}")
 
     //匹配格式化后的图片格式
-    val imgPattern: Pattern = Pattern.compile("<img[^>]*src=['\"]([^'\"]*(?:['\"][^>]+\\})?)['\"][^>]*>")
+    val imgPattern: Pattern = Pattern.compile("<img[^>]*src=\"([^\"]*(?:\"[^>]+\\})?)\"[^>]*>")
+
+    //匹配自定义html格式字符串
+    val useHtmlRegex = Regex("<usehtml>.*?</usehtml>", RegexOption.DOT_MATCHES_ALL) //.包含换行
 
     //dataURL图片类型
     val dataUriRegex = Regex("^data:.*?;base64,(.*)")
+    //提取标题中的段评
+    val imgRegex = Regex("(.*)((?:data|https?):[\\s\\S]+)$")
+    //匹配章节信息中的字数
+    val wordCountRegex = Regex("(?:^|字数[：:、]?|\\s+)([0-9万千百\\.]{1,6}字)")
+
+    //正文不计入字数的字符
+    val noWordCountRegex = Regex("[\\s\\u200B-\\u200F\\uFEFF]")
+
+    //提取链接中的域名
+    val domainRegex = Regex("^https?://([^:/]+)",RegexOption.IGNORE_CASE)
 
     val nameRegex = Regex("\\s+作\\s*者.*|\\s+\\S+\\s+著")
     val authorRegex = Regex("^\\s*作\\s*者[:：\\s]+|\\s+著")

@@ -3,7 +3,6 @@ package io.legado.app.model
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import androidx.annotation.Keep
 import com.bumptech.glide.Glide
@@ -39,6 +38,7 @@ import io.legado.app.utils.getPrefString
 import kotlinx.coroutines.currentCoroutineContext
 import splitties.init.appCtx
 import java.io.File
+import androidx.core.graphics.drawable.toDrawable
 
 @Keep
 @Suppress("ConstPropertyName")
@@ -61,25 +61,19 @@ object BookCover {
 
     @SuppressLint("UseCompatLoadingForDrawables")
     fun upDefaultCover() {
+        var path: String?
         val isNightTheme = AppConfig.isNightTheme
-        drawBookName = if (isNightTheme) {
-            appCtx.getPrefBoolean(PreferKey.coverShowNameN, true)
+        if (isNightTheme) {
+            drawBookName = appCtx.getPrefBoolean(PreferKey.coverShowNameN, true)
+            drawBookAuthor = appCtx.getPrefBoolean(PreferKey.coverShowAuthorN, true)
+            path = appCtx.getPrefString(PreferKey.defaultCoverDark)
         } else {
-            appCtx.getPrefBoolean(PreferKey.coverShowName, true)
+            drawBookName = appCtx.getPrefBoolean(PreferKey.coverShowName, true)
+            drawBookAuthor = appCtx.getPrefBoolean(PreferKey.coverShowAuthor, true)
+            path = appCtx.getPrefString(PreferKey.defaultCover)
         }
-        drawBookAuthor = if (isNightTheme) {
-            appCtx.getPrefBoolean(PreferKey.coverShowAuthorN, true)
-        } else {
-            appCtx.getPrefBoolean(PreferKey.coverShowAuthor, true)
-        }
-        val key = if (isNightTheme) PreferKey.defaultCoverDark else PreferKey.defaultCover
-        val path = appCtx.getPrefString(key)
-        if (path.isNullOrBlank()) {
-            defaultDrawable = appCtx.resources.getDrawable(R.drawable.image_cover_default, null)
-            return
-        }
-        defaultDrawable = kotlin.runCatching {
-            BitmapDrawable(appCtx.resources, BitmapUtils.decodeBitmap(path, 600, 900))
+        defaultDrawable = runCatching {
+            BitmapUtils.decodeBitmap(path!!, 600, 800)!!.toDrawable(appCtx.resources)
         }.getOrDefault(appCtx.resources.getDrawable(R.drawable.image_cover_default, null))
     }
 
@@ -187,7 +181,7 @@ object BookCover {
         sourceOrigin: String? = null,
     ): RequestBuilder<Drawable> {
         val loadBlur = ImageLoader.load(context, defaultDrawable)
-            .transform(BlurTransformation(25), CenterCrop())
+            .transform(BlurTransformation(12), CenterCrop())
         if (AppConfig.useDefaultCover) {
             return loadBlur
         }
@@ -197,8 +191,8 @@ object BookCover {
         }
         return ImageLoader.load(context, path)
             .apply(options)
-            .transform(BlurTransformation(25), CenterCrop())
-            .transition(DrawableTransitionOptions.withCrossFade(1500))
+            .transform(BlurTransformation(12), CenterCrop())
+            .transition(DrawableTransitionOptions.withCrossFade(300))
             .thumbnail(loadBlur)
     }
 
@@ -224,7 +218,7 @@ object BookCover {
             hasLoginHeader = false
         )
         val res = analyzeUrl.getStrResponseAwait()
-        val analyzeRule = AnalyzeRule(book)
+        val analyzeRule = AnalyzeRule(book, config)
         analyzeRule.setCoroutineContext(currentCoroutineContext())
         analyzeRule.setContent(res.body)
         analyzeRule.setRedirectUrl(res.url)
@@ -258,7 +252,7 @@ object BookCover {
     ) : BaseSource {
 
         override fun getTag(): String {
-            return searchUrl
+            return "CoverRule"
         }
 
         override fun getKey(): String {

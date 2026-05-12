@@ -6,7 +6,11 @@
     android:layout_height="match_parent"
     android:theme="?attr/actionBarStyle"
     android:background="@android:color/transparent"
+    android:padding="4dp"
     app:tabBackground="@android:color/transparent"
+    app:tabIndicatorHeight="0dp"
     app:tabRippleColor="@android:color/transparent"
     app:tabMaxWidth="100dp"
-    app:tabMinWidth="10dp" />
+    app:tabMinWidth="0dp"
+    app:tabPaddingEnd="0dp"
+    app:tabPaddingStart="0dp" />

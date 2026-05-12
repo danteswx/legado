@@ -1,14 +1,12 @@
 package io.legado.app.ui.replace
 
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.SubMenu
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.SearchView
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
@@ -59,7 +57,7 @@ import kotlinx.coroutines.launch
  */
 class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRuleViewModel>(),
     SearchView.OnQueryTextListener,
-    PopupMenu.OnMenuItemClickListener,
+    MenuItem.OnMenuItemClickListener,
     SelectActionBar.CallBack,
     ReplaceRuleAdapter.CallBack {
     override val binding by viewBinding(ActivityReplaceRuleBinding::inflate)
@@ -183,6 +181,14 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
                     appDb.replaceRuleDao.flowAll()
                 }
 
+                searchKey == getString(R.string.enabled) -> {
+                    appDb.replaceRuleDao.flowEnabled()
+                }
+
+                searchKey == getString(R.string.disabled) -> {
+                    appDb.replaceRuleDao.flowDisabled()
+                }
+
                 searchKey == getString(R.string.no_group) -> {
                     appDb.replaceRuleDao.flowNoGroup()
                 }
@@ -199,13 +205,23 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
                 AppLog.put("替换规则管理界面更新数据出错", it)
             }.flowOn(IO).conflate().collect {
                 if (dataInit) {
-                    setResult(Activity.RESULT_OK)
+                    setResult(RESULT_OK)
                 }
                 adapter.setItems(it, adapter.diffItemCallBack)
                 dataInit = true
                 delay(100)
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        adapter.upResumed(true)
+    }
+
+    override fun onPause() {
+        adapter.upResumed(false)
+        super.onPause()
     }
 
     private fun observeGroupData() {
@@ -224,6 +240,13 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
                 editActivity.launch(ReplaceEditActivity.startIntent(this))
 
             R.id.menu_group_manage -> showDialogFragment<GroupManageDialog>()
+            R.id.menu_enabled_group -> {
+                searchView.setQuery(getString(R.string.enabled), true)
+            }
+
+            R.id.menu_disabled_group -> {
+                searchView.setQuery(getString(R.string.disabled), true)
+            }
             R.id.menu_del_selection -> viewModel.delSelection(adapter.selection)
             R.id.menu_import_onLine -> showImportDialog()
             R.id.menu_import_local -> importDoc.launch {
@@ -244,8 +267,8 @@ class ReplaceRuleActivity : VMBaseActivity<ActivityReplaceRuleBinding, ReplaceRu
         return super.onCompatOptionsItemSelected(item)
     }
 
-    override fun onMenuItemClick(item: MenuItem?): Boolean {
-        when (item?.itemId) {
+    override fun onMenuItemClick(item: MenuItem): Boolean {
+        when (item.itemId) {
             R.id.menu_enable_selection -> viewModel.enableSelection(adapter.selection)
             R.id.menu_disable_selection -> viewModel.disableSelection(adapter.selection)
             R.id.menu_top_sel -> viewModel.topSelect(adapter.selection)

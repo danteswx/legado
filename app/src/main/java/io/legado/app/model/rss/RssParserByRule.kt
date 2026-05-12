@@ -11,9 +11,9 @@ import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setRuleData
 import io.legado.app.model.analyzeRule.RuleData
 import io.legado.app.utils.NetworkUtils
+import kotlinx.coroutines.currentCoroutineContext
 import splitties.init.appCtx
 import java.util.Locale
-import kotlin.coroutines.coroutineContext
 
 @Keep
 object RssParserByRule {
@@ -34,7 +34,6 @@ object RssParserByRule {
                 appCtx.getString(R.string.error_get_web_content, rssSource.sourceUrl)
             )
         }
-        Debug.log(sourceUrl, "≡获取成功:$sourceUrl")
         Debug.log(sourceUrl, body, state = 10)
         var ruleArticles = rssSource.ruleArticles
         if (ruleArticles.isNullOrBlank()) {
@@ -43,7 +42,7 @@ object RssParserByRule {
         } else {
             val articleList = mutableListOf<RssArticle>()
             val analyzeRule = AnalyzeRule(ruleData, rssSource)
-            analyzeRule.setCoroutineContext(coroutineContext)
+            analyzeRule.setCoroutineContext(currentCoroutineContext())
             analyzeRule.setContent(body).setBaseUrl(sortUrl)
             analyzeRule.setRedirectUrl(redirectUrl)
             var reverse = false
@@ -74,7 +73,7 @@ object RssParserByRule {
             val variable = ruleData.getVariable()
             for ((index, item) in collections.withIndex()) {
                 getItem(
-                    sourceUrl, item, analyzeRule, variable, index == 0,
+                    sourceUrl, item, analyzeRule, variable,rssSource.type, index == 0,
                     ruleTitle, rulePubDate, ruleDescription, ruleImage, ruleLink
                 )?.let {
                     it.sort = sortName
@@ -94,6 +93,7 @@ object RssParserByRule {
         item: Any,
         analyzeRule: AnalyzeRule,
         variable: String?,
+        type: Int,
         log: Boolean,
         ruleTitle: List<AnalyzeRule.SourceRule>,
         rulePubDate: List<AnalyzeRule.SourceRule>,
@@ -119,11 +119,20 @@ object RssParserByRule {
             Debug.log(sourceUrl, "└${rssArticle.description}", log)
         }
         Debug.log(sourceUrl, "┌获取图片url", log)
-        rssArticle.image = analyzeRule.getString(ruleImage, isUrl = true)
-        Debug.log(sourceUrl, "└${rssArticle.image}", log)
+        try {
+            analyzeRule.getString(ruleImage).let {
+                if (it.isNotEmpty()) {
+                    rssArticle.image = NetworkUtils.getAbsoluteURL(sourceUrl, it)
+                }
+            }
+            Debug.log(sourceUrl, "└${rssArticle.image ?: ""}", log)
+        } catch (e: Exception) {
+            Debug.log(sourceUrl, "└${e.localizedMessage}", log)
+        }
         Debug.log(sourceUrl, "┌获取文章链接", log)
-        rssArticle.link = NetworkUtils.getAbsoluteURL(sourceUrl, analyzeRule.getString(ruleLink))
+        rssArticle.link = analyzeRule.getString(ruleLink, isUrl = true)
         Debug.log(sourceUrl, "└${rssArticle.link}", log)
+        rssArticle.type = type
         if (rssArticle.title.isBlank()) {
             return null
         }

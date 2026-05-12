@@ -8,6 +8,15 @@
         android:title="@string/only_wifi"
         android:summary="@string/only_wifi_summary" />
 
+    <io.legado.app.lib.prefs.SwitchPreference
+        android:key="loadCoverHighQuality"
+        android:defaultValue="false"
+        android:title="@string/load_cover_high_quality"
+        android:summary="@string/load_cover_high_quality_summary"
+        app:allowDividerAbove="false"
+        app:allowDividerBelow="false"
+        app:iconSpaceReserved="false" />
+
     <io.legado.app.lib.prefs.Preference
         android:key="coverRule"
         android:title="@string/cover_rule"

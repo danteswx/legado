@@ -1,6 +1,7 @@
 package io.legado.app.ui.main.bookshelf.style2
 
 import android.content.Context
+import android.os.Parcelable
 import android.view.LayoutInflater
 import androidx.core.os.bundleOf
 import androidx.recyclerview.widget.AsyncListDiffer
@@ -13,8 +14,15 @@ abstract class BaseBooksAdapter<VH : RecyclerView.ViewHolder>(
     val context: Context,
     val callBack: CallBack
 ) : RecyclerView.Adapter<VH>() {
-
+    private val layoutStates = mutableMapOf<Long, Parcelable?>()
+    private var currentGroupId: Long? = null
+    private var layoutManager: RecyclerView.LayoutManager? = null
     protected val inflater: LayoutInflater = LayoutInflater.from(context)
+
+    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
+        super.onAttachedToRecyclerView(recyclerView)
+        layoutManager = recyclerView.layoutManager
+    }
 
     private val diffItemCallback = object : DiffUtil.ItemCallback<Any>() {
 
@@ -48,7 +56,9 @@ abstract class BaseBooksAdapter<VH : RecyclerView.ViewHolder>(
 
                 oldItem is BookGroup && newItem is BookGroup -> {
                     oldItem.groupName == newItem.groupName &&
-                            oldItem.cover == newItem.cover
+                            oldItem.cover == newItem.cover &&
+                            oldItem.enableRefresh == newItem.enableRefresh &&
+                            oldItem.onlyUpdateRead == newItem.onlyUpdateRead
                 }
 
                 else -> false
@@ -77,7 +87,6 @@ abstract class BaseBooksAdapter<VH : RecyclerView.ViewHolder>(
                     if (oldItem.lastCheckCount != newItem.lastCheckCount
                         || oldItem.durChapterTime != newItem.durChapterTime
                         || oldItem.getUnreadChapterNum() != newItem.getUnreadChapterNum()
-                        || oldItem.lastCheckCount != newItem.lastCheckCount
                     ) {
                         bundle.putBoolean("refresh", true)
                     }
@@ -90,6 +99,9 @@ abstract class BaseBooksAdapter<VH : RecyclerView.ViewHolder>(
                     if (oldItem.cover != newItem.cover) {
                         bundle.putString("cover", newItem.cover)
                     }
+                    if (oldItem.enableRefresh != newItem.enableRefresh || oldItem.onlyUpdateRead != newItem.onlyUpdateRead) {
+                        bundle.putBoolean("unviewable", true)
+                    }
                 }
             }
             if (bundle.isEmpty) return null
@@ -98,10 +110,21 @@ abstract class BaseBooksAdapter<VH : RecyclerView.ViewHolder>(
     }
 
     private val asyncListDiffer by lazy {
-        AsyncListDiffer(this, diffItemCallback)
+        AsyncListDiffer(this, diffItemCallback).apply {
+            addListListener { _, _ ->
+                currentGroupId?.let {
+                    layoutManager?.onRestoreInstanceState(layoutStates[it])
+                    layoutStates[it] = null
+                }
+            }
+        }
     }
 
-    fun updateItems() {
+    fun updateItems(groupId: Long) {
+        currentGroupId?.let {
+            layoutStates[it] = layoutManager?.onSaveInstanceState()
+        }
+        currentGroupId = groupId
         asyncListDiffer.submitList(callBack.getItems())
     }
 

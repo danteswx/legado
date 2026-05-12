@@ -5,12 +5,6 @@
     tools:ignore="AlwaysShowAction">
 
     <item
-        android:id="@+id/menu_search"
-        android:icon="@drawable/ic_search"
-        android:title="@string/search"
-        app:showAsAction="always" />
-
-    <item
         android:id="@+id/menu_update_toc"
         android:icon="@drawable/ic_refresh_black_24dp"
         android:title="@string/update_toc"
@@ -50,6 +44,12 @@
         android:id="@+id/menu_group_manage"
         android:icon="@drawable/ic_groups"
         android:title="@string/group_manage"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_book_tag_manage"
+        android:icon="@drawable/ic_groups"
+        android:title="@string/bookshelf_tag_manage"
         app:showAsAction="never" />
 
     <item

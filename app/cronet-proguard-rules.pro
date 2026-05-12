@@ -150,6 +150,9 @@
 -dontwarn org.chromium.base.library_loader.LibraryLoader
 -dontwarn org.chromium.base.SysUtils
 -dontwarn org.chromium.build.NativeLibraries
+# Referenced by newer standalone Cronet jars but not resolved from the public Android SDK / downloaded jars.
+-dontwarn android.os.SystemProperties
+-dontwarn org.chromium.net.impl.HttpEngineNativeProvider
 
 # Objects of this type are passed around by native code, but the class
 # is never used directly by native code. Since the class is not loaded, it does

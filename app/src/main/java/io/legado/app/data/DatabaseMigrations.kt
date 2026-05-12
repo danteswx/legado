@@ -20,7 +20,34 @@ object DatabaseMigrations {
             migration_31_32, migration_32_33, migration_33_34, migration_34_35,
             migration_35_36, migration_36_37, migration_37_38, migration_38_39,
             migration_39_40, migration_40_41, migration_41_42, migration_42_43,
+            migration_90_91,
         )
+    }
+
+    private val migration_90_91 = object : Migration(90, 91) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `readRecentBooks` (
+                    `bookUrl` TEXT NOT NULL,
+                    `lastRead` INTEGER NOT NULL,
+                    PRIMARY KEY(`bookUrl`)
+                )
+                """
+            )
+            db.execSQL(
+                """
+                INSERT OR REPLACE INTO `readRecentBooks` (`bookUrl`, `lastRead`)
+                SELECT `bookUrl`, `durChapterTime` FROM `books`
+                WHERE `durChapterTime` > 0
+                  AND (
+                    `durChapterIndex` > 0
+                    OR `durChapterPos` > 0
+                    OR (`durChapterTitle` IS NOT NULL AND `durChapterTitle` != '')
+                  )
+                """
+            )
+        }
     }
 
     private val migration_10_11 = object : Migration(10, 11) {
@@ -370,5 +397,52 @@ object DatabaseMigrations {
         columnName = "enabledReview"
     )
     class Migration_64_65 : AutoMigrationSpec
+
+    @Suppress("ClassName")
+    class Migration_80_81 : AutoMigrationSpec {
+        override fun onPostMigrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""
+            CREATE TABLE rssArticles_new (
+                origin TEXT NOT NULL DEFAULT '',
+                sort TEXT NOT NULL DEFAULT '',
+                title TEXT NOT NULL DEFAULT '',
+                `order` INTEGER NOT NULL DEFAULT 0,
+                link TEXT NOT NULL DEFAULT '',
+                pubDate TEXT,
+                description TEXT,
+                content TEXT,
+                image TEXT,
+                `group` TEXT NOT NULL DEFAULT '默认分组',
+                read INTEGER NOT NULL DEFAULT 0,
+                variable TEXT,
+                PRIMARY KEY (origin, link, sort)
+            )
+        """.trimIndent())
+            db.execSQL("""
+            INSERT INTO rssArticles_new (origin, sort, title, `order`, link, pubDate, description, content, image, `group`, read, variable)
+            SELECT origin, sort, title, `order`, link, pubDate, description, content, image, `group`, read, variable FROM rssArticles
+        """.trimIndent())
+            db.execSQL("DROP TABLE rssArticles")
+            db.execSQL("ALTER TABLE rssArticles_new RENAME TO rssArticles")
+        }
+    }
+
+    @Suppress("ClassName")
+    @DeleteColumn(
+        tableName = "rssArticles",
+        columnName = "ratio"
+    )
+    class Migration_83_84 : AutoMigrationSpec
+
+    @Suppress("ClassName")
+    @DeleteColumn(
+        tableName = "chapters",
+        columnName = "lyric"
+    )
+    @DeleteColumn(
+        tableName = "chapters",
+        columnName = "reviewImg"
+    )
+    class Migration_84_85 : AutoMigrationSpec
 
 }

@@ -74,7 +74,6 @@ inline fun <reified T> Gson.fromJsonArray(json: String?): Result<List<T>> {
         }
         val type = TypeToken.getParameterized(List::class.java, T::class.java).type
         val list = fromJson(json, type) as List<T?>
-        // 自动过滤null元素，提高兼容性
         @Suppress("UNCHECKED_CAST")
         list.filterNotNull() as List<T>
     }
@@ -98,7 +97,6 @@ inline fun <reified T> Gson.fromJsonArray(inputStream: InputStream?): Result<Lis
         val reader = InputStreamReader(inputStream)
         val type = TypeToken.getParameterized(List::class.java, T::class.java).type
         val list = fromJson(reader, type) as List<T?>
-        // 自动过滤null元素，提高兼容性
         @Suppress("UNCHECKED_CAST")
         list.filterNotNull() as List<T>
     }

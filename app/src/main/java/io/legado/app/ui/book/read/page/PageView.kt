@@ -2,9 +2,19 @@ package io.legado.app.ui.book.read.page
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.BitmapFactory
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.LayerDrawable
+import android.view.Gravity
 import android.view.LayoutInflater
+import android.view.ViewGroup
+import com.airbnb.lottie.FontAssetDelegate
+import com.airbnb.lottie.ImageAssetDelegate
 import android.widget.FrameLayout
+import com.airbnb.lottie.LottieImageAsset
+import com.airbnb.lottie.LottieDrawable
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.view.ViewCompat
@@ -15,6 +25,8 @@ import io.legado.app.R
 import io.legado.app.constant.AppConst.timeFormat
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.databinding.ViewBookPageBinding
+import io.legado.app.help.book.isEpub
+import io.legado.app.help.config.AdvancedTitleConfig
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ReadTipConfig
@@ -28,12 +40,16 @@ import io.legado.app.ui.widget.BatteryView
 import io.legado.app.utils.activity
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.applyStatusBarPadding
+import io.legado.app.utils.decodeBase64DataUrlBytes
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.gone
+import io.legado.app.utils.SvgUtils
 import io.legado.app.utils.setOnApplyWindowInsetsListenerCompat
 import io.legado.app.utils.setTextIfNotEqual
 import splitties.views.backgroundColor
+import java.io.ByteArrayInputStream
 import java.util.Date
+import org.json.JSONObject
 
 /**
  * 页面视图
@@ -55,6 +71,18 @@ class PageView(context: Context) : FrameLayout(context) {
     private var tvTimeBattery: BatteryView? = null
     private var tvTimeBatteryP: BatteryView? = null
     private var isMainView = false
+    private var currentTextPage: TextPage? = null
+    private var advancedTitleLottieKey: String? = null
+    private val lottieImageCache = object : LinkedHashMap<String, android.graphics.Bitmap>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, android.graphics.Bitmap>?): Boolean {
+            return size > MAX_LOTTIE_IMAGE_CACHE_SIZE
+        }
+    }
+    private val styledLottieJsonCache = object : LinkedHashMap<String, String>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean {
+            return size > MAX_STYLED_LOTTIE_CACHE_SIZE
+        }
+    }
     var isScroll = false
 
     val headerHeight: Int
@@ -62,6 +90,10 @@ class PageView(context: Context) : FrameLayout(context) {
             val h1 = if (binding.vwStatusBar.isGone) 0 else binding.vwStatusBar.height
             val h2 = if (binding.llHeader.isGone) 0 else binding.llHeader.height
             return h1 + h2 + binding.vwRoot.paddingTop
+        }
+    val imgBgPaddingStart: Int
+        get() {
+            return binding.vwRoot.paddingStart
         }
 
     init {
@@ -75,6 +107,17 @@ class PageView(context: Context) : FrameLayout(context) {
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         upBg()
+    }
+
+    override fun onDetachedFromWindow() {
+        binding.advancedTitleLottie.cancelAnimation()
+        synchronized(lottieImageCache) {
+            lottieImageCache.clear()
+        }
+        synchronized(styledLottieJsonCache) {
+            styledLottieJsonCache.clear()
+        }
+        super.onDetachedFromWindow()
     }
 
     fun upStyle() = binding.run {
@@ -97,6 +140,9 @@ class PageView(context: Context) : FrameLayout(context) {
             tvFooterLeft.setColor(tipColor)
             tvFooterMiddle.setColor(tipColor)
             tvFooterRight.setColor(tipColor)
+            advancedTitleFallback.setTextColor(textColor)
+            advancedTitleFallback.textSize = advancedTitleTextSizeSp()
+            advancedTitleFallback.typeface = ChapterProvider.titlePaint.typeface ?: ChapterProvider.typeface
             vwTopDivider.backgroundColor = tipDividerColor
             vwBottomDivider.backgroundColor = tipDividerColor
             upStatusBar()
@@ -126,14 +172,20 @@ class PageView(context: Context) : FrameLayout(context) {
      */
     fun upStatusBar() = with(binding.vwStatusBar) {
 //        setPadding(paddingLeft, context.statusBarHeight, paddingRight, paddingBottom)
-        isGone = ReadBookConfig.hideStatusBar || readBookActivity?.isInMultiWindow == true
+        isGone = ReadBook.book?.isEpub == true ||
+            ReadBookConfig.hideStatusBar ||
+            readBookActivity?.isInMultiWindow == true
     }
 
     fun upNavigationBar() {
-        binding.vwNavigationBar.isGone = ReadBookConfig.hideNavigationBar
+        binding.vwNavigationBar.isGone = ReadBook.book?.isEpub == true || ReadBookConfig.hideNavigationBar
     }
 
     fun upPaddingDisplayCutouts() {
+        if (ReadBookConfig.isNineBgImg) {
+            ViewCompat.setOnApplyWindowInsetsListener(binding.vwRoot, null)
+            return
+        }
         if (AppConfig.paddingDisplayCutouts) {
             binding.vwRoot.setOnApplyWindowInsetsListenerCompat { _, windowInsets ->
                 val insets = windowInsets.getInsets(WindowInsetsCompat.Type.displayCutout())
@@ -154,21 +206,31 @@ class PageView(context: Context) : FrameLayout(context) {
     /**
      * 更新阅读信息
      */
-    private fun upTipStyle() = binding.run {
+    private fun upTipStyle(textPage: TextPage? = currentTextPage) = binding.run {
+        val isEpub = ReadBook.book?.isEpub == true
         tvHeaderLeft.tag = null
         tvHeaderMiddle.tag = null
         tvHeaderRight.tag = null
         tvFooterLeft.tag = null
         tvFooterMiddle.tag = null
         tvFooterRight.tag = null
-        llHeader.isGone = when (ReadTipConfig.headerMode) {
-            1 -> false
-            2 -> true
-            else -> !ReadBookConfig.hideStatusBar
+        llHeader.isGone = if (isEpub) {
+            true
+        } else {
+            when (ReadTipConfig.headerMode) {
+                1 -> false
+                2 -> true
+                else -> !ReadBookConfig.hideStatusBar
+            }
         }
-        llFooter.isGone = when (ReadTipConfig.footerMode) {
-            1 -> true
-            else -> false
+        llFooter.isGone = if (isEpub) {
+            true
+        } else {
+            when (ReadTipConfig.footerMode) {
+                1 -> true
+                2 -> !ReadBookConfig.hideStatusBar
+                else -> false
+            }
         }
         ReadTipConfig.apply {
             tvHeaderLeft.isGone = tipHeaderLeft == none
@@ -265,12 +327,28 @@ class PageView(context: Context) : FrameLayout(context) {
      * 更新背景
      */
     fun upBg() {
-        binding.vwRoot.background = LayerDrawable(
-            arrayOf(
-                ReadBookConfig.bgMeanColor.toDrawable(),
-                ReadBookConfig.bg
+        val bgDrawable = ReadBookConfig.bg
+        val followScrollBackground =
+            AppConfig.readScrollFollowBackground &&
+                isScroll &&
+                !ReadBookConfig.isNineBgImg &&
+                bgDrawable is BitmapDrawable
+        val bgAlpha = (ReadBookConfig.bgAlpha / 100f * 255).toInt()
+        val foregroundDrawable = if (followScrollBackground) {
+            binding.contentTextView.setScrollFollowBackground(bgDrawable.bitmap, bgAlpha)
+            null
+        } else {
+            binding.contentTextView.setScrollFollowBackground(null, bgAlpha)
+            bgDrawable
+        }
+        binding.vwRoot.background = foregroundDrawable?.let {
+            LayerDrawable(
+                arrayOf(
+                    ReadBookConfig.bgMeanColor.toDrawable(),
+                    it
+                )
             )
-        )
+        } ?: ReadBookConfig.bgMeanColor.toDrawable()
         upBgAlpha()
     }
 
@@ -278,7 +356,14 @@ class PageView(context: Context) : FrameLayout(context) {
      * 更新背景透明度
      */
     fun upBgAlpha() {
-        ReadBookConfig.bg?.alpha = (ReadBookConfig.bgAlpha / 100f * 255).toInt()
+        val bgAlpha = (ReadBookConfig.bgAlpha / 100f * 255).toInt()
+        binding.contentTextView.setScrollFollowBackgroundAlpha(bgAlpha)
+        val background = binding.vwRoot.background
+        if (background is LayerDrawable && background.numberOfLayers > 1) {
+            background.getDrawable(1).alpha = bgAlpha
+        } else {
+            ReadBookConfig.bg?.alpha = bgAlpha
+        }
         binding.vwRoot.invalidate()
     }
 
@@ -315,6 +400,9 @@ class PageView(context: Context) : FrameLayout(context) {
      * 设置内容
      */
     fun setContent(textPage: TextPage, resetPageOffset: Boolean = true) {
+        currentTextPage = textPage
+        upTipStyle(textPage)
+        upAdvancedTitleLottie(textPage)
         if (isMainView && !isScroll) {
             setProgress(textPage)
         } else {
@@ -325,7 +413,7 @@ class PageView(context: Context) : FrameLayout(context) {
         if (resetPageOffset) {
             resetPageOffset()
         }
-        binding.contentTextView.setContent(textPage)
+        binding.contentTextView.setContent(textPage, resetPageOffset)
     }
 
     fun invalidateContentView() {
@@ -376,8 +464,17 @@ class PageView(context: Context) : FrameLayout(context) {
     }
 
     fun setIsScroll(value: Boolean) {
+        val changed = isScroll != value
         isScroll = value
         binding.contentTextView.setIsScroll(value)
+        if (value) {
+            binding.advancedTitleLottie.pauseAnimation()
+        } else if (binding.advancedTitleLottie.visibility == VISIBLE) {
+            binding.advancedTitleLottie.playAnimation()
+        }
+        if (changed && AppConfig.readScrollFollowBackground) {
+            upBg()
+        }
     }
 
     /**
@@ -399,7 +496,7 @@ class PageView(context: Context) : FrameLayout(context) {
      * @return true:已处理, false:未处理
      */
     fun onClick(x: Float, y: Float): Boolean {
-        return binding.contentTextView.click(x, y - headerHeight)
+        return binding.contentTextView.click(x - imgBgPaddingStart, y - headerHeight)
     }
 
     /**
@@ -408,9 +505,8 @@ class PageView(context: Context) : FrameLayout(context) {
     fun longPress(
         x: Float, y: Float,
         select: (textPos: TextPos) -> Unit,
-    ) {
-        return binding.contentTextView.longPress(x, y - headerHeight, select)
-    }
+    ): Boolean =
+        binding.contentTextView.longPress(x - imgBgPaddingStart, y - headerHeight, select)
 
     /**
      * 选择文本
@@ -419,7 +515,7 @@ class PageView(context: Context) : FrameLayout(context) {
         x: Float, y: Float,
         select: (textPos: TextPos) -> Unit,
     ) {
-        return binding.contentTextView.selectText(x, y - headerHeight, select)
+        return binding.contentTextView.selectText(x - imgBgPaddingStart, y - headerHeight, select)
     }
 
     fun getCurVisiblePage(): TextPage {
@@ -436,7 +532,7 @@ class PageView(context: Context) : FrameLayout(context) {
     }
 
     fun selectStartMove(x: Float, y: Float) {
-        binding.contentTextView.selectStartMove(x, y - headerHeight)
+        binding.contentTextView.selectStartMove(x - imgBgPaddingStart, y - headerHeight)
     }
 
     fun selectStartMoveIndex(
@@ -452,7 +548,7 @@ class PageView(context: Context) : FrameLayout(context) {
     }
 
     fun selectEndMove(x: Float, y: Float) {
-        binding.contentTextView.selectEndMove(x, y - headerHeight)
+        binding.contentTextView.selectEndMove(x - imgBgPaddingStart, y - headerHeight)
     }
 
     fun selectEndMoveIndex(
@@ -495,9 +591,226 @@ class PageView(context: Context) : FrameLayout(context) {
         return binding.contentTextView.relativePage(relativePagePos)
     }
 
+    private fun upAdvancedTitleLottie(textPage: TextPage) {
+        val lottieView = binding.advancedTitleLottie
+        val fallbackView = binding.advancedTitleFallback
+        fun hide() {
+            lottieView.cancelAnimation()
+            advancedTitleLottieKey = null
+            lottieView.visibility = GONE
+            fallbackView.visibility = GONE
+        }
+        fun showFallback(block: TextPage.EpubEmbeddedBlock, forceDefaultTitle: Boolean = false) {
+            lottieView.cancelAnimation()
+            lottieView.visibility = GONE
+            advancedTitleLottieKey = null
+            val scale = advancedTitleScale()
+            val targetWidth = (block.width * 0.86f * scale).toInt().coerceAtLeast(160)
+            val targetHeight = (block.height * scale).toInt().coerceAtLeast(1)
+            val params = fallbackView.layoutParams as ViewGroup.LayoutParams
+            if (params.width != targetWidth || params.height != targetHeight) {
+                params.width = targetWidth
+                params.height = targetHeight
+                fallbackView.layoutParams = params
+            }
+            fallbackView.translationY = block.offsetY
+            fallbackView.gravity = Gravity.CENTER
+            fallbackView.text = if (forceDefaultTitle) textPage.title else textPage.title
+            fallbackView.visibility = VISIBLE
+        }
+        if (ReadBookConfig.titleMode != AdvancedTitleConfig.TITLE_MODE_ADVANCED) {
+            hide()
+            return
+        }
+        val block = textPage.epubEmbeddedBlocks.firstOrNull {
+            it.role == AdvancedTitleConfig.LOTTIE_BLOCK_ROLE
+        } ?: run {
+            hide()
+            return
+        }
+        if (isScroll) {
+            showFallback(block, forceDefaultTitle = true)
+            return
+        }
+        val scale = advancedTitleScale()
+        val targetWidth = (block.width * 0.86f * scale).toInt().coerceAtLeast(160)
+        val targetHeight = (block.height * scale).toInt()
+            .coerceAtLeast((targetWidth * 120f / 720f).toInt())
+        val params = lottieView.layoutParams as ViewGroup.LayoutParams
+        if (params.width != targetWidth || params.height != targetHeight) {
+            params.width = targetWidth
+            params.height = targetHeight
+            lottieView.layoutParams = params
+        }
+        lottieView.translationY = block.offsetY
+        lottieView.repeatCount = LottieDrawable.INFINITE
+        lottieView.setFontAssetDelegate(defaultFontAssetDelegate)
+        lottieView.setImageAssetDelegate(dataUriImageAssetDelegate)
+        val json = block.payload?.takeIf { it.isNotBlank() }
+        val resolvedJson = json?.let { applyLottieTextFallbackStyle(it) }
+        val nextKey = resolvedJson?.let { "advanced_title:${it.hashCode()}" } ?: "advanced_title:raw"
+        if (advancedTitleLottieKey != nextKey) {
+            advancedTitleLottieKey = nextKey
+            runCatching {
+                if (resolvedJson != null) {
+                    lottieView.setAnimationFromJson(resolvedJson, nextKey)
+                } else {
+                    lottieView.setAnimation(R.raw.advanced_title_lottie)
+                }
+            }.onFailure {
+                showFallback(block)
+                return
+            }
+        }
+        fallbackView.visibility = GONE
+        lottieView.visibility = VISIBLE
+        runCatching {
+            if (!isScroll && !lottieView.isAnimating) {
+                lottieView.playAnimation()
+            } else if (isScroll) {
+                lottieView.pauseAnimation()
+                lottieView.progress = 1f
+            }
+        }.onFailure {
+            showFallback(block)
+        }
+    }
+
+    private fun advancedTitleTextSizeSp(): Float {
+        return with(ReadBookConfig) {
+            (textSize + titleSize * ADVANCED_TITLE_SIZE_FACTOR).coerceAtLeast(1f)
+        }
+    }
+
+    private fun advancedTitleScale(): Float {
+        return with(ReadBookConfig) {
+            (advancedTitleTextSizeSp() / textSize.coerceAtLeast(1)).coerceIn(0.6f, 2.5f)
+        }
+    }
+
+    private fun applyLottieTextFallbackStyle(rawJson: String): String {
+        val fallbackColor = ReadBookConfig.textColor
+        val fallbackHex = String.format("#%06X", 0xFFFFFF and fallbackColor)
+        val fallbackFont = "legado_default_font"
+        val cacheKey = "${rawJson.hashCode()}:$fallbackHex"
+        synchronized(styledLottieJsonCache) {
+            styledLottieJsonCache[cacheKey]?.let { return it }
+        }
+        return runCatching {
+            val root = JSONObject(rawJson)
+            val layers = root.optJSONArray("layers") ?: return rawJson
+            for (i in 0 until layers.length()) {
+                val layer = layers.optJSONObject(i) ?: continue
+                if (layer.optInt("ty") != 5) continue
+                val text = layer.optJSONObject("t") ?: continue
+                val d = text.optJSONObject("d") ?: continue
+                val kArr = d.optJSONArray("k") ?: continue
+                for (j in 0 until kArr.length()) {
+                    val keyFrame = kArr.optJSONObject(j) ?: continue
+                    val style = keyFrame.optJSONObject("s") ?: continue
+                    if (!style.has("f") || style.optString("f").isBlank()) {
+                        style.put("f", fallbackFont)
+                    }
+                    if (!style.has("fc") || style.optJSONArray("fc") == null) {
+                        style.put("fc", parseColorArray(fallbackHex))
+                    }
+                }
+            }
+            val fonts = root.optJSONObject("fonts") ?: JSONObject().also { root.put("fonts", it) }
+            val list = fonts.optJSONArray("list") ?: org.json.JSONArray().also { fonts.put("list", it) }
+            var hasFont = false
+            for (i in 0 until list.length()) {
+                val item = list.optJSONObject(i) ?: continue
+                if (item.optString("fName") == fallbackFont) {
+                    hasFont = true
+                    break
+                }
+            }
+            if (!hasFont) {
+                list.put(JSONObject().apply {
+                    put("fName", fallbackFont)
+                    put("fFamily", fallbackFont)
+                    put("fStyle", "Regular")
+                    put("ascent", 75)
+                })
+            }
+            root.toString()
+        }.getOrDefault(rawJson).also { styledJson ->
+            synchronized(styledLottieJsonCache) {
+                styledLottieJsonCache[cacheKey] = styledJson
+            }
+        }
+    }
+
+    private fun parseColorArray(hex: String): org.json.JSONArray {
+        val color = Color.parseColor(hex)
+        return org.json.JSONArray().apply {
+            put(Color.red(color) / 255.0)
+            put(Color.green(color) / 255.0)
+            put(Color.blue(color) / 255.0)
+        }
+    }
+
+    private val dataUriImageAssetDelegate = ImageAssetDelegate { asset: LottieImageAsset ->
+        val source = resolveLottieAssetSource(asset) ?: return@ImageAssetDelegate null
+        synchronized(lottieImageCache) {
+            lottieImageCache[source]?.let { return@ImageAssetDelegate it }
+        }
+        val bitmap = loadLottieAssetBitmap(source)
+        if (bitmap != null) {
+            synchronized(lottieImageCache) {
+                lottieImageCache[source] = bitmap
+            }
+        }
+        bitmap
+    }
+
+    private fun resolveLottieAssetSource(asset: LottieImageAsset): String? {
+        val candidates = arrayListOf<String>()
+        asset.fileName?.let { candidates.add(it) }
+        if (!asset.dirName.isNullOrBlank() && !asset.fileName.isNullOrBlank()) {
+            candidates.add(asset.dirName + asset.fileName)
+        }
+        return candidates.firstOrNull { candidate ->
+            candidate.startsWith("data:image", ignoreCase = true)
+        }
+    }
+
+    private fun loadLottieAssetBitmap(source: String): android.graphics.Bitmap? {
+        return runCatching {
+            val bytes = source.decodeBase64DataUrlBytes() ?: return@runCatching null
+            decodeBitmapByType(source, bytes)
+        }.getOrNull()
+    }
+
+    private fun decodeBitmapByType(source: String, bytes: ByteArray): android.graphics.Bitmap? {
+        val lower = source.lowercase()
+        return if (lower.contains("image/svg+xml") || lower.endsWith(".svg")) {
+            SvgUtils.createBitmap(ByteArrayInputStream(bytes), 1200, 1200)
+        } else {
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        }
+    }
+
+    private val defaultFontAssetDelegate = object : FontAssetDelegate() {
+        override fun fetchFont(fontFamily: String): Typeface {
+            return ChapterProvider.titlePaint.typeface ?: ChapterProvider.typeface ?: Typeface.DEFAULT
+        }
+    }
+
     val textPage get() = binding.contentTextView.textPage
 
     val selectedText: String get() = binding.contentTextView.getSelectedText()
 
+    fun hasSelection(): Boolean = binding.contentTextView.hasSelection()
+
+    fun hasNativeSelection(): Boolean = binding.contentTextView.hasNativeSelection()
+
     val selectStartPos get() = binding.contentTextView.selectStart
+
+    private companion object {
+        const val ADVANCED_TITLE_SIZE_FACTOR = 1.25f
+        const val MAX_STYLED_LOTTIE_CACHE_SIZE = 6
+        const val MAX_LOTTIE_IMAGE_CACHE_SIZE = 4
+    }
 }

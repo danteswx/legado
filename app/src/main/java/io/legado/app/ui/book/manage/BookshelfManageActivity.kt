@@ -7,7 +7,6 @@ import android.view.MenuItem
 import android.widget.CheckBox
 import android.widget.LinearLayout
 import androidx.activity.viewModels
-import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.SearchView
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
@@ -62,7 +61,7 @@ import kotlin.math.max
  */
 class BookshelfManageActivity :
     VMBaseActivity<ActivityArrangeBookBinding, BookshelfManageViewModel>(),
-    PopupMenu.OnMenuItemClickListener,
+    MenuItem.OnMenuItemClickListener,
     SelectActionBar.CallBack,
     BookAdapter.CallBack,
     SourcePickerDialog.Callback,
@@ -73,6 +72,7 @@ class BookshelfManageActivity :
     override val groupList: ArrayList<BookGroup> = arrayListOf()
     private val groupRequestCode = 22
     private val addToGroupRequestCode = 34
+    private val removeToGroupRequestCode = 42
     private val adapter by lazy { BookAdapter(this, this) }
     private val itemTouchCallback by lazy { ItemTouchCallback(adapter) }
     private var booksFlowJob: Job? = null
@@ -296,8 +296,8 @@ class BookshelfManageActivity :
         return super.onCompatOptionsItemSelected(item)
     }
 
-    override fun onMenuItemClick(item: MenuItem?): Boolean {
-        when (item?.itemId) {
+    override fun onMenuItemClick(item: MenuItem): Boolean {
+        when (item.itemId) {
             R.id.menu_del_selection -> alertDelSelection()
             R.id.menu_update_enable ->
                 viewModel.upCanUpdate(adapter.selection, true)
@@ -306,6 +306,7 @@ class BookshelfManageActivity :
                 viewModel.upCanUpdate(adapter.selection, false)
 
             R.id.menu_add_to_group -> selectGroup(addToGroupRequestCode, 0)
+            R.id.menu_remove_to_group -> selectGroup(removeToGroupRequestCode, 0)
             R.id.menu_change_source -> showDialogFragment<SourcePickerDialog>()
             R.id.menu_clear_cache -> viewModel.clearCache(adapter.selection)
             R.id.menu_check_selected_interval -> adapter.checkSelectedInterval()
@@ -366,6 +367,14 @@ class BookshelfManageActivity :
                 val array = Array(books.size) { index ->
                     val book = books[index]
                     book.copy(group = book.group or groupId)
+                }
+                viewModel.updateBook(*array)
+            }
+
+            removeToGroupRequestCode -> adapter.selection.let { books ->
+                val array = Array(books.size) { index ->
+                    val book = books[index]
+                    book.copy(group = book.group and groupId.inv())
                 }
                 viewModel.updateBook(*array)
             }

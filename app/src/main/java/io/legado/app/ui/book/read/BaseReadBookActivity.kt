@@ -16,6 +16,7 @@ import androidx.core.view.updateLayoutParams
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.AppConst.charsets
+import io.legado.app.constant.PageAnim
 import io.legado.app.constant.PreferKey
 import io.legado.app.databinding.ActivityBookReadBinding
 import io.legado.app.databinding.DialogDownloadChoiceBinding
@@ -27,7 +28,6 @@ import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.ThemeStore
-import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.model.CacheBook
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.config.BgTextConfigDialog
@@ -40,6 +40,7 @@ import io.legado.app.utils.FileDoc
 import io.legado.app.utils.find
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.gone
+import io.legado.app.utils.isHuaweiSystemDevice
 import io.legado.app.utils.isTv
 import io.legado.app.utils.setLightStatusBar
 import io.legado.app.utils.setNavigationBarColorAuto
@@ -91,10 +92,13 @@ abstract class BaseReadBookActivity :
             }
             windowInsets
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
-        binding.navigationBar.setBackgroundColor(bottomBackground)
+        updateNavigationSpacerBackground()
         viewModel.permissionDenialLiveData.observe(this) {
             selectBookFolderResult.launch {
                 mode = HandleFileContract.DIR_SYS
@@ -152,6 +156,7 @@ abstract class BaseReadBookActivity :
             "2" -> requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
             "3" -> requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
             "4" -> requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
+            "5" -> requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
         }
     }
 
@@ -219,18 +224,25 @@ abstract class BaseReadBookActivity :
 
     override fun upNavigationBarColor() {
         upNavigationBar()
-        when {
-            binding.readMenu.isVisible -> super.upNavigationBarColor()
-            binding.searchMenu.bottomMenuVisible -> super.upNavigationBarColor()
-            bottomDialog > 0 -> super.upNavigationBarColor()
-            !AppConfig.immNavigationBar -> super.upNavigationBarColor()
-            else -> setNavigationBarColorAuto(ReadBookConfig.bgMeanColor)
-        }
+        updateReaderNavigationBarColor()
     }
 
     @SuppressLint("RtlHardcoded")
     private fun upNavigationBar() {
+        updateNavigationSpacerBackground()
         binding.navigationBar.gone(!menuLayoutIsVisible)
+    }
+
+    private fun updateNavigationSpacerBackground(color: Int = ReadBookConfig.bgMeanColor) {
+        binding.navigationBar.setBackgroundColor(
+            ColorUtils.withAlpha(color, 1f)
+        )
+    }
+
+    private fun updateReaderNavigationBarColor() {
+        val navigationColor = ReadBookConfig.bgMeanColor
+        updateNavigationSpacerBackground(navigationColor)
+        setNavigationBarColorAuto(navigationColor)
     }
 
     /**
@@ -253,10 +265,13 @@ abstract class BaseReadBookActivity :
     private fun upLayoutInDisplayCutoutMode() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             window.attributes = window.attributes.apply {
-                layoutInDisplayCutoutMode = if (ReadBookConfig.readBodyToLh) {
-                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-                } else {
-                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER
+                layoutInDisplayCutoutMode = when {
+                    ReadBookConfig.readBodyToLh || isHuaweiSystemDevice ->
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+
+                    else -> {
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER
+                    }
                 }
             }
         }
@@ -361,15 +376,17 @@ abstract class BaseReadBookActivity :
     }
 
     fun showPageAnimConfig(success: () -> Unit) {
-        val items = arrayListOf<String>()
-        items.add(getString(R.string.btn_default_s))
-        items.add(getString(R.string.page_anim_cover))
-        items.add(getString(R.string.page_anim_slide))
-        items.add(getString(R.string.page_anim_simulation))
-        items.add(getString(R.string.page_anim_scroll))
-        items.add(getString(R.string.page_anim_none))
-        selector(R.string.page_anim, items) { _, i ->
-            ReadBook.book?.setPageAnim(i - 1)
+        val items = listOf(
+            getString(R.string.btn_default_s) to null,
+            getString(R.string.page_anim_cover) to PageAnim.coverPageAnim,
+            getString(R.string.page_anim_linked_cover) to PageAnim.linkedCoverPageAnim,
+            getString(R.string.page_anim_slide) to PageAnim.slidePageAnim,
+            getString(R.string.page_anim_simulation) to PageAnim.simulationPageAnim,
+            getString(R.string.page_anim_scroll) to PageAnim.scrollPageAnim,
+            getString(R.string.page_anim_none) to PageAnim.noAnim
+        )
+        selector(R.string.page_anim, items.map { it.first }) { _, i ->
+            ReadBook.book?.setPageAnim(items.getOrNull(i)?.second ?: -1)
             success()
         }
     }

@@ -1,21 +1,37 @@
 package io.legado.app.help.http
 
 import android.annotation.SuppressLint
+import android.graphics.Color
 import android.net.http.SslError
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.AndroidRuntimeException
+import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
 import android.webkit.SslErrorHandler
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import io.legado.app.constant.AppConst
+import io.legado.app.data.appDb
+import io.legado.app.data.entities.BaseSource
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.CacheManager
+import io.legado.app.help.WebCacheManager
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
+import io.legado.app.help.webView.PooledWebView
+import io.legado.app.help.webView.WebJsExtensions
+import io.legado.app.help.webView.WebJsExtensions.Companion.getInjectionString
+import io.legado.app.help.webView.WebJsExtensions.Companion.nameCache
+import io.legado.app.help.webView.WebJsExtensions.Companion.nameJava
+import io.legado.app.help.webView.WebJsExtensions.Companion.nameSource
+import io.legado.app.help.webView.WebViewPool
+import io.legado.app.model.Debug
+import io.legado.app.utils.get
 import io.legado.app.utils.runOnUI
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Runnable
@@ -38,18 +54,22 @@ class BackstageWebView(
     private val html: String? = null,
     private val encode: String? = null,
     private val tag: String? = null,
-    private val headerMap: Map<String, String>? = null,
+    private val headerMap: HashMap<String, String>? = null,
     private val sourceRegex: String? = null,
     private val overrideUrlRegex: String? = null,
     private val javaScript: String? = null,
-    private val delayTime: Long = 0,
+    private var delayTime: Long = 0,
+    private val cacheFirst: Boolean = false,
+    private val timeout: Long? = null,
+    private val result: String? = null,
+    private val isRule: Boolean = false
 ) {
 
     private val mHandler = Handler(Looper.getMainLooper())
     private var callback: Callback? = null
-    private var mWebView: WebView? = null
+    private var pooledWebView: PooledWebView? = null
 
-    suspend fun getStrResponse(): StrResponse = withTimeout(60000L) {
+    suspend fun getStrResponse(): StrResponse = withTimeout(timeout ?: 60000L) {
         suspendCancellableCoroutine { block ->
             block.invokeOnCancellation {
                 runOnUI {
@@ -68,10 +88,14 @@ class BackstageWebView(
                         block.resumeWithException(error)
                 }
             }
+            if (javaScript == null && delayTime == 0L) {
+                delayTime = 900L
+            }
             runOnUI {
                 try {
                     load()
                 } catch (error: Throwable) {
+                    destroy()
                     block.resumeWithException(error)
                 }
             }
@@ -85,12 +109,31 @@ class BackstageWebView(
     @Throws(AndroidRuntimeException::class)
     private fun load() {
         val webView = createWebView()
-        mWebView = webView
         try {
             when {
-                !html.isNullOrEmpty() -> if (url.isNullOrEmpty()) {
-                    webView.loadData(html, "text/html", getEncoding())
-                } else {
+                !html.isNullOrEmpty() -> {
+                    if (isRule) {
+                        webView.addJavascriptInterface(WebCacheManager, nameCache)
+                        tag?.let { key ->
+                           appDb.bookSourceDao.getBookSource(key)?.let {
+                               webView.webChromeClient = object : WebChromeClient() {
+                                   /* 监听网页日志 */
+                                   override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
+                                       val messageLevel = consoleMessage.messageLevel().name
+                                       val message = consoleMessage.message()
+                                       Debug.log(it.bookSourceUrl, "${messageLevel}: $message", true)
+                                       return true
+                                   }
+                               }
+                               webView.addJavascriptInterface(it as BaseSource, nameSource)
+                               val webJsExtensions = WebJsExtensions(it, null, webView)
+                               webView.addJavascriptInterface(webJsExtensions, nameJava)
+                            }
+                        }
+                    }
+                    result?.let {
+                        CacheManager.put("webview_result", it)
+                    }
                     webView.loadDataWithBaseURL(url, html, "text/html", getEncoding(), url)
                 }
 
@@ -102,18 +145,21 @@ class BackstageWebView(
             }
         } catch (e: Exception) {
             callback?.onError(e)
+            destroy()
         }
     }
 
-    @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
+    @SuppressLint("SetJavaScriptEnabled")
     private fun createWebView(): WebView {
-        val webView = WebView(appCtx)
+        val pooledWebView = WebViewPool.acquire(appCtx)
+        this.pooledWebView = pooledWebView
+        val webView = pooledWebView.realWebView
+        webView.setBackgroundColor(Color.TRANSPARENT)
+        webView.onResume() //缓存库拿的需要激活
         val settings = webView.settings
-        settings.javaScriptEnabled = true
-        settings.domStorageEnabled = true
         settings.blockNetworkImage = true
-        settings.userAgentString = headerMap?.get(AppConst.UA_NAME) ?: AppConfig.userAgent
-        settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+        settings.userAgentString = headerMap?.get(AppConst.UA_NAME, true) ?: AppConfig.userAgent
+        settings.cacheMode = if(cacheFirst) WebSettings.LOAD_CACHE_ELSE_NETWORK else WebSettings.LOAD_DEFAULT
         if (sourceRegex.isNullOrBlank() && overrideUrlRegex.isNullOrBlank()) {
             webView.webViewClient = HtmlWebViewClient()
         } else {
@@ -123,8 +169,8 @@ class BackstageWebView(
     }
 
     private fun destroy() {
-        mWebView?.destroy()
-        mWebView = null
+        pooledWebView?.let { WebViewPool.release(it) }
+        pooledWebView = null
     }
 
     private fun getJs(): String {
@@ -164,11 +210,14 @@ class BackstageWebView(
 
         override fun onPageFinished(view: WebView, url: String) {
             setCookie(url)
-            if (runnable == null) {
-                runnable = EvalJsRunnable(view, url, getJs())
+            result?.let {
+                view.evaluateJavascript("window.result = $nameCache.getFromMemory('webview_result')", null)
             }
-            mHandler.removeCallbacks(runnable!!)
-            mHandler.postDelayed(runnable!!, 1000 + delayTime)
+            val runnable = runnable ?: EvalJsRunnable(view, url, getJs()).also {
+                runnable = it
+            }
+            mHandler.removeCallbacks(runnable)
+            mHandler.postDelayed(runnable, 100L + delayTime)
         }
 
         @SuppressLint("WebViewClientOnReceivedSslError")
@@ -183,13 +232,19 @@ class BackstageWebView(
         private inner class EvalJsRunnable(
             webView: WebView,
             private val url: String,
-            private val mJavaScript: String
+            mJavaScript: String
         ) : Runnable {
-            var retry = 0
+            private var retry = 0
+            private val intervals = listOf(200L, 400L, 600L, 800L, 1000L)
             private val mWebView: WeakReference<WebView> = WeakReference(webView)
+            private val jsStr = if (isRule) {
+                "$getInjectionString\n$mJavaScript"
+            } else mJavaScript
             override fun run() {
-                mWebView.get()?.evaluateJavascript(mJavaScript) {
-                    handleResult(it)
+                mWebView.get()?.evaluateJavascript(jsStr) {
+                    if (pooledWebView != null) {
+                        handleResult(it)
+                    }
                 }
             }
 
@@ -215,8 +270,13 @@ class BackstageWebView(
                     }
                     return@async
                 }
+                val nextDelay = if (retry < intervals.size) {
+                    intervals[retry]
+                } else {
+                    intervals.last()
+                }
                 retry++
-                mHandler.postDelayed(this@EvalJsRunnable, 1000)
+                mHandler.postDelayed(this@EvalJsRunnable, nextDelay)
             }
 
             private fun buildStrResponse(content: String): StrResponse {
@@ -297,7 +357,7 @@ class BackstageWebView(
             setCookie(url)
             if (!javaScript.isNullOrEmpty()) {
                 val runnable = LoadJsRunnable(webView, javaScript)
-                mHandler.postDelayed(runnable, 1000L + delayTime)
+                mHandler.postDelayed(runnable, 100L + delayTime)
             }
         }
 

@@ -25,7 +25,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.flow
 import org.mozilla.javascript.Context
 import splitties.init.appCtx
-import kotlin.coroutines.coroutineContext
+import io.legado.app.constant.AppPattern
+import kotlinx.coroutines.currentCoroutineContext
 
 /**
  * 获取目录
@@ -37,7 +38,8 @@ object BookChapterList {
         book: Book,
         baseUrl: String,
         redirectUrl: String,
-        body: String?
+        body: String?,
+        isFromBookInfo: Boolean = false
     ): List<BookChapter> {
         body ?: throw NoStackTraceException(
             appCtx.getString(R.string.error_get_web_content, baseUrl)
@@ -59,7 +61,8 @@ object BookChapterList {
         var chapterData =
             analyzeChapterList(
                 book, baseUrl, redirectUrl, body,
-                tocRule, listRule, bookSource, log = true
+                tocRule, listRule, bookSource, log = true,
+                isFromBookInfo = isFromBookInfo
             )
         chapterList.addAll(chapterData.first)
         when (chapterData.second.size) {
@@ -72,13 +75,14 @@ object BookChapterList {
                         mUrl = nextUrl,
                         source = bookSource,
                         ruleData = book,
-                        coroutineContext = coroutineContext
+                        coroutineContext = currentCoroutineContext()
                     )
                     val res = analyzeUrl.getStrResponseAwait() //控制并发访问
                     res.body?.let { nextBody ->
                         chapterData = analyzeChapterList(
                             book, nextUrl, nextUrl,
-                            nextBody, tocRule, listRule, bookSource
+                            nextBody, tocRule, listRule, bookSource,
+                            isFromBookInfo = isFromBookInfo
                         )
                         nextUrl = chapterData.second.firstOrNull() ?: ""
                         chapterList.addAll(chapterData.first)
@@ -101,12 +105,13 @@ object BookChapterList {
                         mUrl = urlStr,
                         source = bookSource,
                         ruleData = book,
-                        coroutineContext = coroutineContext
+                        coroutineContext = currentCoroutineContext()
                     )
                     val res = analyzeUrl.getStrResponseAwait() //控制并发访问
                     analyzeChapterList(
                         book, urlStr, res.url,
-                        res.body!!, tocRule, listRule, bookSource, false
+                        res.body!!, tocRule, listRule, bookSource, false,
+                        isFromBookInfo = isFromBookInfo
                     ).first
                 }.collect {
                     chapterList.addAll(it)
@@ -119,7 +124,7 @@ object BookChapterList {
         if (!reverse) {
             chapterList.reverse()
         }
-        coroutineContext.ensureActive()
+        currentCoroutineContext().ensureActive()
         //去重
         val lh = LinkedHashSet(chapterList)
         val list = ArrayList(lh)
@@ -127,7 +132,7 @@ object BookChapterList {
             list.reverse()
         }
         Debug.log(book.origin, "◇目录总数:${list.size}")
-        coroutineContext.ensureActive()
+        currentCoroutineContext().ensureActive()
         list.forEachIndexed { index, bookChapter ->
             bookChapter.index = index
         }
@@ -151,8 +156,13 @@ object BookChapterList {
             }
         }
         val replaceRules = ContentProcessor.get(book).getTitleReplaceRules()
+        val replaceBook = book.toReplaceBook()
         book.durChapterTitle = list.getOrElse(book.durChapterIndex) { list.last() }
-            .getDisplayTitle(replaceRules, book.getUseReplaceRule())
+            .getDisplayTitle(
+                replaceRules,
+                book.getUseReplaceRule(),
+                replaceBook = replaceBook
+            )
         if (book.totalChapterNum < list.size) {
             book.lastCheckCount = list.size - book.totalChapterNum
             book.latestChapterTime = System.currentTimeMillis()
@@ -161,9 +171,13 @@ object BookChapterList {
         book.totalChapterNum = list.size
         book.latestChapterTitle =
             list.getOrElse(book.simulatedTotalChapterNum() - 1) { list.last() }
-                .getDisplayTitle(replaceRules, book.getUseReplaceRule())
-        coroutineContext.ensureActive()
-        getWordCount(list, book)
+                .getDisplayTitle(
+                    replaceRules,
+                    book.getUseReplaceRule(),
+                    replaceBook = replaceBook
+                )
+        currentCoroutineContext().ensureActive()
+        upChapterInfo(list, book)
         return list
     }
 
@@ -176,12 +190,13 @@ object BookChapterList {
         listRule: String,
         bookSource: BookSource,
         getNextUrl: Boolean = true,
-        log: Boolean = false
+        log: Boolean = false,
+        isFromBookInfo:Boolean
     ): Pair<List<BookChapter>, List<String>> {
-        val analyzeRule = AnalyzeRule(book, bookSource)
+        val analyzeRule = AnalyzeRule(book, bookSource, false, isFromBookInfo)
         analyzeRule.setContent(body).setBaseUrl(baseUrl)
         analyzeRule.setRedirectUrl(redirectUrl)
-        analyzeRule.setCoroutineContext(coroutineContext)
+        analyzeRule.setCoroutineContext(currentCoroutineContext())
         //获取目录列表
         val chapterList = arrayListOf<BookChapter>()
         Debug.log(bookSource.bookSourceUrl, "┌获取目录列表", log)
@@ -205,7 +220,7 @@ object BookChapterList {
                 log
             )
         }
-        coroutineContext.ensureActive()
+        currentCoroutineContext().ensureActive()
         if (elements.isNotEmpty()) {
             Debug.log(bookSource.bookSourceUrl, "┌解析目录列表", log)
             val nameRule = analyzeRule.splitSourceRule(tocRule.chapterName)
@@ -214,18 +229,31 @@ object BookChapterList {
             val payRule = analyzeRule.splitSourceRule(tocRule.isPay)
             val upTimeRule = analyzeRule.splitSourceRule(tocRule.updateTime)
             val isVolumeRule = analyzeRule.splitSourceRule(tocRule.isVolume)
+            val tocCountWords = AppConfig.tocCountWords
             elements.forEachIndexed { index, item ->
-                coroutineContext.ensureActive()
+                currentCoroutineContext().ensureActive()
                 analyzeRule.setContent(item)
                 val bookChapter = BookChapter(bookUrl = book.bookUrl, baseUrl = redirectUrl)
                 analyzeRule.setChapter(bookChapter)
                 bookChapter.title = analyzeRule.getString(nameRule)
                 bookChapter.url = analyzeRule.getString(urlRule)
-                bookChapter.tag = analyzeRule.getString(upTimeRule)
+                val info = analyzeRule.getString(upTimeRule)
                 val isVolume = analyzeRule.getString(isVolumeRule)
                 bookChapter.isVolume = false
                 if (isVolume.isTrue()) {
                     bookChapter.isVolume = true
+                    bookChapter.tag = info
+                } else {
+                    if (tocCountWords) {
+                        AppPattern.wordCountRegex.find(info)?.let { match ->
+                            bookChapter.apply {
+                                wordCount = match.groupValues[1].trim()
+                                tag = info.replaceFirst(match.value, "")
+                            }
+                        } ?: run { bookChapter.tag = info }
+                    } else {
+                        bookChapter.tag = info
+                    }
                 }
                 if (bookChapter.url.isEmpty()) {
                     if (bookChapter.isVolume) {
@@ -261,7 +289,12 @@ object BookChapterList {
                 Debug.log(bookSource.bookSourceUrl, "≡首章信息", log)
                 Debug.log(bookSource.bookSourceUrl, "◇章节名称:${chapterList[0].title}", log)
                 Debug.log(bookSource.bookSourceUrl, "◇章节链接:${chapterList[0].url}", log)
-                Debug.log(bookSource.bookSourceUrl, "◇章节信息:${chapterList[0].tag}", log)
+                chapterList[0].wordCount?.run{
+                    Debug.log(bookSource.bookSourceUrl, "◇章节信息:${chapterList[0].tag} $this", log)
+                    Debug.log(bookSource.bookSourceUrl, "⇒已识别到章节信息中的字数",log)
+                } ?: run {
+                    Debug.log(bookSource.bookSourceUrl, "◇章节信息:${chapterList[0].tag}", log)
+                }
                 Debug.log(bookSource.bookSourceUrl, "◇是否VIP:${chapterList[0].isVip}", log)
                 Debug.log(bookSource.bookSourceUrl, "◇是否购买:${chapterList[0].isPay}", log)
             }
@@ -269,17 +302,26 @@ object BookChapterList {
         return Pair(chapterList, nextUrlList)
     }
 
-    private fun getWordCount(list: ArrayList<BookChapter>, book: Book) {
+    private fun upChapterInfo(list: ArrayList<BookChapter>, book: Book) {
         if (!AppConfig.tocCountWords) {
             return
         }
         val chapterList = appDb.bookChapterDao.getChapterList(book.bookUrl)
         if (chapterList.isNotEmpty()) {
-            val map = chapterList.associateBy({ it.getFileName() }, { it.wordCount })
-            for (bookChapter in list) {
-                val wordCount = map[bookChapter.getFileName()]
-                if (wordCount != null) {
-                    bookChapter.wordCount = wordCount
+            val mapByIdentity = HashMap<String, Triple<String?, String?, String?>>(chapterList.size)
+            val mapByTitle = HashMap<String, Triple<String?, String?, String?>>(chapterList.size)
+            for (chapter in chapterList) {
+                val triple = Triple(chapter.wordCount, chapter.variable, chapter.imgUrl)
+                mapByIdentity[chapter.contentCacheIdentity()] = triple
+                mapByTitle.putIfAbsent(chapter.title.trim(), triple)
+            }
+            for (chapter in list) {
+                (mapByIdentity[chapter.contentCacheIdentity()] ?: mapByTitle[chapter.title.trim()])?.let { (w, v, i) ->
+                    chapter.run {
+                        w?.let { wordCount = it }
+                        v?.let { variable = it }
+                        i?.let { imgUrl = it }
+                    }
                 }
             }
         }

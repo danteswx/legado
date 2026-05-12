@@ -1,6 +1,7 @@
 package io.legado.app.ui.widget
 
 import android.content.Context
+import android.os.Build
 import android.view.ViewGroup
 import android.widget.PopupWindow
 import io.legado.app.base.adapter.ItemViewHolder
@@ -8,6 +9,7 @@ import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.databinding.ItemTextBinding
 import io.legado.app.databinding.PopupActionBinding
 import io.legado.app.lib.dialogs.SelectItem
+import io.legado.app.utils.dpToPx
 import splitties.systemservices.layoutInflater
 
 class PopupAction(private val context: Context) :
@@ -27,6 +29,9 @@ class PopupAction(private val context: Context) :
         isTouchable = true
         isOutsideTouchable = false
         isFocusable = true
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            elevation = 14f.dpToPx()
+        }
 
         binding.recyclerView.adapter = adapter
     }

@@ -55,7 +55,9 @@ class HandleFileActivity :
             if (it.isContentScheme()) {
                 val modeFlags =
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                contentResolver.takePersistableUriPermission(it, modeFlags)
+                try {
+                    contentResolver.takePersistableUriPermission(it, modeFlags)
+                } catch (_: SecurityException) { }
             }
             onResult(Intent().setData(it))
         } ?: finish()
@@ -78,9 +80,10 @@ class HandleFileActivity :
             HandleFileContract.DIR_SYS -> getDirActions(true)
             HandleFileContract.DIR -> getDirActions()
             HandleFileContract.FILE -> getFileActions()
-            HandleFileContract.EXPORT -> arrayListOf(
-                SelectItem(getString(R.string.upload_url), 111)
-            ).apply {
+            HandleFileContract.EXPORT -> arrayListOf<SelectItem<Int>>().apply {
+                if (intent.getBooleanExtra("showUploadUrl", true)) {
+                    add(SelectItem(getString(R.string.upload_url), 111))
+                }
                 addAll(getDirActions())
             }
 
@@ -163,6 +166,10 @@ class HandleFileActivity :
                         showInputDirectoryDialog()
                     }
 
+                    113 -> checkPermissions { // 手动输入图片链接
+                        showInputImgSrcDialog()
+                    }
+
                     else -> {
                         val path = item.title
                         val uri = if (path.isContentScheme()) {
@@ -202,6 +209,41 @@ class HandleFileActivity :
                     onResult(Intent().setData(Uri.fromFile(file)))
                 } else {
                     toastOnUi(getString(R.string.invalid_directory))
+                }
+            }
+            onDismiss {
+                finish()
+            }
+            cancelButton()
+        }
+    }
+
+    private fun showInputImgSrcDialog() {
+        val alertBinding = DialogEditTextBinding.inflate(layoutInflater).apply {
+            editView.hint = getString(R.string.enter_img_src_path)
+        }
+
+        alert(getString(R.string.manual_input)) {
+            customView { alertBinding.root }
+            okButton {
+                val inputPath = alertBinding.editView.text.toString()
+                if (inputPath.isBlank()) {
+                    toastOnUi(getString(R.string.empty_img_src_input))
+                    return@okButton
+                }
+                if (inputPath.startsWith("http", true)) {
+                    onResult(Intent().setData(inputPath.toUri()))
+                    return@okButton
+                }
+                val file = File(inputPath)
+                if (file.exists() &&
+                    file.isFile &&
+                    isExternalStorage(file) &&
+                    file.canRead()
+                ) {
+                    onResult(Intent().setData(Uri.fromFile(file)))
+                } else {
+                    toastOnUi(getString(R.string.invalid_file_path))
                 }
             }
             onDismiss {
@@ -269,6 +311,7 @@ class HandleFileActivity :
             SelectItem(getString(R.string.sys_image_picker), HandleFileContract.IMAGE)
         ).apply {
             addAll(getFileActions())
+            add(SelectItem(getString(R.string.manual_input_img_src), 113)) //手动输入图片链接
         }
     }
 

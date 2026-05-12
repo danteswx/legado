@@ -74,7 +74,11 @@ class SearchAdapter(context: Context, val callBack: CallBack) :
     override fun registerListener(holder: ItemViewHolder, binding: ItemSearchBinding) {
         binding.root.setOnClickListener {
             getItem(holder.layoutPosition)?.let {
-                callBack.showBookInfo(it.name, it.author, it.bookUrl)
+                if (it.origins.size > 1) {
+                    callBack.showBookSourceSelector(it)
+                } else {
+                    callBack.showBookInfo(it)
+                }
             }
         }
     }
@@ -89,11 +93,8 @@ class SearchAdapter(context: Context, val callBack: CallBack) :
             tvIntroduce.text = searchBook.trimIntro(context)
             upKind(binding, searchBook.getKindList())
             ivCover.load(
-                searchBook.coverUrl,
-                searchBook.name,
-                searchBook.author,
-                AppConfig.loadCoverOnlyWifi,
-                searchBook.origin
+                searchBook,
+                AppConfig.loadCoverOnlyWifi
             )
         }
     }
@@ -108,11 +109,8 @@ class SearchAdapter(context: Context, val callBack: CallBack) :
                     "kind" -> upKind(binding, searchBook.getKindList())
                     "isInBookshelf" -> ivInBookshelf.isVisible = callBack.isInBookshelf(searchBook)
                     "cover" -> ivCover.load(
-                        searchBook.coverUrl,
-                        searchBook.name,
-                        searchBook.author,
-                        false,
-                        searchBook.origin
+                        searchBook,
+                        false
                     )
                 }
             }
@@ -150,6 +148,8 @@ class SearchAdapter(context: Context, val callBack: CallBack) :
         /**
          * 显示书籍详情
          */
-        fun showBookInfo(name: String, author: String, bookUrl: String)
+        fun showBookInfo(book: SearchBook)
+
+        fun showBookSourceSelector(book: SearchBook)
     }
 }

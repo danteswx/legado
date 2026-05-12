@@ -19,7 +19,9 @@ import io.legado.app.data.dao.CookieDao
 import io.legado.app.data.dao.DictRuleDao
 import io.legado.app.data.dao.HttpTTSDao
 import io.legado.app.data.dao.KeyboardAssistsDao
+import io.legado.app.data.dao.ReadRecentBookDao
 import io.legado.app.data.dao.ReadRecordDao
+import io.legado.app.data.dao.ReadRecordDailyDao
 import io.legado.app.data.dao.ReplaceRuleDao
 import io.legado.app.data.dao.RssArticleDao
 import io.legado.app.data.dao.RssReadRecordDao
@@ -41,7 +43,9 @@ import io.legado.app.data.entities.Cookie
 import io.legado.app.data.entities.DictRule
 import io.legado.app.data.entities.HttpTTS
 import io.legado.app.data.entities.KeyboardAssist
+import io.legado.app.data.entities.ReadRecentBook
 import io.legado.app.data.entities.ReadRecord
+import io.legado.app.data.entities.ReadRecordDaily
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.data.entities.RssArticle
 import io.legado.app.data.entities.RssReadRecord
@@ -67,13 +71,15 @@ val appDb by lazy {
 }
 
 @Database(
-    version = 75,
+    version = 91,
     exportSchema = true,
     entities = [Book::class, BookGroup::class, BookSource::class, BookChapter::class,
         ReplaceRule::class, SearchBook::class, SearchKeyword::class, Cookie::class,
         RssSource::class, Bookmark::class, RssArticle::class, RssReadRecord::class,
-        RssStar::class, TxtTocRule::class, ReadRecord::class, HttpTTS::class, Cache::class,
-        RuleSub::class, DictRule::class, KeyboardAssist::class, Server::class],
+        RssStar::class, TxtTocRule::class, ReadRecord::class, ReadRecordDaily::class,
+        HttpTTS::class, Cache::class,
+        RuleSub::class, DictRule::class, KeyboardAssist::class, Server::class,
+        ReadRecentBook::class],
     views = [BookSourcePart::class],
     autoMigrations = [
         AutoMigration(from = 43, to = 44),
@@ -108,6 +114,21 @@ val appDb by lazy {
         AutoMigration(from = 72, to = 73),
         AutoMigration(from = 73, to = 74),
         AutoMigration(from = 74, to = 75),
+        AutoMigration(from = 75, to = 76),
+        AutoMigration(from = 76, to = 77),
+        AutoMigration(from = 77, to = 78),
+        AutoMigration(from = 78, to = 79),
+        AutoMigration(from = 79, to = 80),
+        AutoMigration(from = 80, to = 81, spec = DatabaseMigrations.Migration_80_81::class),
+        AutoMigration(from = 81, to = 82),
+        AutoMigration(from = 82, to = 83),
+        AutoMigration(from = 83, to = 84, spec = DatabaseMigrations.Migration_83_84::class),
+        AutoMigration(from = 84, to = 85, spec = DatabaseMigrations.Migration_84_85::class),
+        AutoMigration(from = 85, to = 86),
+        AutoMigration(from = 86, to = 87),
+        AutoMigration(from = 87, to = 88),
+        AutoMigration(from = 88, to = 89),
+        AutoMigration(from = 89, to = 90)
     ]
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -127,6 +148,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract val cookieDao: CookieDao
     abstract val txtTocRuleDao: TxtTocRuleDao
     abstract val readRecordDao: ReadRecordDao
+    abstract val readRecordDailyDao: ReadRecordDailyDao
+    abstract val readRecentBookDao: ReadRecentBookDao
     abstract val httpTTSDao: HttpTTSDao
     abstract val cacheDao: CacheDao
     abstract val ruleSubDao: RuleSubDao
@@ -196,6 +219,13 @@ abstract class AppDatabase : RoomDatabase() {
                     where not exists (select * from book_groups where groupId = ${BookGroup.IdLocalNone})
                 """.trimIndent()
                 db.execSQL(insertBookGroupLocalNoneGroupSql)
+                @Language("sql")
+                val insertBookGroupVideoSql = """
+                    insert into book_groups(groupId, groupName, 'order', show) 
+                    select ${BookGroup.IdVideo}, '视频', -5, 1
+                    where not exists (select * from book_groups where groupId = ${BookGroup.IdVideo})
+                    """.trimIndent()
+                db.execSQL(insertBookGroupVideoSql)
                 @Language("sql")
                 val insertBookGroupErrorSql = """
                     insert into book_groups(groupId, groupName, 'order', show) 

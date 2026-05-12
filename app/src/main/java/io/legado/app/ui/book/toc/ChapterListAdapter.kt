@@ -11,7 +11,9 @@ import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.databinding.ItemChapterListBinding
+import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
+import io.legado.app.help.exoplayer.ExoPlayerHelper
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.lib.theme.ThemeUtils
@@ -75,6 +77,7 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
         upDisplayTileJob = Coroutine.async(callback.scope) {
             val book = callback.book ?: return@async
             val replaceRules = ContentProcessor.get(book.name, book.origin).getTitleReplaceRules()
+            val replaceBook = book.toReplaceBook()
             val useReplace = AppConfig.tocUiUseReplace && book.getUseReplaceRule()
             val items = getItems()
             launch {
@@ -82,7 +85,7 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
                     val item = items[i]
                     if (displayTitleMap[item.title] == null) {
                         ensureActive()
-                        val displayTitle = item.getDisplayTitle(replaceRules, useReplace)
+                        val displayTitle = item.getDisplayTitle(replaceRules, useReplace, replaceBook = replaceBook)
                         ensureActive()
                         displayTitleMap[item.title] = displayTitle
                         handler.post {
@@ -96,7 +99,7 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
                     val item = items[i]
                     if (displayTitleMap[item.title] == null) {
                         ensureActive()
-                        val displayTitle = item.getDisplayTitle(replaceRules, useReplace)
+                        val displayTitle = item.getDisplayTitle(replaceRules, useReplace, replaceBook = replaceBook)
                         ensureActive()
                         displayTitleMap[item.title] = displayTitle
                         handler.post {
@@ -126,7 +129,13 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
             val isDur = callback.durChapterIndex() == item.index
             val cached = callback.isLocalBook
                     || item.isVolume
-                    || cacheFileNames.contains(item.getFileName())
+                    || callback.book?.let { book ->
+                        if (callback.isAudioBook) {
+                            ExoPlayerHelper.isMediaCached(item.resourceUrl)
+                        } else {
+                            BookHelp.getChapterCacheFileNames(book, item).any(cacheFileNames::contains)
+                        }
+                    } == true
             if (payloads.isEmpty()) {
                 if (isDur) {
                     tvChapterName.setTextColor(context.accentColor)
@@ -137,14 +146,22 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
                 if (item.isVolume) {
                     //卷名，如第一卷 突出显示
                     tvChapterItem.setBackgroundColor(context.getCompatColor(R.color.btn_bg_press))
+                    ivChecked.setImageResource(
+                        if (callback.isVolumeCollapsed(item)) {
+                            R.drawable.ic_expand_more
+                        } else {
+                            R.drawable.ic_expand_less
+                        }
+                    )
+                    ivChecked.visible()
                 } else {
                     //普通章节 保持不变
                     tvChapterItem.background =
                         ThemeUtils.resolveDrawable(context, android.R.attr.selectableItemBackground)
                 }
 
-                //卷名不显示
-                if (!item.tag.isNullOrEmpty() && !item.isVolume) {
+                //卷名不显示 去掉了 !item.isVolume，让卷名也显示
+                if (!item.tag.isNullOrEmpty()) {
                     //更新时间规则
                     tvTag.text = item.tag
                     tvTag.visible()
@@ -165,10 +182,10 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
                     ivLocked.gone()
                 }
 
-                upHasCache(binding, isDur, cached)
+                upHasCache(binding, item, isDur, cached)
             } else {
                 tvChapterName.text = getDisplayTitle(item)
-                upHasCache(binding, isDur, cached)
+                upHasCache(binding, item, isDur, cached)
             }
         }
     }
@@ -176,7 +193,11 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
     override fun registerListener(holder: ItemViewHolder, binding: ItemChapterListBinding) {
         holder.itemView.setOnClickListener {
             getItem(holder.layoutPosition)?.let {
-                callback.openChapter(it)
+                if (it.isVolume) {
+                    callback.toggleVolume(it)
+                } else {
+                    callback.openChapter(it)
+                }
             }
         }
         holder.itemView.setOnLongClickListener {
@@ -187,8 +208,24 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
         }
     }
 
-    private fun upHasCache(binding: ItemChapterListBinding, isDur: Boolean, cached: Boolean) =
+    private fun upHasCache(
+        binding: ItemChapterListBinding,
+        item: BookChapter,
+        isDur: Boolean,
+        cached: Boolean
+    ) =
         binding.apply {
+            if (item.isVolume) {
+                ivChecked.setImageResource(
+                    if (callback.isVolumeCollapsed(item)) {
+                        R.drawable.ic_expand_more
+                    } else {
+                        R.drawable.ic_expand_less
+                    }
+                )
+                ivChecked.visible()
+                return@apply
+            }
             ivChecked.setImageResource(R.drawable.ic_outline_cloud_24)
             ivChecked.visible(!cached)
             if (isDur) {
@@ -201,7 +238,10 @@ class ChapterListAdapter(context: Context, val callback: Callback) :
         val scope: CoroutineScope
         val book: Book?
         val isLocalBook: Boolean
+        val isAudioBook: Boolean
         fun openChapter(bookChapter: BookChapter)
+        fun toggleVolume(bookChapter: BookChapter)
+        fun isVolumeCollapsed(bookChapter: BookChapter): Boolean
         fun durChapterIndex(): Int
         fun onListChanged()
     }

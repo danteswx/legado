@@ -31,7 +31,7 @@ enum class AppVariant {
 @Keep
 data class GithubRelease(
     val assets: List<Asset>?,
-    val body: String,
+    val body: String?,
     @SerializedName("prerelease")
     val isPreRelease: Boolean,
 ) {
@@ -39,7 +39,7 @@ data class GithubRelease(
         assets ?: throw NoStackTraceException("获取新版本出错")
         return assets
             .filter { it.isValid }
-            .map { it.assetToAppReleaseInfo(isPreRelease, body) }
+            .map { it.assetToAppReleaseInfo(isPreRelease, body.orEmpty()) }
     }
 }
 
@@ -59,11 +59,11 @@ data class Asset(
     val url: String
 ) {
     val isValid: Boolean
-        get() = (contentType == "application/vnd.android.package-archive") && (state == "uploaded")
+        get() = contentType == "application/vnd.android.package-archive" && state == "uploaded"
 
     fun assetToAppReleaseInfo(preRelease: Boolean, note: String): AppReleaseInfo {
         val instant = Instant.parse(createdAt)
-        val timestamp: Long = instant.toEpochMilli()
+        val timestamp = instant.toEpochMilli()
 
         val appVariant = when {
             preRelease && name.contains("releaseA") -> AppVariant.BETA_RELEASEA

@@ -16,7 +16,9 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.databinding.FragmentChapterListBinding
 import io.legado.app.help.book.BookHelp
+import io.legado.app.help.book.isAudio
 import io.legado.app.help.book.isLocal
+import io.legado.app.help.book.isVideo
 import io.legado.app.help.book.simulatedTotalChapterNum
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.getPrimaryTextColor
@@ -27,7 +29,6 @@ import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers.Default
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.launch
@@ -40,7 +41,11 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     private val binding by viewBinding(FragmentChapterListBinding::bind)
     private val mLayoutManager by lazy { UpLinearLayoutManager(requireContext()) }
     private val adapter by lazy { ChapterListAdapter(requireContext(), this) }
+    private val collapsedVolumeIndexes = linkedSetOf<Int>()
     private var durChapterIndex = 0
+    private var chapterList: List<BookChapter> = emptyList()
+    private var currentSearchKey: String? = null
+    private var suppressNextListScroll = false
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) = binding.run {
         viewModel.chapterListCallBack = this@ChapterListFragment
@@ -73,7 +78,7 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
             }
         }
         tvCurrentChapterInfo.setOnClickListener {
-            mLayoutManager.scrollToPositionWithOffset(durChapterIndex, 0)
+            mLayoutManager.scrollToPositionWithOffset(visiblePositionOf(durChapterIndex), 0)
         }
         binding.llChapterBaseInfo.applyNavigationBarPadding()
     }
@@ -81,8 +86,8 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     @SuppressLint("SetTextI18n")
     private fun initBook(book: Book) {
         lifecycleScope.launch {
-            upChapterList(null)
             durChapterIndex = book.durChapterIndex
+            upChapterList(null)
             binding.tvCurrentChapterInfo.text =
                 "${book.durChapterTitle}(${book.durChapterIndex + 1}/${book.simulatedTotalChapterNum()})"
             initCacheFileNames(book)
@@ -102,9 +107,12 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
         observeEvent<Pair<Book, BookChapter>>(EventBus.SAVE_CONTENT) { (book, chapter) ->
             viewModel.bookData.value?.bookUrl?.let { bookUrl ->
                 if (book.bookUrl == bookUrl) {
-                    adapter.cacheFileNames.add(chapter.getFileName())
+                    adapter.cacheFileNames.addAll(BookHelp.getChapterCacheFileNames(book, chapter))
                     if (viewModel.searchKey.isNullOrEmpty()) {
-                        adapter.notifyItemChanged(chapter.index, true)
+                        val position = visiblePositionOf(chapter.index)
+                        if (position in 0 until adapter.itemCount) {
+                            adapter.notifyItemChanged(position, true)
+                        }
                     } else {
                         adapter.getItems().forEachIndexed { index, bookChapter ->
                             if (bookChapter.index == chapter.index) {
@@ -123,29 +131,36 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
                 val end = (book?.simulatedTotalChapterNum() ?: Int.MAX_VALUE) - 1
                 when {
                     searchKey.isNullOrBlank() ->
-                        appDb.bookChapterDao.getChapterList(viewModel.bookUrl, 0, end)
+                        appDb.bookChapterDao.getChapterList(viewModel.bookUrl, 0, end).also {
+                            chapterList = it
+                        }
 
                     else -> appDb.bookChapterDao.search(viewModel.bookUrl, searchKey, 0, end)
                 }
             }.let {
-                adapter.setItems(it)
+                currentSearchKey = searchKey
+                if (searchKey.isNullOrBlank()) {
+                    chapterList = it
+                    resetCollapsedVolumes(it)
+                }
+                adapter.setItems(visibleChapters(it, searchKey))
             }
         }
     }
 
     override fun onListChanged() {
+        if (suppressNextListScroll) {
+            suppressNextListScroll = false
+            adapter.upDisplayTitles(mLayoutManager.findFirstVisibleItemPosition().coerceAtLeast(0))
+            return
+        }
         lifecycleScope.launch {
-            var scrollPos = 0
-            withContext(Default) {
-                adapter.getItems().forEachIndexed { index, bookChapter ->
-                    if (bookChapter.index >= durChapterIndex) {
-                        return@withContext
-                    }
-                    scrollPos = index
-                }
+            val scrollPos = visiblePositionOf(durChapterIndex)
+            binding.recyclerView.post {
+                val centerOffset = (binding.recyclerView.height / 2).coerceAtLeast(0)
+                mLayoutManager.scrollToPositionWithOffset(scrollPos, centerOffset)
+                adapter.upDisplayTitles(scrollPos)
             }
-            mLayoutManager.scrollToPositionWithOffset(scrollPos, 0)
-            adapter.upDisplayTitles(scrollPos)
         }
     }
 
@@ -167,12 +182,111 @@ class ChapterListFragment : VMBaseFragment<TocViewModel>(R.layout.fragment_chapt
     override val isLocalBook: Boolean
         get() = viewModel.bookData.value?.isLocal == true
 
+    override val isAudioBook: Boolean
+        get() = viewModel.bookData.value?.let { it.isAudio || it.isVideo } == true
+
     override fun durChapterIndex(): Int {
         return durChapterIndex
     }
 
+    override fun isVolumeCollapsed(bookChapter: BookChapter): Boolean {
+        return bookChapter.isVolume && collapsedVolumeIndexes.contains(bookChapter.index)
+    }
+
+    override fun toggleVolume(bookChapter: BookChapter) {
+        if (!bookChapter.isVolume || !currentSearchKey.isNullOrBlank()) {
+            return
+        }
+        if (!collapsedVolumeIndexes.add(bookChapter.index)) {
+            collapsedVolumeIndexes.remove(bookChapter.index)
+        }
+        val visible = visibleChapters(chapterList, currentSearchKey)
+        suppressNextListScroll = true
+        adapter.setItems(visible)
+        binding.recyclerView.post {
+            visible.indexOfFirst { it.index == bookChapter.index }.takeIf { it >= 0 }?.let {
+                adapter.notifyItemChanged(it, true)
+            }
+        }
+    }
+
+    private fun visibleChapters(
+        chapters: List<BookChapter>,
+        searchKey: String?
+    ): List<BookChapter> {
+        if (!searchKey.isNullOrBlank() || collapsedVolumeIndexes.isEmpty()) {
+            return chapters
+        }
+        val visible = arrayListOf<BookChapter>()
+        var hideUntilNextVolume = false
+        chapters.forEach { chapter ->
+            if (chapter.isVolume) {
+                visible.add(chapter)
+                hideUntilNextVolume = collapsedVolumeIndexes.contains(chapter.index)
+            } else if (!hideUntilNextVolume) {
+                visible.add(chapter)
+            }
+        }
+        return visible
+    }
+
+    private fun resetCollapsedVolumes(chapters: List<BookChapter>) {
+        collapsedVolumeIndexes.clear()
+        val currentVolumeIndex = chapters
+            .filter { it.isVolume && it.index <= durChapterIndex }
+            .maxByOrNull { it.index }
+            ?.index
+        chapters.filter { it.isVolume }.forEach { chapter ->
+            if (chapter.index != currentVolumeIndex) {
+                collapsedVolumeIndexes.add(chapter.index)
+            }
+        }
+    }
+
+    private fun visiblePositionOf(chapterIndex: Int): Int {
+        val items = adapter.getItems()
+        val exact = items.indexOfFirst { it.index == chapterIndex }
+        if (exact >= 0) return exact
+        return items.indexOfLast { it.index < chapterIndex }.coerceAtLeast(0)
+    }
+
     override fun openChapter(bookChapter: BookChapter) {
         activity?.run {
+            if (book?.isVideo == true) {
+                val volumes = arrayListOf<BookChapter>()
+                chapterList.forEach { chapter ->
+                    if (chapter.isVolume) {
+                        volumes.add(chapter)
+                    }
+                }
+                var chapterInVolumeIndex = 0
+                var durVolumeIndex = 0
+                if (volumes.isNotEmpty()) {
+                    for ((index, volume) in volumes.reversed().withIndex()) {
+                        val first = bookChapter.index
+                        if (volume.index < first) {
+                            chapterInVolumeIndex = first - volume.index - 1
+                            durVolumeIndex = volumes.size - index - 1
+                            break
+                        } else if (volume.index == first) {
+                            chapterInVolumeIndex = 0
+                            durVolumeIndex = volumes.size - index - 1
+                            break
+                        }
+                    }
+                } else {
+                    chapterInVolumeIndex = bookChapter.index
+                }
+                setResult(
+                    RESULT_OK, Intent()
+                        .putExtra("index", bookChapter.index)
+                        .putExtra("chapterChanged", bookChapter.index != durChapterIndex)
+                        .putExtra("durVolumeIndex", durVolumeIndex)
+                        .putExtra("chapterInVolumeIndex", chapterInVolumeIndex)
+                )
+                finish()
+                return@run
+            }
             setResult(
                 RESULT_OK, Intent()
                     .putExtra("index", bookChapter.index)

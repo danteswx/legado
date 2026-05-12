@@ -35,12 +35,6 @@ by appCtx.getSharedPreferences("local", Context.MODE_PRIVATE) {
             putLong("lastBackup", value)
         }
 
-    var lastDataChangeTime: Long
-        get() = getLong("lastDataChangeTime", 0)
-        set(value) {
-            putLong("lastDataChangeTime", value)
-        }
-
     var privacyPolicyOk: Boolean
         get() = getBoolean("privacyPolicyOk")
         set(value) {
@@ -82,7 +76,6 @@ by appCtx.getSharedPreferences("local", Context.MODE_PRIVATE) {
         set(value) {
             edit { putLong(versionCodeKey, value) }
         }
-
     val isFirstOpenApp: Boolean
         get() {
             val value = getBoolean("firstOpen", true)

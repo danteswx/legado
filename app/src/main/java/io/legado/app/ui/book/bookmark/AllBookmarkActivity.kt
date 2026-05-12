@@ -14,11 +14,13 @@ import io.legado.app.databinding.ActivityAllBookmarkBinding
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.showDialogFragment
+import io.legado.app.utils.startActivityForBook
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * 所有书签
@@ -76,7 +78,24 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
     }
 
     override fun onItemClick(bookmark: Bookmark, position: Int) {
+        lifecycleScope.launch {
+            val book = withContext(IO) {
+                appDb.bookDao.getBook(bookmark.bookName, bookmark.bookAuthor)
+            }
+            if (book == null) {
+                showDialogFragment(BookmarkDialog(bookmark, position))
+            } else {
+                startActivityForBook(book) {
+                    putExtra("index", bookmark.chapterIndex)
+                    putExtra("chapterPos", bookmark.chapterPos)
+                }
+            }
+        }
+    }
+
+    override fun onItemLongClick(bookmark: Bookmark, position: Int): Boolean {
         showDialogFragment(BookmarkDialog(bookmark, position))
+        return true
     }
 
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.AttributeSet
 import android.widget.LinearLayout
 import android.widget.TextView
+import io.legado.app.lib.theme.uiTypeface
 import io.legado.app.ui.widget.text.AccentBgTextView
 import io.legado.app.utils.dpToPx
 
@@ -17,17 +18,10 @@ class LabelsBar @JvmOverloads constructor(
     private val usedViews = arrayListOf<TextView>()
     var textSize = 12f
 
-    fun setLabels(labels: Array<String>) {
+    fun setLabels(labels: List<String>, onClick: ((String) -> Unit)? = null, onLongClick: ((String) -> Boolean)? = null) {
         clear()
         labels.forEach {
-            addLabel(it)
-        }
-    }
-
-    fun setLabels(labels: List<String>) {
-        clear()
-        labels.forEach {
-            addLabel(it)
+            addLabel(it, onClick, onLongClick)
         }
     }
 
@@ -37,11 +31,12 @@ class LabelsBar @JvmOverloads constructor(
         removeAllViews()
     }
 
-    fun addLabel(label: String) {
+    fun addLabel(label: String, onClick: ((String) -> Unit)?, onLongClick: ((String) -> Boolean)?) {
         val tv = if (unUsedViews.isEmpty()) {
             AccentBgTextView(context, null).apply {
                 setPadding(3.dpToPx(), 0, 3.dpToPx(), 0)
                 setRadius(2)
+                typeface = context.uiTypeface()
                 val lp = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
                 lp.setMargins(0, 0, 2.dpToPx(), 0)
                 layoutParams = lp
@@ -53,10 +48,17 @@ class LabelsBar @JvmOverloads constructor(
             unUsedViews.last().apply {
                 usedViews.add(this)
                 unUsedViews.removeAt(unUsedViews.lastIndex)
+                typeface = context.uiTypeface()
             }
         }
         tv.textSize = textSize
         tv.text = label
+        if (onClick != null) {
+            tv.setOnClickListener { onClick.invoke(label) }
+        }
+        if (onLongClick != null) {
+            tv.setOnLongClickListener { onLongClick.invoke(label) }
+        }
         addView(tv)
     }
 }

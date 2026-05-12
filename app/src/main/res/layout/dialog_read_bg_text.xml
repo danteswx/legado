@@ -63,12 +63,33 @@
         tools:ignore="TouchTargetSizeCheck" />
 
     <io.legado.app.lib.theme.view.ThemeSwitch
-        android:id="@+id/sw_underline"
+        android:id="@+id/sw_scroll_follow_bg"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:padding="6dp"
-        android:text="@string/text_underline"
+        android:text="@string/read_scroll_follow_background"
         tools:ignore="TouchTargetSizeCheck" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="6dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/text_underline"
+            android:textColor="@color/primaryText" />
+
+        <androidx.appcompat.widget.AppCompatSpinner
+            android:id="@+id/sp_underline"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:theme="@style/Spinner" />
+    </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -110,6 +131,32 @@
             android:textSize="14sp"
             app:isBottomBackground="true"
             tools:ignore="HardcodedText" />
+
+        <io.legado.app.ui.widget.text.StrokeTextView
+            android:id="@+id/tv_text_accent_color"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginLeft="6dp"
+            android:layout_marginRight="6dp"
+            android:layout_weight="5"
+            android:background="?attr/selectableItemBackground"
+            android:gravity="center"
+            android:padding="6dp"
+            android:singleLine="true"
+            android:text="@string/text_accent_color"
+            android:textSize="14sp"
+            app:isBottomBackground="true"
+            tools:ignore="HardcodedText" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="6dp">
 
         <ImageView
             android:id="@+id/iv_import"
@@ -164,6 +211,15 @@
         android:max="100"
         android:padding="6dp"
         tools:ignore="UnusedAttribute" />
+
+    <io.legado.app.ui.widget.DetailSeekBar
+        android:id="@+id/dsb_text_shadow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="6dp"
+        app:max="100"
+        app:isBottomBackground="true"
+        app:title="@string/text_shadow" />
 
     <TextView
         android:id="@+id/tv_bg_image"

@@ -9,7 +9,7 @@
         android:id="@+id/cv_toast"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        app:cardCornerRadius="10dp"
+        app:cardCornerRadius="@dimen/ui_panel_radius"
         app:cardElevation="2dp"
         app:cardUseCompatPadding="true">
 

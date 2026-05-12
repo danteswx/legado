@@ -2,6 +2,7 @@ package io.legado.app.ui.config
 
 import android.annotation.SuppressLint
 import android.content.ComponentName
+import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -10,10 +11,13 @@ import androidx.core.view.postDelayed
 import androidx.fragment.app.activityViewModels
 import androidx.preference.ListPreference
 import androidx.preference.Preference
+import androidx.preference.SwitchPreferenceCompat
 import com.jeremyliao.liveeventbus.LiveEventBus
 import io.legado.app.R
+import io.legado.app.base.BaseActivity
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
+import io.legado.app.databinding.DialogEditCodeBinding
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.AppFreezeMonitor
 import io.legado.app.help.DispatchersMonitor
@@ -27,9 +31,13 @@ import io.legado.app.model.ImageProvider
 import io.legado.app.receiver.SharedReceiverActivity
 import io.legado.app.service.WebService
 import io.legado.app.ui.file.HandleFileContract
+import io.legado.app.ui.book.read.config.ContentSelectMenuConfigDialog
+import io.legado.app.ui.video.config.SettingsDialog
+import io.legado.app.ui.widget.code.addJsonPattern
 import io.legado.app.ui.widget.number.NumberPickerDialog
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.getPrefBoolean
+import io.legado.app.utils.isJsonObject
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.putPrefBoolean
 import io.legado.app.utils.putPrefString
@@ -57,6 +65,9 @@ class OtherConfigFragment : PreferenceFragment(),
         }
     }
 
+    private var onlyUpdateReadPref: Preference? = null
+    private var targetKeyHandled = false
+
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         putPrefBoolean(PreferKey.processText, isProcessTextEnabled())
         addPreferencesFromResource(R.xml.pref_config_other)
@@ -71,6 +82,9 @@ class OtherConfigFragment : PreferenceFragment(),
         upPreferenceSummary(PreferKey.bitmapCacheSize, AppConfig.bitmapCacheSize.toString())
         upPreferenceSummary(PreferKey.imageRetainNum, AppConfig.imageRetainNum.toString())
         upPreferenceSummary(PreferKey.sourceEditMaxLine, AppConfig.sourceEditMaxLine.toString())
+        onlyUpdateReadPref = findPreference<Preference>(PreferKey.onlyUpdateRead)?.also {
+            it.isVisible = AppConfig.autoRefreshBook
+        }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -78,6 +92,12 @@ class OtherConfigFragment : PreferenceFragment(),
         activity?.setTitle(R.string.other_setting)
         preferenceManager.sharedPreferences?.registerOnSharedPreferenceChangeListener(this)
         listView.setEdgeEffectColor(primaryColor)
+        consumeTargetKey()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        consumeTargetKey()
     }
 
     override fun onDestroy() {
@@ -88,6 +108,8 @@ class OtherConfigFragment : PreferenceFragment(),
     override fun onPreferenceTreeClick(preference: Preference): Boolean {
         when (preference.key) {
             PreferKey.userAgent -> showUserAgentDialog()
+            PreferKey.customHosts -> showCustomHostsDialog()
+            PreferKey.videoSetting -> showDialogFragment(SettingsDialog(requireActivity()))
             PreferKey.defaultBookTreeUri -> localBookTreeSelect.launch {
                 title = getString(R.string.select_book_folder)
                 mode = HandleFileContract.DIR_SYS
@@ -121,7 +143,14 @@ class OtherConfigFragment : PreferenceFragment(),
                 }
 
             PreferKey.cleanCache -> clearCache()
+            PreferKey.contentSelectMenuConfig -> ContentSelectMenuConfigDialog()
+                .show(parentFragmentManager, "contentSelectMenuConfig")
             PreferKey.uploadRule -> showDialogFragment<DirectLinkUploadConfig>()
+            "discoverySubscriptionSettings" -> {
+                startActivity(Intent(requireContext(), ConfigActivity::class.java).apply {
+                    putExtra("configTag", ConfigTag.DISCOVERY_SUBSCRIPTION_CONFIG)
+                })
+            }
             PreferKey.checkSource -> showDialogFragment<CheckSourceConfig>()
             PreferKey.bitmapCacheSize -> {
                 NumberPickerDialog(requireContext())
@@ -197,7 +226,7 @@ class OtherConfigFragment : PreferenceFragment(),
                 setProcessTextEnable(it.getBoolean(key, true))
             }
 
-            PreferKey.showDiscovery, PreferKey.showRss -> postEvent(EventBus.NOTIFY_MAIN, true)
+            PreferKey.showReadRecord -> postEvent(EventBus.NOTIFY_MAIN, true)
             PreferKey.language -> listView.postDelayed(1000) {
                 appCtx.restart()
             }
@@ -220,6 +249,15 @@ class OtherConfigFragment : PreferenceFragment(),
 
             PreferKey.sourceEditMaxLine -> {
                 upPreferenceSummary(key, AppConfig.sourceEditMaxLine.toString())
+            }
+
+            PreferKey.autoRefresh -> {
+                val isEnabled = sharedPreferences?.getBoolean(key, false) ?: false
+                onlyUpdateReadPref?.isVisible = isEnabled
+            }
+
+            PreferKey.highBrush -> {
+                (activity as? BaseActivity<*>)?.applyPreferredRefreshRate()
             }
         }
     }
@@ -264,6 +302,27 @@ class OtherConfigFragment : PreferenceFragment(),
                     removePref(PreferKey.userAgent)
                 } else {
                     putPrefString(PreferKey.userAgent, userAgent)
+                }
+            }
+            cancelButton()
+        }
+    }
+
+    @SuppressLint("InflateParams")
+    private fun showCustomHostsDialog() {
+        alert(getString(R.string.custom_hosts)) {
+            val alertBinding = DialogEditCodeBinding.inflate(layoutInflater).apply {
+                editViewC.hint = getString(R.string.json_format)
+                editView.addJsonPattern()
+                editView.setText(AppConfig.customHosts)
+            }
+            customView { alertBinding.root }
+            okButton {
+                val customHosts = alertBinding.editView.text?.toString()
+                if (customHosts.isJsonObject()) {
+                    putPrefString(PreferKey.customHosts, customHosts!!)
+                } else {
+                    removePref(PreferKey.customHosts)
                 }
             }
             cancelButton()
@@ -330,6 +389,23 @@ class OtherConfigFragment : PreferenceFragment(),
                 LocalConfig.password = editTextBinding.editView.text.toString()
             }
             cancelButton()
+        }
+    }
+
+    private fun consumeTargetKey() {
+        if (targetKeyHandled) return
+        val targetKey = activity?.intent?.getStringExtra("targetKey")?.trim().orEmpty()
+        if (targetKey.isBlank()) return
+        val preference = findPreference<Preference>(targetKey) ?: return
+        targetKeyHandled = true
+        listView.post {
+            scrollToPreference(preference)
+            if (preference is SwitchPreferenceCompat) {
+                preference.isChecked = !preference.isChecked
+            } else {
+                onPreferenceTreeClick(preference)
+            }
+            activity?.intent?.removeExtra("targetKey")
         }
     }
 

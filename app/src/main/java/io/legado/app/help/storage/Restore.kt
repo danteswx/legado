@@ -4,6 +4,9 @@ import android.content.Context
 import android.database.sqlite.SQLiteConstraintException
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
+import com.google.gson.JsonElement
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import io.legado.app.BuildConfig
 import io.legado.app.R
 import io.legado.app.constant.AppConst.androidId
@@ -30,10 +33,12 @@ import io.legado.app.help.LauncherIconHelp
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.upType
 import io.legado.app.help.config.LocalConfig
+import io.legado.app.help.config.NavigationBarIconConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ThemeConfig
+import io.legado.app.help.config.ThemePackageManager
+import io.legado.app.model.VideoPlay.VIDEO_PREF_NAME
 import io.legado.app.model.BookCover
-import io.legado.app.model.ReadBook
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.utils.ACache
 import io.legado.app.utils.FileUtils
@@ -42,6 +47,8 @@ import io.legado.app.utils.LogUtils
 import io.legado.app.utils.compress.ZipUtils
 import io.legado.app.utils.defaultSharedPreferences
 import io.legado.app.utils.fromJsonArray
+import io.legado.app.utils.externalFiles
+import io.legado.app.utils.getFile
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getPrefInt
 import io.legado.app.utils.getPrefString
@@ -67,6 +74,13 @@ object Restore {
     private val mutex = Mutex()
 
     private const val TAG = "Restore"
+
+    internal val backgroundAssetDirNames = arrayOf(
+        PreferKey.bgImage,
+        PreferKey.bgImageN,
+        PreferKey.bookInfoBgImage,
+        PreferKey.bookInfoBgImageN
+    )
 
     suspend fun restore(context: Context, uri: Uri) {
         LogUtils.d(TAG, "开始恢复备份 uri:$uri")
@@ -94,16 +108,20 @@ object Restore {
 
     suspend fun restoreLocked(path: String) {
         mutex.withLock {
-            restore(path)
+            RestoreJournal.begin(RestoreJournal.buildSnapshotTargets(path))
+            try {
+                restore(path)
+                RestoreJournal.markPendingValidation()
+            } catch (e: Throwable) {
+                RestoreJournal.rollbackNow("恢复过程异常: ${e.localizedMessage}")
+                throw e
+            }
         }
     }
 
     private suspend fun restore(path: String) {
         val aes = BackupAES()
-        // 获取恢复前的本地书籍列表，用于后续删除不在备份中的书籍
-        val localBooksBeforeRestore = appDb.bookDao.all.map { it.bookUrl }.toSet()
-
-        fileToListT<Book>(path, "bookshelf.json")?.let {
+        fileToBookList(path)?.let {
             it.forEach { book ->
                 book.upType()
             }
@@ -113,13 +131,10 @@ object Restore {
                 }
             val newBooks = arrayListOf<Book>()
             val ignoreLocalBook = BackupConfig.ignoreLocalBook
-            val restoredBookUrls = mutableSetOf<String>()
-
             it.forEach { book ->
                 if (ignoreLocalBook && book.isLocal) {
                     return@forEach
                 }
-                restoredBookUrls.add(book.bookUrl)
                 if (appDb.bookDao.has(book.bookUrl)) {
                     try {
                         appDb.bookDao.update(book)
@@ -131,44 +146,15 @@ object Restore {
                 }
             }
             appDb.bookDao.insert(*newBooks.toTypedArray())
-
-            // 删除本地有但备份中没有的书籍（覆盖模式）
-            val booksToDelete = localBooksBeforeRestore - restoredBookUrls
-            if (booksToDelete.isNotEmpty()) {
-                LogUtils.d(TAG, "删除本地有但备份中没有的书籍，数量: ${booksToDelete.size}")
-                booksToDelete.forEach { bookUrl ->
-                    appDb.bookDao.getBook(bookUrl)?.let { book ->
-                        // 直接删除，不触发自动备份
-                        if (ReadBook.book?.bookUrl == bookUrl) {
-                            ReadBook.book = null
-                        }
-                        appDb.bookDao.delete(book)
-                    }
-                }
-            }
         }
         fileToListT<Bookmark>(path, "bookmark.json")?.let {
             appDb.bookmarkDao.insert(*it.toTypedArray())
         }
-        fileToListT<BookGroup>(path, "bookGroup.json")?.let { list ->
-            val localGroups = appDb.bookGroupDao.all
-            val restoredIds = list.map { it.groupId }.toSet()
-            appDb.bookGroupDao.insert(*list.toTypedArray())
-            // 删除本地有但备份中没有的分组
-            localGroups.filter { it.groupId !in restoredIds }.let { toDelete ->
-                if (toDelete.isNotEmpty()) {
-                    appDb.bookGroupDao.delete(*toDelete.toTypedArray())
-                }
-            }
+        fileToListT<BookGroup>(path, "bookGroup.json")?.let {
+            appDb.bookGroupDao.insert(*it.toTypedArray())
         }
-        fileToListT<BookSource>(path, "bookSource.json")?.let { list ->
-            val localUrls = appDb.bookSourceDao.all.map { it.bookSourceUrl }.toSet()
-            val restoredUrls = list.map { it.bookSourceUrl }.toSet()
-            appDb.bookSourceDao.insert(*list.toTypedArray())
-            // 删除本地有但备份中没有的书源
-            (localUrls - restoredUrls).forEach { url ->
-                appDb.bookSourceDao.delete(url)
-            }
+        fileToListT<BookSource>(path, "bookSource.json")?.let {
+            appDb.bookSourceDao.insert(*it.toTypedArray())
         } ?: run {
             val bookSourceFile = File(path, "bookSource.json")
             if (bookSourceFile.exists()) {
@@ -176,28 +162,14 @@ object Restore {
                 ImportOldData.importOldSource(json)
             }
         }
-        fileToListT<RssSource>(path, "rssSources.json")?.let { list ->
-            val localUrls = appDb.rssSourceDao.all.map { it.sourceUrl }.toSet()
-            val restoredUrls = list.map { it.sourceUrl }.toSet()
-            appDb.rssSourceDao.insert(*list.toTypedArray())
-            // 删除本地有但备份中没有的RSS源
-            (localUrls - restoredUrls).forEach { url ->
-                appDb.rssSourceDao.delete(url)
-            }
+        fileToListT<RssSource>(path, "rssSources.json")?.let {
+            appDb.rssSourceDao.insert(*it.toTypedArray())
         }
         fileToListT<RssStar>(path, "rssStar.json")?.let {
             appDb.rssStarDao.insert(*it.toTypedArray())
         }
-        fileToListT<ReplaceRule>(path, "replaceRule.json")?.let { list ->
-            val localRules = appDb.replaceRuleDao.all
-            val restoredIds = list.map { it.id }.toSet()
-            appDb.replaceRuleDao.insert(*list.toTypedArray())
-            // 删除本地有但备份中没有的替换规则
-            localRules.filter { it.id !in restoredIds }.let { toDelete ->
-                if (toDelete.isNotEmpty()) {
-                    appDb.replaceRuleDao.delete(*toDelete.toTypedArray())
-                }
-            }
+        fileToListT<ReplaceRule>(path, "replaceRule.json")?.let {
+            appDb.replaceRuleDao.insert(*it.toTypedArray())
         }
         fileToListT<SearchKeyword>(path, "searchHistory.json")?.let {
             appDb.searchKeywordDao.insert(*it.toTypedArray())
@@ -215,6 +187,7 @@ object Restore {
             appDb.dictRuleDao.insert(*it.toTypedArray())
         }
         fileToListT<KeyboardAssist>(path, "keyboardAssists.json")?.let {
+            appDb.keyboardAssistsDao.deleteAll() //先删除所有,保证和备份数据一样
             appDb.keyboardAssistsDao.insert(*it.toTypedArray())
         }
         fileToListT<ReadRecord>(path, "readRecord.json")?.let {
@@ -291,6 +264,9 @@ object Restore {
                 AppLog.put("恢复阅读界面出错\n${it.localizedMessage}", it)
             }
         }
+        restoreBackgroundAssets(path)
+        restoreThemePackages(path)
+        restoreNavigationIcons(path)
         //AppWebDav.downBgs()
         appCtx.getSharedPreferences(path, "config")?.all?.let { map ->
             val edit = appCtx.defaultSharedPreferences.edit()
@@ -322,7 +298,30 @@ object Restore {
                     }
                 }
             }
-            edit.apply()
+            edit.commit()
+        }
+        normalizeBackgroundPrefs()
+        normalizeStringPrefs()
+        kotlin.runCatching {
+            ThemePackageManager.ensureLocalAppliedTheme(appCtx, false)
+            ThemePackageManager.ensureLocalAppliedTheme(appCtx, true)
+            ThemePackageManager.reapplyRestoredAppliedThemes(appCtx)
+        }.onFailure {
+            AppLog.put("恢复默认主题包出错\n${it.localizedMessage}", it)
+        }
+        appCtx.getSharedPreferences(path, "videoConfig")?.all?.let { map ->
+            appCtx.getSharedPreferences(VIDEO_PREF_NAME, Context.MODE_PRIVATE).edit().apply {
+                map.forEach { (key, value) ->
+                    when (value) {
+                        is Int -> putInt(key, value)
+                        is Boolean -> putBoolean(key, value)
+                        is Long -> putLong(key, value)
+                        is Float -> putFloat(key, value)
+                        is String -> putString(key, value)
+                    }
+                }
+                apply()
+            }
         }
         ReadBookConfig.apply {
             comicStyleSelect = appCtx.getPrefInt(PreferKey.comicStyleSelect)
@@ -360,6 +359,255 @@ object Restore {
             appCtx.toastOnUi("$fileName\n读取文件出错\n${e.localizedMessage}")
         }
         return null
+    }
+
+    private fun fileToBookList(path: String): List<Book>? {
+        val fileName = "bookshelf.json"
+        try {
+            val file = File(path, fileName)
+            if (file.exists()) {
+                LogUtils.d(TAG, "阅读恢复备份 $fileName 文件大小 ${file.length()}")
+                val list = arrayListOf<Book>()
+                file.reader().use { reader ->
+                    val jsonArray = JsonParser.parseReader(reader).asJsonArray
+                    jsonArray.forEachIndexed { index, element ->
+                        val bookJson = element.deepCopy()
+                        sanitizeBookJson(bookJson)
+                        runCatching {
+                            GSON.fromJson(bookJson, Book::class.java)
+                        }.onSuccess { book ->
+                            if (book != null) {
+                                list.add(book)
+                            }
+                        }.onFailure {
+                            AppLog.put("$fileName 第${index + 1}项读取失败\n${it.localizedMessage}", it)
+                        }
+                    }
+                }
+                LogUtils.d(TAG, "阅读恢复备份 $fileName 列表大小 ${list.size}")
+                return list
+            } else {
+                LogUtils.d(TAG, "阅读恢复备份 $fileName 文件不存在")
+            }
+        } catch (e: Exception) {
+            AppLog.put("$fileName\n读取解析出错\n${e.localizedMessage}", e)
+            appCtx.toastOnUi("$fileName\n读取文件出错\n${e.localizedMessage}")
+        }
+        return null
+    }
+
+    private fun sanitizeBookJson(element: JsonElement) {
+        if (!element.isJsonObject) {
+            return
+        }
+        val bookJson = element.asJsonObject
+        val readConfig = bookJson.get("readConfig") ?: return
+        if (!readConfig.isJsonObject) {
+            bookJson.remove("readConfig")
+            return
+        }
+        sanitizeReadConfigJson(readConfig.asJsonObject)
+    }
+
+    private fun sanitizeReadConfigJson(readConfig: JsonObject) {
+        val startDate = readConfig.get("startDate") ?: return
+        if (startDate.isJsonPrimitive && startDate.asJsonPrimitive.isString) {
+            val legacyStartDate = runCatching {
+                JsonParser.parseString(startDate.asString)
+            }.getOrNull()
+            if (legacyStartDate?.isJsonObject == true &&
+                legacyStartDate.asJsonObject.isValidLocalDateJson()
+            ) {
+                readConfig.add("startDate", legacyStartDate)
+            } else {
+                readConfig.remove("startDate")
+            }
+        } else if (startDate.isJsonObject && !startDate.asJsonObject.isValidLocalDateJson()) {
+            readConfig.remove("startDate")
+        }
+    }
+
+    private fun JsonObject.isValidLocalDateJson(): Boolean {
+        val year = getIntOrNull("year") ?: return true
+        val month = getIntOrNull("month") ?: return true
+        val day = getIntOrNull("day") ?: return true
+        return year > 0 && month in 1..12 && day in 1..31
+    }
+
+    private fun JsonObject.getIntOrNull(name: String): Int? {
+        val value = get(name)?.takeIf { it.isJsonPrimitive } ?: return null
+        return runCatching { value.asInt }.getOrNull()
+    }
+
+    private fun restoreBackgroundAssets(path: String) {
+        backgroundAssetDirNames.forEach { dirName ->
+            val sourceDir = File(path, dirName)
+            if (!sourceDir.exists() || !sourceDir.isDirectory) return@forEach
+            val targetDir = appCtx.externalFiles.getFile(dirName)
+            kotlin.runCatching {
+                FileUtils.delete(targetDir, deleteRootDir = true)
+                copyDir(sourceDir, targetDir)
+            }.onFailure {
+                AppLog.put("恢复背景图片出错 $dirName\n${it.localizedMessage}", it)
+            }
+        }
+    }
+
+    private fun restoreThemePackages(path: String) {
+        val sourceDir = File(path, "themePackages")
+        if (!sourceDir.exists() || !sourceDir.isDirectory) return
+        val targetDir = ThemePackageManager.rootDir
+        kotlin.runCatching {
+            FileUtils.delete(targetDir, deleteRootDir = true)
+            copyDir(sourceDir, targetDir)
+        }.onFailure {
+            AppLog.put("恢复主题包出错\n${it.localizedMessage}", it)
+        }
+    }
+
+    private fun restoreNavigationIcons(path: String) {
+        val sourceDir = File(path, "navigationBarPackages")
+        if (!sourceDir.exists() || !sourceDir.isDirectory) return
+        val targetDir = NavigationBarIconConfig.rootDir
+        kotlin.runCatching {
+            FileUtils.delete(targetDir, deleteRootDir = true)
+            copyDir(sourceDir, targetDir)
+        }.onFailure {
+            AppLog.put("恢复导航栏图标出错\n${it.localizedMessage}", it)
+        }
+    }
+
+    private fun normalizeBackgroundPrefs() {
+        val edit = appCtx.defaultSharedPreferences.edit()
+        var changed = false
+        backgroundAssetDirNames.forEach { key ->
+            val current = appCtx.getPrefString(key) ?: return@forEach
+            if (current.isBlank() || current.startsWith("http")) return@forEach
+            if (File(current).exists()) return@forEach
+            val fileName = File(current).name.takeIf { it.isNotBlank() } ?: return@forEach
+            val restoredFile = appCtx.externalFiles.getFile(key, fileName)
+            if (restoredFile.exists()) {
+                edit.putString(key, restoredFile.absolutePath)
+                changed = true
+            }
+        }
+        if (changed) {
+            edit.commit()
+        }
+    }
+
+    private fun normalizeStringPrefs() {
+        val stringKeys = setOf(
+            PreferKey.language,
+            PreferKey.themeMode,
+            PreferKey.userAgent,
+            PreferKey.customHosts,
+            PreferKey.bookGroupStyle,
+            PreferKey.bookshelfHiddenTags,
+            PreferKey.bookshelfGroupTags,
+            PreferKey.ttsEngine,
+            PreferKey.prevKeys,
+            PreferKey.nextKeys,
+            PreferKey.mergedDiscoveryRssTarget,
+            PreferKey.modernDiscoverySourceUrl,
+            PreferKey.modernRssSourceUrl,
+            PreferKey.aiProviderList,
+            PreferKey.aiCurrentProviderId,
+            PreferKey.aiModelConfigList,
+            PreferKey.aiCurrentModelId,
+            PreferKey.aiMcpServerList,
+            PreferKey.aiChatSessionList,
+            PreferKey.aiReadHistoryList,
+            PreferKey.themePackageSyncTasks,
+            PreferKey.aiCurrentChatSessionId,
+            PreferKey.aiSystemPrompt,
+            PreferKey.aiSkillPrompt,
+            PreferKey.aiSkillList,
+            PreferKey.aiTavilyApiKey,
+            PreferKey.aiTavilyBaseUrl,
+            PreferKey.aiTavilySearchDepth,
+            PreferKey.aiTavilyTopic,
+            PreferKey.aiBaseUrl,
+            PreferKey.aiApiKey,
+            PreferKey.aiCurrentModel,
+            PreferKey.aiModelList,
+            PreferKey.bookExportFileName,
+            PreferKey.bookImportFileName,
+            PreferKey.episodeExportFileName,
+            PreferKey.fontFolder,
+            PreferKey.backupPath,
+            PreferKey.webDavUrl,
+            PreferKey.webDavAccount,
+            PreferKey.webDavPassword,
+            PreferKey.webDavDir,
+            PreferKey.exportCharset,
+            PreferKey.chineseConverterType,
+            PreferKey.launcherIcon,
+            PreferKey.uiFontPath,
+            PreferKey.titleFontPath,
+            PreferKey.bottomBarEffectMode,
+            PreferKey.bottomBarLayoutMode,
+            PreferKey.bottomBarSidebarGravity,
+            PreferKey.uiCornerScale,
+            PreferKey.defaultCover,
+            PreferKey.defaultCoverDark,
+            PreferKey.screenOrientation,
+            PreferKey.mangaFooterConfig,
+            PreferKey.mangaColorFilter,
+            PreferKey.contentSelectMenuConfig,
+            PreferKey.contentSelectActions,
+            PreferKey.contentSelectDefaultOpen,
+            PreferKey.advancedTitleConfig,
+            PreferKey.advancedTitleLottieJson,
+            PreferKey.advancedTitleLottiePath,
+            PreferKey.doublePageHorizontal,
+            PreferKey.defaultBookTreeUri,
+            PreferKey.readRecordComponents,
+            PreferKey.readRecordRecentSnapshots,
+            PreferKey.readRecordGoalConfig,
+            PreferKey.welcomeImage,
+            PreferKey.welcomeImageDark,
+            PreferKey.progressBarBehavior,
+            PreferKey.webDavDeviceName,
+            PreferKey.defaultHomePage,
+            PreferKey.clickImgWay,
+            PreferKey.dThemeName,
+            PreferKey.dNThemeName,
+            PreferKey.bgImage,
+            PreferKey.bookInfoBgImage,
+            PreferKey.bgImageN,
+            PreferKey.bookInfoBgImageN,
+            "navigationBarPackageDay",
+            "navigationBarPackageNight"
+        )
+        val all = appCtx.defaultSharedPreferences.all
+        val edit = appCtx.defaultSharedPreferences.edit()
+        var changed = false
+        stringKeys.forEach { key ->
+            val value = all[key] ?: return@forEach
+            if (value !is String) {
+                edit.putString(key, value.toString())
+                changed = true
+            }
+        }
+        if (changed) {
+            edit.commit()
+        }
+    }
+
+    private fun copyDir(source: File, target: File) {
+        if (!target.exists()) {
+            target.mkdirs()
+        }
+        source.listFiles()?.forEach { file ->
+            val targetFile = File(target, file.name)
+            if (file.isDirectory) {
+                copyDir(file, targetFile)
+            } else {
+                targetFile.parentFile?.mkdirs()
+                file.copyTo(targetFile, overwrite = true)
+            }
+        }
     }
 
 }

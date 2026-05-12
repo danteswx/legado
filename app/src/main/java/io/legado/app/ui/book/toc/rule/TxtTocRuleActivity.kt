@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import androidx.activity.viewModels
-import androidx.appcompat.widget.PopupMenu
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
 import io.legado.app.R
@@ -45,7 +44,7 @@ class TxtTocRuleActivity : VMBaseActivity<ActivityTxtTocRuleBinding, TxtTocRuleV
     TxtTocRuleAdapter.CallBack,
     SelectActionBar.CallBack,
     TxtTocRuleEditDialog.Callback,
-    PopupMenu.OnMenuItemClickListener {
+    MenuItem.OnMenuItemClickListener {
 
     override val viewModel by viewModels<TxtTocRuleViewModel>()
     override val binding by viewBinding(ActivityTxtTocRuleBinding::inflate)
@@ -116,6 +115,16 @@ class TxtTocRuleActivity : VMBaseActivity<ActivityTxtTocRuleBinding, TxtTocRuleV
                 adapter.setItems(tocRules, adapter.diffItemCallBack)
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        adapter.upResumed(true)
+    }
+
+    override fun onPause() {
+        adapter.upResumed(false)
+        super.onPause()
     }
 
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {

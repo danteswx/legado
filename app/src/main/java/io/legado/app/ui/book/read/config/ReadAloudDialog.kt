@@ -33,7 +33,7 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud) {
         super.onStart()
         dialog?.window?.run {
             clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            setBackgroundDrawableResource(R.color.background)
+            setBackgroundDrawableResource(android.R.color.transparent)
             decorView.setPadding(0, 0, 0, 0)
             val attr = attributes
             attr.dimAmount = 0.0f
@@ -57,8 +57,13 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud) {
         val bg = requireContext().bottomBackground
         val isLight = ColorUtils.isColorLight(bg)
         val textColor = requireContext().getPrimaryTextColor(isLight)
+        val palette = ReaderSheetStyle.resolve(requireContext())
         binding.run {
-            rootView.setBackgroundColor(bg)
+            rootView.background = ReaderSheetStyle.topSheetDrawable(palette)
+            panelTransport.background = null
+            panelTimer.background = null
+            panelTts.background = null
+            panelActions.background = null
             tvPre.setTextColor(textColor)
             tvNext.setTextColor(textColor)
             ivPlayPrev.setColorFilter(textColor)
@@ -68,7 +73,7 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud) {
             ivTimer.setColorFilter(textColor)
             tvTimer.setTextColor(textColor)
             ivTtsSpeechReduce.setColorFilter(textColor)
-            tvTtsSpeed.setTextColor(textColor)
+            tvTtsSpeed.setTextColor(palette.secondaryTextColor)
             tvTtsSpeedValue.setTextColor(textColor)
             ivTtsSpeechAdd.setColorFilter(textColor)
             ivCatalog.setColorFilter(textColor)
@@ -181,10 +186,7 @@ class ReadAloudDialog : BaseDialogFragment(R.layout.dialog_read_aloud) {
             binding.ivPlayPause.setImageResource(R.drawable.ic_play_24dp)
             binding.ivPlayPause.contentDescription = getString(R.string.audio_play)
         }
-        val bg = requireContext().bottomBackground
-        val isLight = ColorUtils.isColorLight(bg)
-        val textColor = requireContext().getPrimaryTextColor(isLight)
-        binding.ivPlayPause.setColorFilter(textColor)
+        binding.ivPlayPause.setColorFilter(ReaderSheetStyle.resolve(requireContext()).textColor)
     }
 
     private fun upSeekTimer() {

@@ -3,10 +3,10 @@ package io.legado.app.base
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.Configuration
-import android.graphics.drawable.BitmapDrawable
 import android.os.Build
 import android.os.Bundle
 import android.util.AttributeSet
+import android.view.Display
 import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
@@ -15,6 +15,7 @@ import android.widget.FrameLayout
 import androidx.activity.addCallback
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
 import androidx.viewbinding.ViewBinding
 import io.legado.app.R
 import io.legado.app.constant.AppConst
@@ -23,11 +24,9 @@ import io.legado.app.constant.Theme
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ThemeConfig
 import io.legado.app.lib.theme.ThemeStore
-import io.legado.app.lib.theme.backgroundColor
-import io.legado.app.lib.theme.primaryColor
+import io.legado.app.lib.theme.UiCorner
 import io.legado.app.ui.widget.TitleBar
 import io.legado.app.utils.ColorUtils
-import io.legado.app.utils.applyBackgroundTint
 import io.legado.app.utils.applyOpenTint
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.disableAutoFill
@@ -39,16 +38,17 @@ import io.legado.app.utils.setStatusBarColorAuto
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.windowSize
 
-
 abstract class BaseActivity<VB : ViewBinding>(
     val fullScreen: Boolean = true,
     private val theme: Theme = Theme.Auto,
     private val toolBarTheme: Theme = Theme.Auto,
     private val transparent: Boolean = false,
-    private val imageBg: Boolean = true
+    private val imageBg: Boolean = true,
+    private val showOpenMenuIcon: Boolean = true
 ) : AppCompatActivity() {
 
     protected abstract val binding: VB
+    private var lastThemeValuesChanged = 0L
 
     val isInMultiWindow: Boolean
         @SuppressLint("ObsoleteSdkInt")
@@ -71,7 +71,10 @@ abstract class BaseActivity<VB : ViewBinding>(
         attrs: AttributeSet
     ): View? {
         if (AppConst.menuViewNames.contains(name) && parent?.parent is FrameLayout) {
-            (parent.parent as View).setBackgroundColor(backgroundColor)
+            (parent.parent as View).background = UiCorner.opaqueRounded(
+                androidx.core.content.ContextCompat.getColor(context, R.color.background_card),
+                UiCorner.panelRadius(context)
+            )
         }
         return super.onCreateView(parent, name, context, attrs)
     }
@@ -81,9 +84,12 @@ abstract class BaseActivity<VB : ViewBinding>(
         window.decorView.disableAutoFill()
         initTheme()
         super.onCreate(savedInstanceState)
+        applyPreferredRefreshRate()
         setupSystemBar()
         setContentView(binding.root)
+        applyRootBackgroundPolicy()
         upBackgroundImage()
+        lastThemeValuesChanged = ThemeStore.valuesChanged(this)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             findViewById<TitleBar>(R.id.title_bar)
                 ?.onMultiWindowModeChanged(isInMultiWindowMode, fullScreen)
@@ -93,6 +99,22 @@ abstract class BaseActivity<VB : ViewBinding>(
         }
         observeLiveBus()
         onActivityCreated(savedInstanceState)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        applyPreferredRefreshRate()
+        refreshThemeBackgroundIfChanged()
+    }
+
+    private fun refreshThemeBackgroundIfChanged() {
+        val valuesChanged = ThemeStore.valuesChanged(this)
+        if (valuesChanged != lastThemeValuesChanged) {
+            lastThemeValuesChanged = valuesChanged
+            setupSystemBar()
+            applyRootBackgroundPolicy()
+            upBackgroundImage()
+        }
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -105,6 +127,7 @@ abstract class BaseActivity<VB : ViewBinding>(
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        applyPreferredRefreshRate()
         findViewById<TitleBar>(R.id.title_bar)
             ?.onMultiWindowModeChanged(isInMultiWindow, fullScreen)
         setupSystemBar()
@@ -119,7 +142,7 @@ abstract class BaseActivity<VB : ViewBinding>(
     }
 
     override fun onMenuOpened(featureId: Int, menu: Menu): Boolean {
-        menu.applyOpenTint(this)
+        menu.applyOpenTint(this, showOpenMenuIcon)
         return super.onMenuOpened(featureId, menu)
     }
 
@@ -140,36 +163,65 @@ abstract class BaseActivity<VB : ViewBinding>(
             Theme.Transparent -> setTheme(R.style.AppTheme_Transparent)
             Theme.Dark -> {
                 setTheme(R.style.AppTheme_Dark)
-                window.decorView.applyBackgroundTint(backgroundColor)
+                applyInitialWindowBackground()
             }
 
             Theme.Light -> {
                 setTheme(R.style.AppTheme_Light)
-                window.decorView.applyBackgroundTint(backgroundColor)
+                applyInitialWindowBackground()
             }
 
             else -> {
-                if (ColorUtils.isColorLight(primaryColor)) {
-                    setTheme(R.style.AppTheme_Light)
-                } else {
+                if (AppConfig.isNightTheme) {
                     setTheme(R.style.AppTheme_Dark)
+                } else {
+                    setTheme(R.style.AppTheme_Light)
                 }
-                window.decorView.applyBackgroundTint(backgroundColor)
+                applyInitialWindowBackground()
             }
         }
     }
 
+    private fun applyWindowBackgroundColor() {
+        ViewCompat.setBackgroundTintList(window.decorView, null)
+        window.decorView.setBackgroundColor(ThemeConfig.getFallbackBackgroundColor(this))
+    }
+
+    private fun applyInitialWindowBackground() {
+        if (imageBg && !AppConfig.isEInkMode && ThemeConfig.hasUsableBgImage(this)) {
+            ViewCompat.setBackgroundTintList(window.decorView, null)
+            window.decorView.background = null
+        } else {
+            applyWindowBackgroundColor()
+        }
+    }
+
+    private fun applyRootBackgroundPolicy() {
+        if (imageBg && !AppConfig.isEInkMode && ThemeConfig.hasUsableBgImage(this)) {
+            ViewCompat.setBackgroundTintList(binding.root, null)
+            binding.root.background = null
+        }
+    }
+
     open fun upBackgroundImage() {
-        if (imageBg) {
-            try {
-                ThemeConfig.getBgImage(this, windowManager.windowSize)?.let {
-                    window.decorView.background = BitmapDrawable(resources, it)
-                }
-            } catch (e: OutOfMemoryError) {
-                toastOnUi("背景图片太大,内存溢出")
-            } catch (e: Exception) {
-                AppLog.put("加载背景出错\n${e.localizedMessage}", e)
+        if (!imageBg || AppConfig.isEInkMode) {
+            applyWindowBackgroundColor()
+            return
+        }
+        try {
+            val drawable = ThemeConfig.getBgImage(this, windowManager.windowSize)
+            if (drawable != null) {
+                ViewCompat.setBackgroundTintList(window.decorView, null)
+                window.decorView.background = drawable
+            } else {
+                applyWindowBackgroundColor()
             }
+        } catch (_: OutOfMemoryError) {
+            applyWindowBackgroundColor()
+            toastOnUi(R.string.background_image_too_large)
+        } catch (e: Exception) {
+            applyWindowBackgroundColor()
+            AppLog.put(getString(R.string.background_image_load_error, e.localizedMessage), e)
         }
     }
 
@@ -186,6 +238,52 @@ abstract class BaseActivity<VB : ViewBinding>(
             setLightStatusBar(true)
         }
         upNavigationBarColor()
+    }
+
+    @SuppressLint("ObsoleteSdkInt")
+    open fun applyPreferredRefreshRate() {
+        val layoutParams = window.attributes
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val display = currentDisplay()
+            val targetMode = resolvePreferredDisplayMode(display)
+            layoutParams.preferredDisplayModeId = targetMode?.modeId ?: 0
+            layoutParams.preferredRefreshRate = when {
+                targetMode != null -> targetMode.refreshRate
+                AppConfig.useHighRefreshRate -> 0f
+                else -> 60f
+            }
+        } else {
+            layoutParams.preferredRefreshRate = if (AppConfig.useHighRefreshRate) 0f else 60f
+        }
+        window.attributes = layoutParams
+    }
+
+    @SuppressLint("ObsoleteSdkInt")
+    private fun currentDisplay(): Display? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            display
+        } else {
+            windowManager.defaultDisplay
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.M)
+    private fun resolvePreferredDisplayMode(display: Display?): Display.Mode? {
+        display ?: return null
+        val currentMode = display.mode
+        val sameResolutionModes = display.supportedModes.filter {
+            it.physicalWidth == currentMode.physicalWidth &&
+                it.physicalHeight == currentMode.physicalHeight
+        }
+        if (sameResolutionModes.isEmpty()) return null
+        return if (AppConfig.useHighRefreshRate) {
+            sameResolutionModes.maxByOrNull { it.refreshRate }
+        } else {
+            sameResolutionModes
+                .filter { it.refreshRate <= 61f }
+                .maxByOrNull { it.refreshRate }
+                ?: sameResolutionModes.minByOrNull { it.refreshRate }
+        }
     }
 
     open fun upNavigationBarColor() {

@@ -5,36 +5,40 @@ package io.legado.app.ui.main.bookshelf.style1
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
-import androidx.appcompat.widget.SearchView
+import android.widget.PopupWindow
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
 import androidx.fragment.app.FragmentStatePagerAdapter
-import com.google.android.material.tabs.TabLayout
+import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
+import io.legado.app.constant.EventBus
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.databinding.FragmentBookshelf1Binding
+import io.legado.app.help.book.BookTagHelper
 import io.legado.app.help.config.AppConfig
-import io.legado.app.lib.theme.accentColor
+import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
-import io.legado.app.ui.book.group.GroupEditDialog
-import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.main.bookshelf.BaseBookshelfFragment
 import io.legado.app.ui.main.bookshelf.style1.books.BooksFragment
+import io.legado.app.ui.widget.ModernActionPopup
+import io.legado.app.ui.widget.RoundedTagBarView
+import io.legado.app.utils.applyStatusBarPadding
 import io.legado.app.utils.isCreated
+import io.legado.app.utils.observeEvent
+import io.legado.app.utils.postEvent
 import io.legado.app.utils.setEdgeEffectColor
-import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
-import kotlin.collections.set
+import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.launch
 
 /**
  * 书架界面
  */
-class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1),
-    TabLayout.OnTabSelectedListener,
-    SearchView.OnQueryTextListener {
+class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1) {
 
     constructor(position: Int) : this() {
         val bundle = Bundle()
@@ -44,11 +48,13 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
 
     private val binding by viewBinding(FragmentBookshelf1Binding::bind)
     private val adapter by lazy { TabFragmentPageAdapter(childFragmentManager) }
-    private val tabLayout: TabLayout by lazy {
-        binding.titleBar.findViewById(R.id.tab_layout)
-    }
     private val bookGroups = mutableListOf<BookGroup>()
     private val fragmentMap = hashMapOf<Long, BooksFragment>()
+    private var groupMenuPopup: PopupWindow? = null
+    private var bookTags = emptyList<String>()
+    private var selectedBookTag = ""
+    private val groupBooksCache = hashMapOf<Long, List<Book>>()
+    private var currentGroupIndex = 0
     override val groupId: Long get() = selectedGroup?.groupId ?: 0
 
     override val books: List<Book>
@@ -57,82 +63,231 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
             return fragment?.getBooks() ?: emptyList()
         }
 
+    override var onlyUpdateRead = false
+
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
-        setSupportToolbar(binding.titleBar.toolbar)
         initView()
         initBookGroupData()
     }
 
     private val selectedGroup: BookGroup?
-        get() = bookGroups.getOrNull(tabLayout.selectedTabPosition)
+        get() = bookGroups.getOrNull(binding.viewPagerBookshelf.currentItem)
 
     private fun initView() {
+        binding.root.applyStatusBarPadding()
         binding.viewPagerBookshelf.setEdgeEffectColor(primaryColor)
-        tabLayout.isTabIndicatorFullWidth = false
-        tabLayout.tabMode = TabLayout.MODE_SCROLLABLE
-        tabLayout.setSelectedTabIndicatorColor(requireContext().accentColor)
-        tabLayout.setupWithViewPager(binding.viewPagerBookshelf)
+        binding.btnMore.setOnClickListener {
+            showModernBookshelfMenu(it)
+        }
+        binding.llTitleSelect.setOnClickListener {
+            showGroupSwitchMenu(it)
+        }
+        binding.tabBarGlassView.visibility = View.GONE
+        binding.tabBarShellOverlay.visibility = View.GONE
+        binding.tabIndicatorContainer.visibility = View.GONE
+        binding.btnMoreGlassView.visibility = View.GONE
+        binding.btnMoreShellOverlay.visibility = View.GONE
+        binding.btnMore.setBackgroundResource(R.drawable.bg_more_icon_button_clear)
+        val iconColor = ContextCompat.getColor(requireContext(), R.color.primaryText)
+        binding.btnMore.setColorFilter(iconColor)
+        binding.ivBookshelfTitleArrow.setColorFilter(iconColor)
+        binding.tabLayout.setOnTagClickListener { index ->
+            val tag = bookTags.getOrNull(index).orEmpty()
+            if (tag == selectedBookTag) {
+                selectedGroup?.let { group ->
+                    fragmentMap[group.groupId]?.let { fragment ->
+                        val label = tag.ifBlank { getString(R.string.bookshelf_tag_all) }
+                        toastOnUi("${group.groupName} · $label(${fragment.getBooksCount()})")
+                    }
+                }
+            } else {
+                selectedBookTag = tag
+                binding.tabLayout.setSelectedIndex(index, smooth = true)
+                fragmentMap[groupId]?.setBookTagFilter(tag)
+            }
+        }
+        binding.tabLayout.setOnTagLongClickListener { index ->
+            selectedBookTag = bookTags.getOrNull(index).orEmpty()
+            fragmentMap[groupId]?.setBookTagFilter(selectedBookTag)
+            true
+        }
         binding.viewPagerBookshelf.offscreenPageLimit = 1
+        binding.viewPagerBookshelf.swipeEnabled = AppConfig.bottomBarLayoutMode != "sidebar"
         binding.viewPagerBookshelf.adapter = adapter
+        binding.viewPagerBookshelf.addOnPageChangeListener(
+            object : androidx.viewpager.widget.ViewPager.SimpleOnPageChangeListener() {
+                override fun onPageSelected(position: Int) {
+                    if (position !in bookGroups.indices) return
+                    currentGroupIndex = position
+                    selectedBookTag = ""
+                    updateHeaderTitle()
+                    val group = bookGroups[position]
+                    fragmentMap[group.groupId]?.setBookTagFilter("")
+                    renderBookTags(groupBooksCache[group.groupId].orEmpty())
+                }
+            }
+        )
+        updateHeaderTitle()
     }
 
-    override fun onQueryTextSubmit(query: String?): Boolean {
-        SearchActivity.start(requireContext(), query)
-        return false
-    }
-
-    override fun onQueryTextChange(newText: String?): Boolean {
-        return false
+    override fun onResume() {
+        super.onResume()
+        binding.viewPagerBookshelf.swipeEnabled = AppConfig.bottomBarLayoutMode != "sidebar"
     }
 
     @Synchronized
     override fun upGroup(data: List<BookGroup>) {
         if (data.isEmpty()) {
             appDb.bookGroupDao.enableGroup(BookGroup.IdAll)
+        } else if (data != bookGroups) {
+            bookGroups.clear()
+            bookGroups.addAll(data)
+            adapter.notifyDataSetChanged()
+            selectSavedGroup()
         } else {
-            if (data != bookGroups) {
-                bookGroups.clear()
-                bookGroups.addAll(data)
-                adapter.notifyDataSetChanged()
-                selectLastTab()
-                for (i in 0 until adapter.count) {
-                    tabLayout.getTabAt(i)?.view?.setOnLongClickListener {
-                        showDialogFragment(GroupEditDialog(bookGroups[i]))
-                        true
-                    }
-                }
-            }
+            renderGroupTags()
         }
+        updateHeaderTitle()
     }
 
     override fun upSort() {
         adapter.notifyDataSetChanged()
     }
 
-    private fun selectLastTab() {
-        tabLayout.post {
-            tabLayout.removeOnTabSelectedListener(this)
-            tabLayout.getTabAt(AppConfig.saveTabPosition)?.select()
-            tabLayout.addOnTabSelectedListener(this)
-        }
-    }
-
-    override fun onTabReselected(tab: TabLayout.Tab) {
-        selectedGroup?.let { group ->
-            fragmentMap[group.groupId]?.let {
-                toastOnUi("${group.groupName}(${it.getBooksCount()})")
+    private fun selectSavedGroup() {
+        binding.viewPagerBookshelf.post {
+            if (bookGroups.isEmpty()) {
+                binding.tabLayout.submitItems(emptyList(), -1)
+                updateHeaderTitle()
+                return@post
             }
+            val target = AppConfig.saveTabPosition.coerceIn(0, bookGroups.lastIndex)
+            switchToGroup(target)
         }
-    }
-
-    override fun onTabUnselected(tab: TabLayout.Tab) = Unit
-
-    override fun onTabSelected(tab: TabLayout.Tab) {
-        AppConfig.saveTabPosition = tab.position
     }
 
     override fun gotoTop() {
         fragmentMap[groupId]?.gotoTop()
+    }
+
+    private fun renderGroupTags() {
+        renderBookTags(emptyList())
+    }
+
+    private fun updateHeaderTitle() {
+        binding.tvBookshelfTitle.text = selectedGroup?.groupName ?: getString(R.string.bookshelf)
+    }
+
+    fun onBooksChanged(groupId: Long, books: List<Book>) {
+        groupBooksCache[groupId] = books
+        if (groupId != this.groupId) return
+        renderBookTags(books)
+    }
+
+    private fun renderBookTags(books: List<Book>) {
+        if (!isAdded) return
+        val allText = getString(R.string.bookshelf_tag_all)
+        val storedTags = AppConfig.bookshelfGroupTags[groupId].orEmpty()
+        val tags = storedTags.ifEmpty {
+            val migratedTags = books.asSequence()
+                .flatMap { BookTagHelper.parse(it.customTag).asSequence() }
+                .distinct()
+                .sorted()
+                .toList()
+            if (migratedTags.isNotEmpty()) {
+                val map = AppConfig.bookshelfGroupTags.toMutableMap()
+                map[groupId] = migratedTags
+                AppConfig.bookshelfGroupTags = map
+            }
+            migratedTags
+        }
+            .filterNot { it in AppConfig.bookshelfHiddenTags[groupId].orEmpty() }
+        bookTags = listOf("") + tags
+        if (selectedBookTag.isNotBlank() && selectedBookTag !in tags) {
+            selectedBookTag = ""
+            fragmentMap[groupId]?.setBookTagFilter("")
+        }
+        binding.tabLayout.submitItems(
+            bookTags.map { RoundedTagBarView.Item(it.ifBlank { allText }) },
+            bookTags.indexOf(selectedBookTag).takeIf { it >= 0 } ?: 0
+        )
+    }
+
+    private fun showGroupSwitchMenu(anchor: View) {
+        if (bookGroups.isEmpty()) return
+        val selectedId = selectedGroup?.groupId
+        val actions = bookGroups.mapIndexed { index, group ->
+            val prefix = if (group.groupId == selectedId) "✓ " else ""
+            ModernActionPopup.Action(prefix + group.groupName) {
+                selectedBookTag = ""
+                switchToGroup(index)
+            }
+        }
+        groupMenuPopup = ModernActionPopup.show(anchor, actions, groupMenuPopup)
+    }
+
+    private fun switchToGroup(index: Int) {
+        if (index !in bookGroups.indices) return
+        currentGroupIndex = index
+        binding.viewPagerBookshelf.setCurrentItem(index, false)
+        AppConfig.saveTabPosition = index
+        selectedBookTag = ""
+        fragmentMap[groupId]?.setBookTagFilter("")
+        renderBookTags(groupBooksCache[groupId].orEmpty())
+        updateHeaderTitle()
+    }
+
+    fun switchToGroupId(groupId: Long) {
+        val index = bookGroups.indexOfFirst { it.groupId == groupId }
+        if (index >= 0) {
+            switchToGroup(index)
+        }
+    }
+
+    override fun showBookTagManageAlert() {
+        val group = selectedGroup ?: return
+        val targetBooks = groupBooksCache[group.groupId].orEmpty()
+        val tags = targetBooks
+            .flatMap { BookTagHelper.parse(it.customTag) }
+            .distinct()
+            .sorted()
+        if (tags.isEmpty()) {
+            toastOnUi(R.string.bookshelf_tag_none)
+            return
+        }
+        val checked = BooleanArray(tags.size) { true }
+        val labels = tags.map { tag ->
+            "$tag (${targetBooks.count { BookTagHelper.has(it.customTag, tag) }})"
+        }.toTypedArray()
+        alert(title = "${group.groupName} · ${getString(R.string.bookshelf_tag_manage)}") {
+            setMessage(getString(R.string.bookshelf_tag_manage_hint))
+            multiChoiceItems(labels, checked) { _, which, isChecked ->
+                checked[which] = isChecked
+            }
+            okButton {
+                val keepTags = tags.filterIndexed { index, _ -> checked[index] }.toSet()
+                lifecycleScope.launch(IO) {
+                    targetBooks.forEach { book ->
+                        val normalized = BookTagHelper.join(
+                            BookTagHelper.parse(book.customTag).filter { it in keepTags }
+                        )
+                        if (normalized != book.customTag) {
+                            book.customTag = normalized
+                            appDb.bookDao.update(book)
+                        }
+                    }
+                    postEvent(EventBus.BOOKSHELF_REFRESH, "")
+                }
+            }
+            cancelButton()
+        }
+    }
+
+    override fun observeLiveBus() {
+        super.observeLiveBus()
+        observeEvent<String>(EventBus.BOOKSHELF_REFRESH) {
+            renderBookTags(groupBooksCache[groupId].orEmpty())
+        }
     }
 
     private inner class TabFragmentPageAdapter(fm: FragmentManager) :
@@ -163,6 +318,7 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
 
         override fun getItem(position: Int): Fragment {
             val group = bookGroups[position]
+            onlyUpdateRead = group.onlyUpdateRead
             return BooksFragment(position, group)
         }
 

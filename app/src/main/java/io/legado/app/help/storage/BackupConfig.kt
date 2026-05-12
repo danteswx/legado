@@ -89,17 +89,26 @@ object BackupConfig {
         PreferKey.cBBackground,
         PreferKey.bgImage,
         PreferKey.bgImageBlurring,
+        PreferKey.bookInfoBgImage,
+        PreferKey.uiCornerScale,
+        PreferKey.uiLayoutAlpha,
+        PreferKey.uiCornerSearchFollow,
+        PreferKey.uiCornerReplyFollow,
+        PreferKey.tNavBar,
         PreferKey.cNPrimary,
         PreferKey.cNAccent,
         PreferKey.cNBackground,
         PreferKey.cNBBackground,
         PreferKey.bgImageN,
-        PreferKey.bgImageNBlurring
+        PreferKey.bgImageNBlurring,
+        PreferKey.bookInfoBgImageN,
+        PreferKey.tNavBarN
     )
 
     private val coverPrefKeys = arrayOf(
         PreferKey.useDefaultCover,
         PreferKey.loadCoverOnlyWifi,
+        PreferKey.loadCoverHighQuality,
         PreferKey.coverShowName,
         PreferKey.coverShowAuthor,
         PreferKey.coverShowNameN,

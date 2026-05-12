@@ -1,6 +1,7 @@
 package io.legado.app.ui.main.bookshelf.style1.books
 
 import android.annotation.SuppressLint
+import android.graphics.Rect
 import android.os.Bundle
 import android.view.View
 import android.view.ViewConfiguration
@@ -22,12 +23,15 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.databinding.FragmentBooksBinding
+import io.legado.app.help.book.BookTagHelper
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.main.MainViewModel
 import io.legado.app.utils.cnCompare
+import io.legado.app.utils.applyMainBottomBarPadding
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.flowWithLifecycleAndDatabaseChangeFirst
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.setEdgeEffectColor
@@ -57,6 +61,7 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
         bundle.putLong("groupId", group.groupId)
         bundle.putInt("bookSort", group.getRealBookSort())
         bundle.putBoolean("enableRefresh", group.enableRefresh)
+        bundle.putBoolean("onlyUpdateRead", group.onlyUpdateRead)
         arguments = bundle
     }
 
@@ -64,10 +69,16 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
     private val activityViewModel by activityViewModels<MainViewModel>()
     private val bookshelfLayout by lazy { AppConfig.bookshelfLayout }
     private val booksAdapter: BaseBooksAdapter<*> by lazy {
-        if (bookshelfLayout == 0) {
-            BooksAdapterList(requireContext(), this, this, viewLifecycleOwner.lifecycle)
-        } else {
-            BooksAdapterGrid(requireContext(), this)
+        when (bookshelfLayout) {
+            0 -> {
+                BooksAdapterList(requireContext(), this, this, viewLifecycleOwner.lifecycle)
+            }
+            1 -> {
+                BooksAdapterList2(requireContext(), this, this, viewLifecycleOwner.lifecycle)
+            }
+            else -> {
+                BooksAdapterGrid(requireContext(), this)
+            }
         }
     }
     private var booksFlowJob: Job? = null
@@ -79,6 +90,11 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
         private set
     private var upLastUpdateTimeJob: Job? = null
     private var enableRefresh = true
+    private var onlyUpdateRead = false
+    private var bookTagFilter = ""
+    private val bookshelfMargin by lazy { AppConfig.bookshelfMargin }
+    private var itemCount = 0
+    private var totalRows = 0
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         arguments?.let {
@@ -86,6 +102,7 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
             groupId = it.getLong("groupId", -1)
             bookSort = it.getInt("bookSort", 0)
             enableRefresh = it.getBoolean("enableRefresh", true)
+            onlyUpdateRead = it.getBoolean("onlyUpdateRead", false)
             binding.refreshLayout.isEnabled = enableRefresh
         }
         initRecyclerView()
@@ -94,40 +111,82 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
 
     private fun initRecyclerView() {
         binding.rvBookshelf.setEdgeEffectColor(primaryColor)
+        binding.rvBookshelf.clipToPadding = true
+        binding.rvBookshelf.applyMainBottomBarPadding()
         upFastScrollerBar()
         binding.refreshLayout.setColorSchemeColors(accentColor)
+        binding.refreshLayout.setProgressViewOffset(true, (-28).dpToPx(), 56.dpToPx())
         binding.refreshLayout.setOnRefreshListener {
             binding.refreshLayout.isRefreshing = false
-            activityViewModel.upToc(booksAdapter.getItems())
-            // 检查WebDAV远端是否有更新
-            activityViewModel.checkAndRestoreFromWebDav()
+            activityViewModel.upToc(booksAdapter.getItems(), onlyUpdateRead)
         }
-        if (bookshelfLayout == 0) {
-            binding.rvBookshelf.layoutManager = LinearLayoutManager(context)
-        } else {
-            binding.rvBookshelf.layoutManager = GridLayoutManager(context, bookshelfLayout + 2)
-        }
-        if (bookshelfLayout == 0) {
-            binding.rvBookshelf.setRecycledViewPool(activityViewModel.booksListRecycledViewPool)
-        } else {
+        if (bookshelfLayout >= 2) {
+            binding.rvBookshelf.layoutManager = GridLayoutManager(context, bookshelfLayout)
             binding.rvBookshelf.setRecycledViewPool(activityViewModel.booksGridRecycledViewPool)
+        } else {
+            binding.rvBookshelf.layoutManager = LinearLayoutManager(context)
+            binding.rvBookshelf.setRecycledViewPool(activityViewModel.booksListRecycledViewPool)
         }
         booksAdapter.stateRestorationPolicy = StateRestorationPolicy.PREVENT_WHEN_EMPTY
         binding.rvBookshelf.adapter = booksAdapter
-        booksAdapter.registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
-            override fun onItemRangeInserted(positionStart: Int, itemCount: Int) {
-                val layoutManager = binding.rvBookshelf.layoutManager
-                if (positionStart == 0 && itemCount == 1 && layoutManager is LinearLayoutManager) {
-                    val scrollTo = layoutManager.findFirstVisibleItemPosition() - itemCount
-                    binding.rvBookshelf.scrollToPosition(max(0, scrollTo))
-                }
-            }
-
-            override fun onItemRangeMoved(fromPosition: Int, toPosition: Int, itemCount: Int) {
-                val layoutManager = binding.rvBookshelf.layoutManager
-                if (toPosition == 0 && itemCount == 1 && layoutManager is LinearLayoutManager) {
-                    val scrollTo = layoutManager.findFirstVisibleItemPosition() - itemCount
-                    binding.rvBookshelf.scrollToPosition(max(0, scrollTo))
+        /**
+         * 应该是当初没有使用override val keepScrollPosition = true 加的代码
+         * 最近阅读插入顶部时会造成滚动
+         * 但是采用keepScrollPosition = true复原滚动后,代码就多余了
+         * 采用下面代码反而会向上多滚动一个行
+         * 再加上2025/12/19代码,因为下面的代码会出现很奇怪的自动滚动到顶部现象,没理出原因,注释掉下面代码
+         * **/
+//        booksAdapter.registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
+//            override fun onItemRangeInserted(positionStart: Int, itemCount: Int) {
+//                val layoutManager = binding.rvBookshelf.layoutManager
+//                if (positionStart == 0 && itemCount == 1 && layoutManager is LinearLayoutManager) {
+//                    val scrollTo = layoutManager.findFirstVisibleItemPosition() - itemCount
+//                    binding.rvBookshelf.scrollToPosition(max(0, scrollTo))
+//                }
+//            }
+//
+//            override fun onItemRangeMoved(fromPosition: Int, toPosition: Int, itemCount: Int) {
+//                val layoutManager = binding.rvBookshelf.layoutManager
+//                if (toPosition == 0 && itemCount == 1 && layoutManager is LinearLayoutManager) {
+//                    val scrollTo = layoutManager.findFirstVisibleItemPosition() - itemCount
+//                    binding.rvBookshelf.scrollToPosition(max(0, scrollTo))
+//                }
+//            }
+//        })
+        binding.rvBookshelf.addItemDecoration( object : RecyclerView.ItemDecoration() {
+            override fun getItemOffsets(
+                outRect: Rect,
+                view: View,
+                parent: RecyclerView,
+                state: RecyclerView.State
+            ) {
+                val position = parent.getChildAdapterPosition(view)
+                if (bookshelfLayout >= 2) {
+                    val spanCount = bookshelfLayout
+                    val rowIndex = position / spanCount
+                    when (rowIndex) {
+                        0 -> { //第一行加额外上边距
+                            outRect.set(bookshelfMargin, bookshelfMargin + 24, bookshelfMargin, bookshelfMargin)
+                        }
+                        totalRows - 1 -> { //最后一行加额外下边距
+                            outRect.set(bookshelfMargin, bookshelfMargin, bookshelfMargin, bookshelfMargin)
+                        }
+                        else -> {
+                            outRect.set(bookshelfMargin, bookshelfMargin, bookshelfMargin, bookshelfMargin)
+                        }
+                    }
+                } else {
+                    when (position) {
+                        0 -> {
+                            outRect.set(0, bookshelfMargin + 24, 0, bookshelfMargin)
+                        }
+                        itemCount - 1 -> {
+                            outRect.set(0, bookshelfMargin, 0, bookshelfMargin)
+                        }
+                        else -> {
+                            outRect.set(0, bookshelfMargin, 0, bookshelfMargin)
+                        }
+                    }
                 }
             }
         })
@@ -158,6 +217,13 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
         binding.refreshLayout.isEnabled = enable
     }
 
+    fun setBookTagFilter(tag: String) {
+        val normalized = tag.trim()
+        if (bookTagFilter == normalized) return
+        bookTagFilter = normalized
+        upRecyclerData()
+    }
+
     /**
      * 更新书籍列表信息
      */
@@ -185,15 +251,29 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
 
                     else -> list.sortedByDescending { it.durChapterTime }
                 }
+            }.map { list ->
+                val filteredList = if (bookTagFilter.isBlank()) {
+                    list
+                } else {
+                    list.filter { it.hasCustomTag(bookTagFilter) }
+                }
+                list to filteredList
             }.flowWithLifecycleAndDatabaseChangeFirst(
                 viewLifecycleOwner.lifecycle,
                 Lifecycle.State.RESUMED,
                 AppDatabase.BOOK_TABLE_NAME
             ).catch {
                 AppLog.put("书架更新出错", it)
-            }.conflate().flowOn(Dispatchers.Default).collect { list ->
-                binding.tvEmptyMsg.isGone = list.isNotEmpty()
-                binding.refreshLayout.isEnabled = enableRefresh && list.isNotEmpty()
+            }.conflate().flowOn(Dispatchers.Default).collect { (allBooks, list) ->
+                (parentFragment as? io.legado.app.ui.main.bookshelf.style1.BookshelfFragment1)
+                    ?.onBooksChanged(groupId, allBooks)
+                itemCount = list.size
+                val spanCount = bookshelfLayout
+                if (spanCount >= 2) {
+                    totalRows = if (itemCount % spanCount == 0) itemCount / spanCount else itemCount / spanCount + 1
+                }
+                binding.tvEmptyMsg.isGone = itemCount > 0
+                binding.refreshLayout.isEnabled = enableRefresh && itemCount > 0
                 booksAdapter.setItems(list)
                 delay(100)
             }
@@ -202,7 +282,7 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
 
     private fun startLastUpdateTimeJob() {
         upLastUpdateTimeJob?.cancel()
-        if (!AppConfig.showLastUpdateTime || bookshelfLayout != 0) {
+        if (!AppConfig.showLastUpdateTime || bookshelfLayout >= 2) {
             return
         }
         upLastUpdateTimeJob = viewLifecycleOwner.lifecycleScope.launch {
@@ -217,6 +297,10 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
 
     fun getBooks(): List<Book> {
         return booksAdapter.getItems()
+    }
+
+    private fun Book.hasCustomTag(tag: String): Boolean {
+        return BookTagHelper.has(customTag, tag)
     }
 
     fun gotoTop() {

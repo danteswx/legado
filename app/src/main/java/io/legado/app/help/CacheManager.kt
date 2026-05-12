@@ -1,5 +1,6 @@
 package io.legado.app.help
 
+import android.webkit.JavascriptInterface
 import androidx.annotation.Keep
 import androidx.collection.LruCache
 import io.legado.app.data.appDb
@@ -60,7 +61,9 @@ object CacheManager {
         when (value) {
             is ByteArray -> ACache.get().put(key, value, saveTime)
             else -> {
-                val cache = Cache(key, value.toString(), deadline)
+                val valueStr = value.toString()
+                putMemory(key, valueStr)
+                val cache = Cache(key, valueStr, deadline)
                 appDb.cacheDao.insert(cache)
             }
         }
@@ -80,6 +83,22 @@ object CacheManager {
     }
 
     fun get(key: String): String? {
+        getFromMemory(key)?.let {
+            if (it is String) return it
+        }
+        val cache = appDb.cacheDao.get(key)
+        if (cache != null && (cache.deadline == 0L || cache.deadline > System.currentTimeMillis())) {
+            return cache.value?.also {
+                putMemory(key, it)
+            }
+        }
+        return null
+    }
+
+    fun get(key: String, onlyDisk: Boolean): String? {
+        if (!onlyDisk) {
+            return get(key)
+        }
         val cache = appDb.cacheDao.get(key)
         if (cache != null && (cache.deadline == 0L || cache.deadline > System.currentTimeMillis())) {
             return cache.value
@@ -88,19 +107,31 @@ object CacheManager {
     }
 
     fun getInt(key: String): Int? {
-        return get(key)?.toIntOrNull()
+        getFromMemory(key)?.let {
+            if (it is Int) return it
+        }
+        return get(key, true)?.toIntOrNull()
     }
 
     fun getLong(key: String): Long? {
-        return get(key)?.toLongOrNull()
+        getFromMemory(key)?.let {
+            if (it is Long) return it
+        }
+        return get(key, true)?.toLongOrNull()
     }
 
     fun getDouble(key: String): Double? {
-        return get(key)?.toDoubleOrNull()
+        getFromMemory(key)?.let {
+            if (it is Double) return it
+        }
+        return get(key, true)?.toDoubleOrNull()
     }
 
     fun getFloat(key: String): Float? {
-        return get(key)?.toFloatOrNull()
+        getFromMemory(key)?.let {
+            if (it is Float) return it
+        }
+        return get(key, true)?.toFloatOrNull()
     }
 
     fun getByteArray(key: String): ByteArray? {
@@ -119,5 +150,47 @@ object CacheManager {
         appDb.cacheDao.delete(key)
         deleteMemory(key)
         ACache.get().remove(key)
+    }
+}
+
+@Keep
+@Suppress("unused")
+object WebCacheManager {
+    @JvmOverloads
+    @JavascriptInterface
+    fun put(key: String, value: String, saveTime: Int = 0) {
+        CacheManager.put(key, value, saveTime)
+    }
+    @JavascriptInterface
+    fun putMemory(key: String, value: String) {
+        memoryLruCache.put(key, value)
+    }
+    @JavascriptInterface
+    fun getFromMemory(key: String): String? {
+        return memoryLruCache[key]?.toString()
+    }
+    @JavascriptInterface
+    fun deleteMemory(key: String) {
+        memoryLruCache.remove(key)
+    }
+    @JavascriptInterface
+    fun get(key: String): String? {
+        return CacheManager.get(key)
+    }
+    @JavascriptInterface
+    fun get(key: String, onlyDisk: Boolean): String? {
+        return CacheManager.get(key, onlyDisk)
+    }
+    @JavascriptInterface
+    fun putFile(key: String, value: String, saveTime: Int = 0) {
+        CacheManager.putFile(key, value, saveTime)
+    }
+    @JavascriptInterface
+    fun getFile(key: String): String? {
+        return CacheManager.getFile(key)
+    }
+    @JavascriptInterface
+    fun delete(key: String) {
+        CacheManager.delete(key)
     }
 }

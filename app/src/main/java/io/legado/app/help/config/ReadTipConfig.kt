@@ -100,6 +100,7 @@ object ReadTipConfig {
 
     fun getFooterModes(context: Context): LinkedHashMap<Int, String> {
         return linkedMapOf(
+            Pair(2, context.getString(R.string.read_menu_display_auto)),
             Pair(0, context.getString(R.string.show)),
             Pair(1, context.getString(R.string.hide))
         )

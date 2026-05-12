@@ -5,6 +5,7 @@
         <item>音频</item>
         <item>图片</item>
         <item>文件</item>
+        <item>视频</item>
     </string-array>
 
     <string-array name="group_style">
@@ -55,6 +56,7 @@
         <item>icon4</item>
         <item>icon5</item>
         <item>icon6</item>
+        <item>icon7</item>
     </string-array>
 
     <string-array name="chinese_mode">
@@ -101,6 +103,12 @@
         <item>书源</item>
         <item>订阅源</item>
         <item>替换规则</item>
+    </string-array>
+
+    <string-array name="bottom_bar_effect_mode_entries">
+        <item>常规</item>
+        <item>玻璃</item>
+        <item>磨砂玻璃</item>
     </string-array>
 
     <string-array name="tip_color">

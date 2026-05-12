@@ -14,6 +14,8 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ThemeConfig
+import io.legado.app.help.config.ThemePackageManager
+import io.legado.app.help.config.NavigationBarIconConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.BookCover
 import io.legado.app.utils.FileUtils
@@ -44,6 +46,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import androidx.core.content.edit
+import io.legado.app.model.VideoPlay.VIDEO_PREF_NAME
 
 /**
  * 备份
@@ -58,6 +62,13 @@ object Backup {
     private const val TAG = "Backup"
 
     private val mutex = Mutex()
+
+    private val backgroundAssetDirNames = arrayOf(
+        PreferKey.bgImage,
+        PreferKey.bgImageN,
+        PreferKey.bookInfoBgImage,
+        PreferKey.bookInfoBgImageN
+    )
 
     private val backupFileNames by lazy {
         arrayOf(
@@ -81,34 +92,20 @@ object Backup {
             ReadBookConfig.shareConfigFileName,
             ThemeConfig.configFileName,
             BookCover.configFileName,
-            "config.xml"
+            "config.xml",
+            "videoConfig.xml"
         )
     }
 
     private fun getNowZipFileName(): String {
-        return getZipFileName(System.currentTimeMillis())
-    }
-
-    /**
-     * 根据指定时间戳生成备份文件名
-     */
-    private fun getZipFileName(timestamp: Long): String {
-        val dateFormat = SimpleDateFormat("yyyy_MM_dd_HH_mm", Locale.getDefault())
-        val timeStr = dateFormat.format(Date(timestamp))
-        val deviceName = AppConfig.webDavDeviceName?.replace("[^a-zA-Z0-9_-]".toRegex(), "_") ?: "unknown"
-        return "backup_${deviceName}_${timeStr}.zip"
-    }
-
-    fun getTimestampFromFileName(fileName: String): Long {
-        // 格式：backup_deviceName_2025_10_25_20_59.zip
-        val newFormatRegex = Regex("backup_[^_]+_(\\d{4})_(\\d{2})_(\\d{2})_(\\d{2})_(\\d{2})\\.zip")
-        val newFormatMatch = newFormatRegex.find(fileName)
-        if (newFormatMatch != null) {
-            val dateFormat = SimpleDateFormat("yyyy_MM_dd_HH_mm", Locale.getDefault())
-            val dateStr = "${newFormatMatch.groupValues[1]}_${newFormatMatch.groupValues[2]}_${newFormatMatch.groupValues[3]}_${newFormatMatch.groupValues[4]}_${newFormatMatch.groupValues[5]}"
-            return dateFormat.parse(dateStr)?.time ?: 0L
-        }
-        return 0L
+        val backupDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            .format(Date(System.currentTimeMillis()))
+        val deviceName = AppConfig.webDavDeviceName
+        return if (deviceName?.isNotBlank() == true) {
+            "backup${backupDate}-${deviceName}.zip"
+        } else {
+            "backup${backupDate}.zip"
+        }.normalizeFileName()
     }
 
     private fun shouldBackup(): Boolean {
@@ -135,41 +132,6 @@ object Backup {
         }
     }
 
-    /**
-     * 数据变化时自动备份到WebDAV（时间戳一致性保证）
-     */
-    fun backupOnDataChange(context: Context) {
-        if (!AppWebDav.isOk) return
-
-        Coroutine.async {
-            mutex.withLock {
-                try {
-                    // 在实际备份时生成时间戳，保证一致性
-                    val timestamp = System.currentTimeMillis()
-                    val zipFileName = getZipFileName(timestamp)
-
-                    // 执行备份
-                    backup(context, AppConfig.backupPath, zipFileName)
-
-                    // 备份成功后更新本地时间戳（使用同一时间戳）
-                    LocalConfig.lastDataChangeTime = timestamp
-
-                    // 清理WebDAV上的旧备份文件
-                    AppWebDav.deleteOldBackups()
-
-                    // 上传数据变化时间戳到WebDAV，供其他设备判断是否需要恢复
-                    AppWebDav.uploadDataChangeTime(timestamp)
-
-                    AppLog.put("数据变化自动备份成功: $zipFileName")
-                } catch (e: Exception) {
-                    AppLog.put("数据变化自动备份失败\n${e.localizedMessage}", e)
-                }
-            }
-        }.onError {
-            AppLog.put("数据变化自动备份失败\n${it.localizedMessage}")
-        }
-    }
-
     suspend fun backupLocked(context: Context, path: String?) {
         mutex.withLock {
             withContext(IO) {
@@ -178,9 +140,8 @@ object Backup {
         }
     }
 
-    private suspend fun backup(context: Context, path: String?, customZipFileName: String? = null) {
-        val zipFileName = customZipFileName ?: getNowZipFileName()
-        LogUtils.d(TAG, "开始备份 path:$path fileName:$zipFileName")
+    private suspend fun backup(context: Context, path: String?) {
+        LogUtils.d(TAG, "开始备份 path:$path")
         LocalConfig.lastBackup = System.currentTimeMillis()
         val aes = BackupAES()
         FileUtils.delete(backupPath)
@@ -252,10 +213,30 @@ object Backup {
             edit.commit()
         }
         currentCoroutineContext().ensureActive()
+        appCtx.getSharedPreferences(backupPath, "videoConfig")?.let { sp ->
+            sp.edit(commit = true) {
+                appCtx.getSharedPreferences(VIDEO_PREF_NAME, Context.MODE_PRIVATE).all.forEach { (key, value) ->
+                    when (value) {
+                        is Int -> putInt(key, value)
+                        is Boolean -> putBoolean(key, value)
+                        is Long -> putLong(key, value)
+                        is Float -> putFloat(key, value)
+                        is String -> putString(key, value)
+                    }
+                }
+            }
+        }
+        currentCoroutineContext().ensureActive()
+        val zipFileName = getNowZipFileName()
         val paths = arrayListOf(*backupFileNames)
         for (i in 0 until paths.size) {
             paths[i] = backupPath + File.separator + paths[i]
         }
+        backgroundAssetDirNames.forEach { dirName ->
+            paths.add(appCtx.externalFiles.getFile(dirName).absolutePath)
+        }
+        paths.add(ThemePackageManager.rootDir.absolutePath)
+        paths.add(NavigationBarIconConfig.rootDir.absolutePath)
         FileUtils.delete(zipFilePath)
         FileUtils.delete(zipFilePath.replace("tmp_", ""))
         val backupFileName = if (AppConfig.onlyLatestBackup) {

@@ -59,13 +59,16 @@ import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.util.regex.Pattern
-import kotlin.coroutines.coroutineContext
+import androidx.core.net.toUri
+import kotlinx.coroutines.currentCoroutineContext
 
 /**
  * 书籍文件导入 目录正文解析
  * 支持在线文件(txt epub umd 压缩文件 本地文件
  */
 object LocalBook {
+
+    private const val LARGE_EPUB_FAST_IMPORT_BYTES = 100L * 1024L * 1024L
 
     private val nameAuthorPatterns = arrayOf(
         Pattern.compile("(.*?)《([^《》]+)》.*?作者：(.*)"),
@@ -103,7 +106,7 @@ object LocalBook {
 
     fun getLastModified(book: Book): Result<Long> {
         return kotlin.runCatching {
-            val uri = Uri.parse(book.bookUrl)
+            val uri = book.bookUrl.toUri()
             if (uri.isContentScheme()) {
                 return@runCatching DocumentFile.fromSingleUri(appCtx, uri)!!.lastModified()
             }
@@ -149,11 +152,20 @@ object LocalBook {
             }
         }
         val replaceRules = ContentProcessor.get(book).getTitleReplaceRules()
+        val replaceBook = book.toReplaceBook()
         book.durChapterTitle = list.getOrElse(book.durChapterIndex) { list.last() }
-            .getDisplayTitle(replaceRules, book.getUseReplaceRule())
+            .getDisplayTitle(
+                replaceRules,
+                book.getUseReplaceRule(),
+                replaceBook = replaceBook
+            )
         book.latestChapterTitle =
             list.getOrElse(book.simulatedTotalChapterNum() - 1) { list.last() }
-                .getDisplayTitle(replaceRules, book.getUseReplaceRule())
+                .getDisplayTitle(
+                    replaceRules,
+                    book.getUseReplaceRule(),
+                    replaceBook = replaceBook
+                )
         book.totalChapterNum = list.size
         book.latestChapterTime = System.currentTimeMillis()
         return list
@@ -195,7 +207,7 @@ object LocalBook {
             }
         }
 
-        if (content.isNullOrEmpty()) {
+        if (content.isNullOrEmpty() && !chapter.isVolume) {
             return null
         }
 
@@ -228,16 +240,18 @@ object LocalBook {
     /**
      * 导入本地文件
      */
-    fun importFile(uri: Uri): Book {
-        val bookUrl: String
+    fun importFile(uri: Uri, onStage: ((String) -> Unit)? = null): Book {
         //updateTime变量不要修改,否则会导致读取不到缓存
-        val (fileName, _, _, updateTime, _) = FileDoc.fromUri(uri, false).apply {
-            if (size == 0L) throw EmptyFileException("Unexpected empty File")
-
-            bookUrl = toString()
-        }
+        onStage?.invoke("读取文件信息")
+        val fileDoc = FileDoc.fromUri(uri, false)
+        if (fileDoc.size == 0L) throw EmptyFileException("Unexpected empty File")
+        val fileName = fileDoc.name
+        val updateTime = fileDoc.lastModified
+        val bookUrl = fileDoc.toString()
+        val fileSize = fileDoc.size
         var book = appDb.bookDao.getBook(bookUrl)
         if (book == null) {
+            onStage?.invoke("解析书籍信息")
             val nameAuthor = analyzeNameAuthor(fileName)
             book = Book(
                 type = BookType.text or BookType.local,
@@ -248,11 +262,13 @@ object LocalBook {
                 latestChapterTime = updateTime,
                 order = appDb.bookDao.minOrder - 1
             )
-            upBookInfo(book)
+            upBookInfoSafely(book, fileSize)
+            onStage?.invoke("保存书籍信息")
             appDb.bookDao.insert(book)
         } else {
+            onStage?.invoke("更新书籍信息")
             deleteBook(book, false)
-            upBookInfo(book)
+            upBookInfoSafely(book, fileSize)
             // 触发 isLocalModified
             book.latestChapterTime = 0
             //已有书籍说明是更新,删除原有目录
@@ -268,6 +284,37 @@ object LocalBook {
             book.isPdf -> PdfFile.upBookInfo(book)
             book.isMobi -> MobiFile.upBookInfo(book)
         }
+    }
+
+    private fun upBookInfoSafely(book: Book, fileSize: Long) {
+        if (book.isEpub && shouldDeferEpubBookInfo(fileSize)) {
+            if (book.name.isBlank()) {
+                book.name = book.originName.substringBeforeLast(".")
+            }
+            if (book.intro.isNullOrBlank()) {
+                book.intro = "大体积 EPUB 已快速导入，封面和简介将在阅读时按需加载。"
+            }
+            return
+        }
+        if (!book.isEpub) {
+            upBookInfo(book)
+            return
+        }
+        kotlin.runCatching {
+            upBookInfo(book)
+        }.onFailure {
+            AppLog.put("EPUB 元数据解析失败，已先导入书籍\n${it.localizedMessage}", it)
+            if (book.name.isBlank()) {
+                book.name = book.originName.substringBeforeLast(".")
+            }
+            if (book.intro.isNullOrBlank()) {
+                book.intro = "EPUB 已导入，元数据将在阅读时按需加载。"
+            }
+        }
+    }
+
+    private fun shouldDeferEpubBookInfo(fileSize: Long): Boolean {
+        return fileSize >= LARGE_EPUB_FAST_IMPORT_BYTES
     }
 
     /* 导入压缩包内的书籍 */
@@ -294,17 +341,19 @@ object LocalBook {
     }
 
     /* 批量导入 支持自动导入压缩包的支持书籍 */
-    fun importFiles(uri: Uri): List<Book> {
+    fun importFiles(uri: Uri, onStage: ((String) -> Unit)? = null): List<Book> {
         val books = mutableListOf<Book>()
+        onStage?.invoke("读取文件信息")
         val fileDoc = FileDoc.fromUri(uri, false)
         if (ArchiveUtils.isArchive(fileDoc.name)) {
+            onStage?.invoke("解压压缩包")
             books.addAll(
                 importArchiveFile(uri) {
                     it.matches(AppPattern.bookFileRegex)
                 }
             )
         } else {
-            books.add(importFile(uri))
+            books.add(importFile(uri, onStage))
         }
         return books
     }
@@ -329,6 +378,20 @@ object LocalBook {
         if (errorCount == uris.size) {
             throw NoStackTraceException("ImportFiles Error:\nAll input files occur error")
         }
+    }
+
+    fun prepareImportedBookCache(
+        book: Book,
+        onProgress: (stage: String, processed: Int, total: Int, title: String) -> Unit = { _, _, _, _ -> }
+    ) {
+        if (!book.isEpub) return
+        onProgress("toc", 0, 1, book.name)
+        val chapterList = getChapterList(book)
+        if (chapterList.isEmpty()) return
+        appDb.bookChapterDao.delByBook(book.bookUrl)
+        appDb.bookChapterDao.insert(*chapterList.toTypedArray())
+        appDb.bookDao.update(book)
+        onProgress("toc", 1, 1, book.name)
     }
 
     /**
@@ -382,7 +445,7 @@ object LocalBook {
             }
             if (deleteOriginal) {
                 if (book.bookUrl.isContentScheme()) {
-                    val uri = Uri.parse(book.bookUrl)
+                    val uri = book.bookUrl.toUri()
                     DocumentFile.fromSingleUri(appCtx, uri)?.delete()
                 } else {
                     FileUtils.delete(book.bookUrl)
@@ -404,7 +467,7 @@ object LocalBook {
         val inputStream = when {
             str.isAbsUrl() -> AnalyzeUrl(
                 str, source = source, callTimeout = 0,
-                coroutineContext = coroutineContext
+                coroutineContext = currentCoroutineContext()
             ).getInputStreamAwait()
 
             str.isDataUrl() -> ByteArrayInputStream(
@@ -427,7 +490,7 @@ object LocalBook {
         inputStream.use {
             val defaultBookTreeUri = AppConfig.defaultBookTreeUri
             if (defaultBookTreeUri.isNullOrBlank()) throw NoBooksDirException()
-            val treeUri = Uri.parse(defaultBookTreeUri)
+            val treeUri = defaultBookTreeUri.toUri()
             return if (treeUri.isContentScheme()) {
                 val treeDoc = DocumentFile.fromTreeUri(appCtx, treeUri)
                 var doc = treeDoc!!.findFile(fileName)
@@ -456,71 +519,10 @@ object LocalBook {
         }
     }
 
-    /**
-     * 保存书籍文件到指定目录的子文件夹
-     * @param inputStream 输入流
-     * @param fileName 文件名
-     * @param basePathUri 基础目录URI字符串
-     * @param subDir 子目录名称
-     */
-    @Throws(SecurityException::class)
-    fun saveBookFile(
-        inputStream: InputStream,
-        fileName: String,
-        basePathUri: String,
-        vararg subDir: String
-    ): Uri {
-        inputStream.use {
-            val baseUri = Uri.parse(basePathUri)
-            return if (baseUri.isContentScheme()) {
-                val baseDoc = DocumentFile.fromTreeUri(appCtx, baseUri)
-                    ?: throw SecurityException("无效的目录URI")
-                var targetDir = baseDoc
-                // 创建子目录
-                subDir.forEach { dirName ->
-                    targetDir = targetDir.findFile(dirName)
-                        ?: targetDir.createDirectory(dirName)
-                        ?: throw SecurityException("无法创建子目录: $dirName")
-                }
-                var doc = targetDir.findFile(fileName)
-                if (doc == null) {
-                    doc = targetDir.createFile(FileUtils.getMimeType(fileName), fileName)
-                        ?: throw SecurityException("无法创建文件\nPermission Denial")
-                }
-                // 使用 "wt" 模式覆盖写入，避免文件名冲突
-                appCtx.contentResolver.openOutputStream(doc.uri, "wt")!!.use { oStream ->
-                    it.copyTo(oStream)
-                }
-                doc.uri
-            } else {
-                try {
-                    val baseFile = File(baseUri.path!!)
-                    var targetDir = baseFile
-                    // 创建子目录
-                    subDir.forEach { dirName ->
-                        targetDir = targetDir.getFile(dirName)
-                        if (!targetDir.exists()) {
-                            targetDir.mkdirs()
-                        }
-                    }
-                    val file = targetDir.getFile(fileName)
-                    FileOutputStream(file).use { oStream ->
-                        it.copyTo(oStream)
-                    }
-                    Uri.fromFile(file)
-                } catch (e: FileNotFoundException) {
-                    throw SecurityException("保存文件失败\nPermission Denial\n$e").apply {
-                        addSuppressed(e)
-                    }
-                }
-            }
-        }
-    }
-
     fun isOnBookShelf(
         fileName: String
     ): Boolean {
-        return appDb.bookDao.hasFile(fileName) == true
+        return appDb.bookDao.hasFile(fileName)
     }
 
     //文件类书源 合并在线书籍信息 在线 > 本地
@@ -540,9 +542,8 @@ object LocalBook {
         val webDavUrl = localBook.getRemoteUrl()
         if (webDavUrl.isNullOrBlank()) throw NoStackTraceException("Book file is not webDav File")
         try {
-            // 使用backupPath下的remoteBooks子目录
-            val backupPath = AppConfig.backupPath
-                ?: throw NoStackTraceException("没有设置备份路径，无法下载远程书籍")
+            AppConfig.defaultBookTreeUri
+                ?: throw NoBooksDirException()
             // 兼容旧版链接
             val webdav: WebDav = kotlin.runCatching {
                 WebDav.fromPath(webDavUrl)
@@ -556,7 +557,7 @@ object LocalBook {
             inputStream.use {
                 if (localBook.isArchive) {
                     // 压缩包
-                    val archiveUri = saveBookFile(it, localBook.archiveName, backupPath, "remoteBooks")
+                    val archiveUri = saveBookFile(it, localBook.archiveName)
                     val newBook = importArchiveFile(archiveUri, localBook.originName) { name ->
                         name.contains(localBook.originName)
                     }.first()
@@ -564,7 +565,7 @@ object LocalBook {
                     localBook.bookUrl = newBook.bookUrl
                 } else {
                     // txt epub pdf umd
-                    val fileUri = saveBookFile(it, localBook.originName, backupPath, "remoteBooks")
+                    val fileUri = saveBookFile(it, localBook.originName)
                     localBook.bookUrl = FileDoc.fromUri(fileUri, false).toString()
                     localBook.save()
                 }

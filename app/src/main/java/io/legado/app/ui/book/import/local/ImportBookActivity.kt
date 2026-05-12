@@ -1,13 +1,13 @@
 package io.legado.app.ui.book.import.local
 
 import android.annotation.SuppressLint
+import android.app.ProgressDialog
 import android.net.Uri
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import androidx.activity.addCallback
 import androidx.activity.viewModels
-import androidx.appcompat.widget.PopupMenu
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.lifecycleScope
@@ -18,6 +18,7 @@ import io.legado.app.data.appDb
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
+import io.legado.app.lib.dialogs.progressDialog
 import io.legado.app.lib.permission.Permissions
 import io.legado.app.lib.permission.PermissionsCompat
 import io.legado.app.lib.theme.backgroundColor
@@ -44,13 +45,15 @@ import java.io.File
  * 导入本地书籍界面
  */
 class ImportBookActivity : BaseImportBookActivity<ImportBookViewModel>(),
-    PopupMenu.OnMenuItemClickListener,
+    MenuItem.OnMenuItemClickListener,
     ImportBookAdapter.CallBack,
     SelectActionBar.CallBack {
 
     override val viewModel by viewModels<ImportBookViewModel>()
     private val adapter by lazy { ImportBookAdapter(this, this) }
     private var scanDocJob: Job? = null
+    private var currentPathText: CharSequence = ""
+    private var importProgressDialog: ProgressDialog? = null
 
     private val selectFolder = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
@@ -100,8 +103,8 @@ class ImportBookActivity : BaseImportBookActivity<ImportBookViewModel>(),
         return super.onCompatOptionsItemSelected(item)
     }
 
-    override fun onMenuItemClick(item: MenuItem?): Boolean {
-        when (item?.itemId) {
+    override fun onMenuItemClick(item: MenuItem): Boolean {
+        when (item.itemId) {
             R.id.menu_del_selection -> viewModel.deleteDoc(adapter.selected) {
                 adapter.removeSelection()
             }
@@ -119,8 +122,20 @@ class ImportBookActivity : BaseImportBookActivity<ImportBookViewModel>(),
 
     @SuppressLint("NotifyDataSetChanged")
     override fun onClickSelectBarMainAction() {
-        viewModel.addToBookshelf(adapter.selected) {
-            adapter.selected.forEach {
+        val selected = HashSet(adapter.selected)
+        importProgressDialog?.dismiss()
+        importProgressDialog = progressDialog(
+            title = "导入书籍",
+            message = "准备导入...",
+        ) {
+            max = selected.size.coerceAtLeast(1)
+            progress = 0
+            setCancelable(false)
+        }
+        viewModel.addToBookshelfWithProgress(selected, onProgress = {}) {
+            importProgressDialog?.dismiss()
+            importProgressDialog = null
+            selected.forEach {
                 it.isOnBookShelf = true
             }
             adapter.selected.clear()
@@ -153,6 +168,36 @@ class ImportBookActivity : BaseImportBookActivity<ImportBookViewModel>(),
         lifecycleScope.launch {
             viewModel.dataFlow.conflate().collect { docs ->
                 adapter.setItems(docs)
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.scanProgressFlow.collect { progress ->
+                if (progress == null) {
+                    binding.refreshProgressBar.isAutoLoading = false
+                    binding.tvPath.text = currentPathText
+                } else {
+                    binding.refreshProgressBar.isAutoLoading = true
+                    binding.tvPath.text = "扫描中：已扫${progress.scannedDirs}个文件夹，发现${progress.foundBooks}本，待扫${progress.pendingDirs}个"
+                }
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.importProgressFlow.collect { progress ->
+                if (progress == null) {
+                    binding.refreshProgressBar.isAutoLoading = false
+                    binding.tvPath.text = currentPathText
+                } else {
+                    binding.refreshProgressBar.isAutoLoading = true
+                    val message = progress.message.ifBlank {
+                        "导入中：${progress.processed}/${progress.total}，成功${progress.imported}，失败${progress.failed}"
+                    }
+                    binding.tvPath.text = message
+                    importProgressDialog?.run {
+                        max = progress.total
+                        this.progress = progress.processed
+                        setMessage("${message}\n成功${progress.imported}本，失败${progress.failed}本")
+                    }
+                }
             }
         }
     }
@@ -245,7 +290,8 @@ class ImportBookActivity : BaseImportBookActivity<ImportBookViewModel>(),
             lastDoc = doc
             path = path + doc.name + File.separator
         }
-        binding.tvPath.text = path
+        currentPathText = path
+        binding.tvPath.text = currentPathText
         adapter.selected.clear()
         adapter.clearItems()
         viewModel.loadDoc(lastDoc)

@@ -13,8 +13,10 @@ import io.legado.app.constant.AppPattern.dataUriRegex
 import java.io.File
 import java.lang.Character.codePointCount
 import java.lang.Character.offsetByCodePoints
+import java.net.InetAddress
 import java.util.Locale
 import java.util.regex.Pattern
+import androidx.core.net.toUri
 
 fun String?.safeTrim() = if (this.isNullOrBlank()) null else this.trim()
 
@@ -23,7 +25,7 @@ fun String?.isContentScheme(): Boolean = this?.startsWith("content://") == true
 fun String.toEditable(): Editable = Editable.Factory.getInstance().newEditable(this)
 
 fun String.parseToUri(): Uri {
-    return if (isUri()) Uri.parse(this) else {
+    return if (isUri()) this.toUri() else {
         Uri.fromFile(File(this))
     }
 }
@@ -40,7 +42,9 @@ fun String?.isAbsUrl() =
 
 fun String?.isDataUrl() =
     this?.let {
-        dataUriRegex.matches(it)
+        val clean = it.trim()
+        clean.startsWith("data64:", true) ||
+            clean.startsWith("data:", true) && clean.contains(";base64", true) && clean.contains(',')
     } ?: false
 
 fun String?.isJson(): Boolean =
@@ -75,7 +79,7 @@ fun String?.isTrue(nullIsTrue: Boolean = false): Boolean {
     if (this.isNullOrBlank() || this == "null") {
         return nullIsTrue
     }
-    return !this.trim().matches("(?i)^(false|no|not|0)$".toRegex())
+    return !this.trim().matches("(?i)^(?:false|no|not|0|0.0)$".toRegex())
 }
 
 fun String.isHex(): Boolean {
@@ -143,4 +147,30 @@ fun String.encodeURI(): String = URLEncodeUtil.encodeQuery(this)
 
 fun String.normalizeFileName(): String {
     return replace(AppPattern.fileNameRegex2, "_")
+}
+
+/**
+ * 将ip字符串转为InetAddress
+ */
+fun String.parseIpsFromString(): List<InetAddress>? =
+    split(",")
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .mapNotNull { it.runCatching { InetAddress.getByName(this) }.getOrNull() }
+        .takeIf { it.isNotEmpty() }
+
+
+fun String.quoteReplacementJs(): String {
+    if (!this.contains('\\')) {
+        return this
+    }
+    val sb = StringBuilder()
+    for (c in this) {
+        if (c == '\\') {
+            sb.append("\\\\")
+        } else {
+            sb.append(c)
+        }
+    }
+    return sb.toString()
 }

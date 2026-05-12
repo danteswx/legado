@@ -12,10 +12,13 @@
         app:attachToActivity="false"
         app:title="@string/my" />
 
+    <include layout="@layout/view_search" />
+
     <LinearLayout
         android:id="@+id/pre_fragment"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:orientation="vertical" />
 
 </LinearLayout>

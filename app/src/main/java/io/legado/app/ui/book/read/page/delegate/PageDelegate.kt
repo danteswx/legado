@@ -3,11 +3,14 @@ package io.legado.app.ui.book.read.page.delegate
 import android.content.Context
 import android.graphics.Canvas
 import android.view.MotionEvent
+import android.view.animation.Interpolator
 import android.view.animation.LinearInterpolator
 import android.widget.Scroller
 import androidx.annotation.CallSuper
 import com.google.android.material.snackbar.Snackbar
 import io.legado.app.R
+import io.legado.app.help.book.isEpub
+import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.page.PageView
 import io.legado.app.ui.book.read.page.ReadView
 import io.legado.app.ui.book.read.page.entities.PageDirection
@@ -30,14 +33,16 @@ abstract class PageDelegate(protected val readView: ReadView) {
     protected val touchY: Float get() = readView.touchY
 
     protected val nextPage: PageView get() = readView.nextPage
-    protected val curPage: PageView get() = readView.curPage
+    val curPage: PageView get() = readView.curPage
     protected val prevPage: PageView get() = readView.prevPage
 
     protected var viewWidth: Int = readView.width
     protected var viewHeight: Int = readView.height
 
+    protected open fun scrollInterpolator(): Interpolator = LinearInterpolator()
+
     protected val scroller: Scroller by lazy {
-        Scroller(readView.context, LinearInterpolator())
+        Scroller(readView.context, scrollInterpolator())
     }
 
     private val snackBar: Snackbar by lazy {
@@ -191,6 +196,7 @@ abstract class PageDelegate(protected val readView: ReadView) {
     }
 
     fun postInvalidate() {
+        if (ReadBook.book?.isEpub == true) return
         if (isStarted && isRunning && this is HorizontalPageDelegate) {
             readView.post {
                 if (isStarted && isRunning) {

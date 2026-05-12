@@ -24,11 +24,15 @@ import io.legado.app.utils.printOnDebug
 import io.legado.app.utils.toastOnUi
 import org.apache.commons.text.StringEscapeUtils
 import java.util.Date
+import io.legado.app.data.entities.BaseSource
+import io.legado.app.help.webView.WebJsExtensions.Companion.JS_INJECTION2
 
 class WebViewModel(application: Application) : BaseViewModel(application) {
+    var source: BaseSource? = null
     var intent: Intent? = null
     var baseUrl: String = ""
     var html: String? = null
+    var localHtml: Boolean = false
     val headerMap: HashMap<String, String> = hashMapOf()
     var sourceVerificationEnable: Boolean = false
     var refetchAfterSuccess: Boolean = true
@@ -49,7 +53,22 @@ class WebViewModel(application: Application) : BaseViewModel(application) {
             sourceType = intent.getIntExtra("sourceType", SourceType.book)
             sourceVerificationEnable = intent.getBooleanExtra("sourceVerificationEnable", false)
             refetchAfterSuccess = intent.getBooleanExtra("refetchAfterSuccess", true)
-            val source = SourceHelp.getSource(sourceOrigin, sourceType)
+            html = intent.getStringExtra("html")?.let{
+                localHtml = true
+                val headIndex = it.indexOf("<head", ignoreCase = true)
+                if (headIndex >= 0) {
+                    val closingHeadIndex = it.indexOf('>', startIndex = headIndex)
+                    if (closingHeadIndex >= 0) {
+                        val insertPos = closingHeadIndex + 1
+                        StringBuilder(it).insert(insertPos, "<script>$JS_INJECTION2</script>").toString()
+                    } else {
+                        "<head><script>$JS_INJECTION2</script></head>$it"
+                    }
+                } else {
+                    "<head><script>$JS_INJECTION2</script></head>$it"
+                }
+            }
+            source = SourceHelp.getSource(sourceOrigin, sourceType)
             val analyzeUrl = AnalyzeUrl(url, source = source, coroutineContext = coroutineContext)
             baseUrl = analyzeUrl.url
             headerMap.putAll(analyzeUrl.headerMap)
@@ -101,13 +120,15 @@ class WebViewModel(application: Application) : BaseViewModel(application) {
             execute {
                 val url = intent!!.getStringExtra("url")!!
                 val source = appDb.bookSourceDao.getBookSource(sourceOrigin)
-                html = AnalyzeUrl(
-                    url,
-                    headerMapF = headerMap,
-                    source = source,
-                    coroutineContext = coroutineContext
-                ).getStrResponseAwait(useWebView = false).body
-                SourceVerificationHelp.setResult(sourceOrigin, html ?: "")
+                if (html == null) {
+                    html = AnalyzeUrl(
+                        url,
+                        headerMapF = headerMap,
+                        source = source,
+                        coroutineContext = coroutineContext
+                    ).getStrResponseAwait(useWebView = false).body
+                }
+                SourceVerificationHelp.setResult(sourceOrigin, html ?: "", baseUrl)
             }.onSuccess {
                 success.invoke()
             }
@@ -115,8 +136,8 @@ class WebViewModel(application: Application) : BaseViewModel(application) {
             webView.evaluateJavascript("document.documentElement.outerHTML") {
                 execute {
                     html = StringEscapeUtils.unescapeJson(it).trim('"')
-                    SourceVerificationHelp.setResult(sourceOrigin, html ?: "")
                 }.onSuccess {
+                    SourceVerificationHelp.setResult(sourceOrigin, html ?: "",  webView.url ?: "")
                     success.invoke()
                 }
             }

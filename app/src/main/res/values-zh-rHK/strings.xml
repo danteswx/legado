@@ -1,8 +1,9 @@
-<resources>
+﻿<resources>
     <!--App-->
-    <string name="app_name">閲讀</string>
-    <string name="app_name_a">閲讀·A</string>
-    <string name="receiving_shared_label">閲讀·搜尋</string>
+    <string name="app_name">萬卷</string>
+    <string name="app_name_a">萬卷·A</string>
+    <string name="receiving_shared_label">萬卷·搜尋</string>
+    <string name="compose_type">排版</string>
     <string name="tip_perm_request_storage">閲讀需要訪問存儲卡權限，請前往「設定」—「應用程式權限」—開啟所需要的權限</string>
 
     <!--Other-->
@@ -46,6 +47,7 @@
     <string name="recent_reading">最近閲讀</string>
     <string name="last_read">最後閲讀</string>
     <string name="update_log">更新日誌</string>
+    <string name="check_update">檢查更新</string>
     <string name="bookshelf_empty">書架還空著，先去搜索書籍或從發現裏添加吧！</string>
     <string name="action_search">搜尋</string>
     <string name="action_download">下載</string>
@@ -62,8 +64,8 @@
     <string name="book_source_manage">書源管理</string>
     <string name="book_source_manage_desc">新建/導入/編輯/管理書源</string>
     <string name="setting">設定</string>
-    <string name="theme_setting">主題設定</string>
-    <string name="theme_setting_s">同主題/顏色相關的一些設定</string>
+    <string name="theme_setting">介面設定</string>
+    <string name="theme_setting_s">介面、顏色與顯示相關設定</string>
     <string name="other_setting">其它設定</string>
     <string name="other_setting_s">與功能相關的一些設定</string>
     <string name="about">關於</string>
@@ -93,7 +95,7 @@
         \u3000\u3000這是一款使用 Kotlin 全新開發的開源的閲讀應用程式，歡迎你的加入。
     </string>
     <string name="app_share_description">
-        閲讀3.0下載地址：\nhttps://github.com/gedoor/legado/releases
+        閲讀3.0下載地址：\nhttps://github.com/Nowaterisenough/legado/releases
     </string>
     <string name="version_name">Version %s</string>
     <string name="pt_background_verification">後臺校驗書源</string>
@@ -178,7 +180,6 @@
     <string name="copy_source">拷貝源</string>
     <string name="paste_source">粘帖源</string>
     <string name="source_rule_s">源規則説明</string>
-    <string name="check_update">檢查更新</string>
     <string name="camera_scan">掃描 QR Code</string>
     <string name="scan_image">掃描本地圖片</string>
     <string name="rule_summary">規則説明</string>
@@ -233,13 +234,11 @@
     <string name="origin_show">來源: %s</string>
     <string name="import_replace_rule">導入替換規則</string>
     <string name="import_replace_rule_on_line">導入在線規則</string>
-    <string name="check_update_interval">檢查更新間隔</string>
     <string name="bookshelf_px_0">按閲讀時間</string>
     <string name="bookshelf_px_1">按更新時間</string>
     <string name="bookshelf_px_2">按書名</string>
     <string name="bookshelf_px_3">手動排序</string>
     <string name="read_type">閲讀方式</string>
-    <string name="compose_type">排版</string>
     <string name="del_select">刪除所選</string>
     <string name="del_msg">是否確認刪除?</string>
     <string name="clear_font">默認字體</string>
@@ -248,6 +247,7 @@
     <string name="find_empty">沒有內容,去書源裏自定義吧!</string>
     <string name="del_all">刪除所有</string>
     <string name="searchHistory">搜索歷史</string>
+    <string name="search_history_empty">暫無搜索歷史</string>
     <string name="clear">清除</string>
     <string name="showTitle">正文顯示標題</string>
     <string name="refresh_default">書源同步</string>
@@ -332,7 +332,6 @@
     <string name="download_path">內容緩存路徑</string>
     <string name="sys_file_picker">系統文件選擇器</string>
     <string name="new_version">新版本</string>
-    <string name="download_update">下載更新</string>
     <string name="volume_key_page_on_play">朗讀時音量鍵翻頁</string>
     <string name="tip_margin_change">Tip 邊距跟隨邊距調整</string>
     <string name="allow_update">允許更新</string>
@@ -524,6 +523,7 @@
     <string name="content_empty">文章內容為空</string>
     <string name="on_change_source">正在換源請等待…</string>
     <string name="chapter_list_empty">目錄列表為空</string>
+    <string name="toc_loading">加載目錄中…</string>
     <string name="text_letter_spacing">字距</string>
 
     <string name="source_tab_base">基本</string>
@@ -1168,12 +1168,7 @@
     <string name="start_from">起始日期</string>
     <string name="daily_chapters">日更章數</string>
     <string name="start_chapter">開始篇章</string>
-    <string name="update_to_variant_title">检查更新查找版本</string>
-    <string name="update_to_variant_summary">检查更新时查找其他签名版本</string>
-    <string name="default_version">当前</string>
     <string name="official_version">正式版</string>
-    <string name="beta_release_version">测试版</string>
-    <string name="beta_releaseA_version">共存版</string>
     <string name="stream_read_aloud_audio">流式播放音频</string>
     <string name="stream_read_aloud_audio_summary">即边下边播，网络不好时播放会断断续续，仅TTS源有效</string>
     <string name="pause_read_aloud_while_phone_calls_title">来电期间暂停朗读</string>
@@ -1212,8 +1207,6 @@
     <string name="hide_manga_title">隐藏漫画列表标题</string>
     <string name="refresh_explore">刷新发现</string>
     <string name="padding_display_cutouts">填充刘海区域</string>
-    <string name="system_media_control_compatibility_change">系統媒體控件相容性更改</string>
-    <string name="system_media_control_compatibility_change_summary">當鎖屏不顯示系統媒體控件時可以嘗試開啟，比如 OneUI7.0 或 vivo 等</string>
     <string name="read_aloud_pause_resume">朗讀暫停/繼續</string>
     <string name="manga_epaper">墨水屏</string>
     <string name="manga_epaper_stting">墨水屏设置</string>

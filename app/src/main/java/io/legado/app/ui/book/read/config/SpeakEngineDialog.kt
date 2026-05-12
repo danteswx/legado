@@ -31,6 +31,7 @@ import io.legado.app.ui.association.ImportHttpTtsDialog
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.utils.ACache
+import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.fromJsonObject
@@ -43,6 +44,7 @@ import io.legado.app.utils.setLayout
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.splitNotBlank
 import io.legado.app.utils.startActivity
+import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.legado.app.utils.visible
 import kotlinx.coroutines.Dispatchers.IO
@@ -50,6 +52,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
+import java.io.File
 
 /**
  * tts引擎管理
@@ -64,6 +67,7 @@ class SpeakEngineDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
     private var ttsEngine: String? = ReadAloud.ttsEngine
     private val sysTtsViews = arrayListOf<RadioButton>()
     private val callBack: CallBack? get() = parentFragment as? CallBack
+    private var currentSelect = -1
     private val importDocResult = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
             showDialogFragment(ImportHttpTtsDialog(uri.toString()))
@@ -178,6 +182,7 @@ class SpeakEngineDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
 
     override fun onMenuItemClick(item: MenuItem?): Boolean {
         when (item?.itemId) {
+            R.id.menu_clear -> clearCache()
             R.id.menu_add -> showDialogFragment<HttpTtsEditDialog>()
             R.id.menu_default -> viewModel.importDefault()
             R.id.menu_import_local -> importDocResult.launch {
@@ -186,7 +191,7 @@ class SpeakEngineDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
             }
 
             R.id.menu_import_onLine -> importAlert()
-            R.id.menu_export -> exportDirResult.launch {
+            R.id.menu_export_all -> exportDirResult.launch {
                 mode = HandleFileContract.EXPORT
                 fileData = HandleFileContract.FileData(
                     "httpTts.json",
@@ -194,8 +199,34 @@ class SpeakEngineDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
                     "application/json"
                 )
             }
+            R.id.menu_export -> {
+                if (currentSelect == -1) {
+                    toastOnUi(R.string.is_system_tts_no_export)
+                    return true
+                }
+                val tts = adapter.getItem(currentSelect) ?: return true
+                exportDirResult.launch {
+                    mode = HandleFileContract.EXPORT
+                    fileData = HandleFileContract.FileData(
+                        "httpTts_${tts.name}.json",
+                        GSON.toJson(tts).toByteArray(),
+                        "application/json"
+                    )
+                }
+            }
         }
         return true
+    }
+
+    fun clearCache() {
+        execute {
+            ReadAloud.upReadAloudClass()
+            val ttsFolderPath = "${requireContext().cacheDir.absolutePath}${File.separator}httpTTS${File.separator}"
+            FileUtils.listDirsAndFiles(ttsFolderPath)?.forEach {
+                FileUtils.delete(it.absolutePath)
+            }
+            toastOnUi(R.string.clear_cache_success)
+        }
     }
 
     private fun importAlert() {
@@ -229,8 +260,12 @@ class SpeakEngineDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
     private fun upTts(tts: String) {
         ttsEngine = tts
         sysTtsViews.forEach {
-            it.isChecked = GSON.fromJsonObject<SelectItem<String>>(ttsEngine)
+            val isChecked = GSON.fromJsonObject<SelectItem<String>>(ttsEngine)
                 .getOrNull()?.value == it.tag
+            if (isChecked) {
+                currentSelect = -1
+            }
+            it.isChecked = isChecked
         }
         adapter.notifyItemRangeChanged(adapter.getHeaderCount(), adapter.itemCount)
     }
@@ -250,7 +285,11 @@ class SpeakEngineDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
         ) {
             binding.apply {
                 cbName.text = item.name
-                cbName.isChecked = item.id.toString() == ttsEngine
+                val isChecked = item.id.toString() == ttsEngine
+                if (isChecked) {
+                    currentSelect = holder.layoutPosition - getHeaderCount()
+                }
+                cbName.isChecked = isChecked
             }
         }
 
@@ -270,13 +309,32 @@ class SpeakEngineDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
                         }
                     }
                 }
+                cbName.setOnLongClickListener {
+                    getItemByLayoutPosition(holder.layoutPosition)?.let { httpTTS ->
+                        if (!httpTTS.loginUrl.isNullOrBlank()) {
+                            val id = httpTTS.id.toString()
+                            startActivity<SourceLoginActivity> {
+                                putExtra("type", "httpTts")
+                                putExtra("key", id)
+                            }
+                            return@setOnLongClickListener true
+                        }
+                    }
+                    false
+                }
                 ivEdit.setOnClickListener {
                     val id = getItemByLayoutPosition(holder.layoutPosition)!!.id
                     showDialogFragment(HttpTtsEditDialog(id))
                 }
                 ivMenuDelete.setOnClickListener {
                     getItemByLayoutPosition(holder.layoutPosition)?.let { httpTTS ->
-                        appDb.httpTTSDao.delete(httpTTS)
+                        alert(R.string.draw) {
+                            setMessage(getString(R.string.sure_del) + "\n" + httpTTS.name)
+                            noButton()
+                            yesButton {
+                                appDb.httpTTSDao.delete(httpTTS)
+                            }
+                        }
                     }
                 }
             }

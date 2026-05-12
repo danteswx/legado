@@ -5,9 +5,9 @@ import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.PopupWindow
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.widget.PopupMenu
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.textfield.TextInputLayout
@@ -36,10 +36,10 @@ import io.legado.app.model.CacheBook
 import io.legado.app.service.ExportBookService
 import io.legado.app.ui.about.AppLogDialog
 import io.legado.app.ui.file.HandleFileContract
+import io.legado.app.ui.widget.ModernActionPopup
 import io.legado.app.utils.ACache
 import io.legado.app.utils.FileDoc
 import io.legado.app.utils.applyNavigationBarPadding
-import io.legado.app.utils.applyOpenTint
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.checkWrite
 import io.legado.app.utils.cnCompare
@@ -69,7 +69,7 @@ import kotlin.math.max
  * cache/download 缓存界面
  */
 class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>(),
-    PopupMenu.OnMenuItemClickListener,
+    MenuItem.OnMenuItemClickListener,
     CacheAdapter.CallBack {
 
     override val binding by viewBinding(ActivityCacheBookBinding::inflate)
@@ -81,6 +81,7 @@ class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>()
     private val adapter by lazy { CacheAdapter(this, this) }
     private var booksFlowJob: Job? = null
     private var menu: Menu? = null
+    private var modernMenuPopup: PopupWindow? = null
     private val groupList: ArrayList<BookGroup> = arrayListOf()
     private var groupId: Long = -1
 
@@ -126,11 +127,12 @@ class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>()
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.book_cache, menu)
         menu.iconItemOnLongClick(R.id.menu_download) {
-            PopupMenu(this, it).apply {
-                inflate(R.menu.book_cache_download)
-                this.menu.applyOpenTint(this@CacheActivity)
-                setOnMenuItemClickListener(this@CacheActivity)
-            }.show()
+            modernMenuPopup = ModernActionPopup.showFromMenu(
+                it,
+                R.menu.book_cache_download,
+                modernMenuPopup,
+                onClick = ::onMenuItemClick
+            )
         }
         return super.onCompatCreateOptionsMenu(menu)
     }

@@ -8,6 +8,7 @@ import android.view.View
 import androidx.appcompat.app.AlertDialog
 import io.legado.app.R
 import io.legado.app.help.config.AppConfig
+import io.legado.app.lib.theme.dialogSurfaceBackground
 import io.legado.app.utils.applyTint
 
 internal class AndroidAlertBuilder(override val ctx: Context) : AlertBuilder<AlertDialog> {
@@ -143,13 +144,15 @@ internal class AndroidAlertBuilder(override val ctx: Context) : AlertBuilder<Ale
 
     override fun build(): AlertDialog {
         val dialog = builder.create()
-        if (AppConfig.isEInkMode) {
-            dialog.window?.run {
+        dialog.window?.run {
+            if (AppConfig.isEInkMode) {
                 val attr = attributes
                 attr.dimAmount = 0f
                 attr.windowAnimations = 0
                 attributes = attr
                 setBackgroundDrawableResource(R.drawable.bg_eink_border_dialog)
+            } else {
+                setBackgroundDrawable(ctx.dialogSurfaceBackground)
             }
         }
         return dialog
@@ -157,13 +160,15 @@ internal class AndroidAlertBuilder(override val ctx: Context) : AlertBuilder<Ale
 
     override fun show(): AlertDialog {
         val dialog = builder.show().applyTint()
-        if (AppConfig.isEInkMode) {
-            dialog.window?.run {
+        dialog.window?.run {
+            if (AppConfig.isEInkMode) {
                 val attr = attributes
                 attr.dimAmount = 0f
                 attr.windowAnimations = 0
                 attributes = attr
                 setBackgroundDrawableResource(R.drawable.bg_eink_border_dialog)
+            } else {
+                setBackgroundDrawable(ctx.dialogSurfaceBackground)
             }
         }
         return dialog

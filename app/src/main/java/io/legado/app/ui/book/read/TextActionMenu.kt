@@ -27,6 +27,9 @@ import io.legado.app.databinding.ItemTextBinding
 import io.legado.app.databinding.PopupActionMenuBinding
 import io.legado.app.help.config.AppConfig
 import io.legado.app.utils.getPrefBoolean
+import io.legado.app.utils.getPrefString
+import io.legado.app.utils.getPrefStringSet
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.gone
 import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.printOnDebug
@@ -43,10 +46,29 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
     private val adapter = Adapter(context).apply {
         setHasStableIds(true)
     }
-    private val menuItems: List<MenuItemImpl>
+    private val allMenuItems: List<MenuItemImpl>
     private val visibleMenuItems = arrayListOf<MenuItemImpl>()
     private val moreMenuItems = arrayListOf<MenuItemImpl>()
     private val expandTextMenu get() = context.getPrefBoolean(PreferKey.expandTextMenu)
+
+    private val configuredActionIds: Set<String>
+        get() = context.getPrefStringSet(
+            PreferKey.contentSelectActions,
+            mutableSetOf("replace", "copy", "bookmark", "aloud", "dict", "ask_ai")
+        )?.filterNot { it == "generate_image" }?.toSet() ?: emptySet()
+
+    private val defaultOpenActionId: String
+        get() = context.getPrefString(PreferKey.contentSelectDefaultOpen, "").orEmpty()
+
+    private fun menuItemToActionId(itemId: Int): String? = when (itemId) {
+        R.id.menu_replace -> "replace"
+        R.id.menu_copy -> "copy"
+        R.id.menu_bookmark -> "bookmark"
+        R.id.menu_aloud -> "aloud"
+        R.id.menu_dict -> "dict"
+        R.id.menu_ask_ai -> "ask_ai"
+        else -> null
+    }
 
     init {
         @SuppressLint("InflateParams")
@@ -55,6 +77,9 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
         isTouchable = true
         isOutsideTouchable = false
         isFocusable = false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            elevation = 14f.dpToPx()
+        }
 
         val myMenu = MenuBuilder(context)
         val otherMenu = MenuBuilder(context)
@@ -62,9 +87,7 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             onInitializeMenu(otherMenu)
         }
-        menuItems = myMenu.visibleItems + otherMenu.visibleItems
-        visibleMenuItems.addAll(menuItems.subList(0, 5))
-        moreMenuItems.addAll(menuItems.subList(5, menuItems.size))
+        allMenuItems = myMenu.visibleItems + otherMenu.visibleItems
         binding.recyclerView.adapter = adapter
         binding.recyclerViewMore.adapter = adapter
         setOnDismissListener {
@@ -91,13 +114,27 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
         upMenu()
     }
 
+    private fun filteredMenuItems(): List<MenuItemImpl> {
+        return allMenuItems.filter { item ->
+            menuItemToActionId(item.itemId)?.let { configuredActionIds.contains(it) } ?: false
+        }
+    }
+
     fun upMenu() {
+        visibleMenuItems.clear()
+        moreMenuItems.clear()
+        val filteredItems = filteredMenuItems()
+        visibleMenuItems.addAll(filteredItems)
         if (expandTextMenu) {
-            adapter.setItems(menuItems)
+            adapter.setItems(filteredItems)
             binding.ivMenuMore.gone()
         } else {
             adapter.setItems(visibleMenuItems)
-            binding.ivMenuMore.visible()
+            if (moreMenuItems.isEmpty()) {
+                binding.ivMenuMore.gone()
+            } else {
+                binding.ivMenuMore.visible()
+            }
         }
     }
 
@@ -110,60 +147,36 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
         endX: Int,
         endBottomY: Int
     ) {
-        if (expandTextMenu) {
-            when {
-                startTopY > 500 -> {
-                    showAtLocation(
-                        view,
-                        Gravity.BOTTOM or Gravity.START,
-                        startX,
-                        windowHeight - startTopY
-                    )
+        val defaultActionId = defaultOpenActionId
+        if (defaultActionId.isNotEmpty() && configuredActionIds.contains(defaultActionId)) {
+            val defaultItem = filteredMenuItems().firstOrNull { menuItemToActionId(it.itemId) == defaultActionId }
+            if (defaultItem != null) {
+                if (!callBack.onMenuItemSelected(defaultItem.itemId)) {
+                    onMenuItemSelected(defaultItem)
                 }
-
-                endBottomY - startBottomY > 500 -> {
-                    showAtLocation(view, Gravity.TOP or Gravity.START, startX, startBottomY)
-                }
-
-                else -> {
-                    showAtLocation(view, Gravity.TOP or Gravity.START, endX, endBottomY)
-                }
-            }
-        } else {
-            contentView.measure(
-                View.MeasureSpec.UNSPECIFIED,
-                View.MeasureSpec.UNSPECIFIED,
-            )
-            val popupHeight = contentView.measuredHeight
-            when {
-                startBottomY > 500 -> {
-                    showAtLocation(
-                        view,
-                        Gravity.TOP or Gravity.START,
-                        startX,
-                        startTopY - popupHeight
-                    )
-                }
-
-                endBottomY - startBottomY > 500 -> {
-                    showAtLocation(
-                        view,
-                        Gravity.TOP or Gravity.START,
-                        startX,
-                        startBottomY
-                    )
-                }
-
-                else -> {
-                    showAtLocation(
-                        view,
-                        Gravity.TOP or Gravity.START,
-                        endX,
-                        endBottomY
-                    )
-                }
+                callBack.onMenuActionFinally()
+                return
             }
         }
+        contentView.measure(
+            View.MeasureSpec.UNSPECIFIED,
+            View.MeasureSpec.UNSPECIFIED,
+        )
+        val popupWidth = contentView.measuredWidth
+        val popupHeight = contentView.measuredHeight
+        val margin = 8.dpToPx()
+        val spaceAbove = startTopY
+        val spaceBelow = windowHeight - endBottomY
+        val showAbove = spaceAbove >= popupHeight + margin || spaceAbove > spaceBelow
+        val preferredX = ((startX + endX) / 2f - popupWidth / 2f).toInt()
+        val maxX = (view.width - popupWidth - margin).coerceAtLeast(margin)
+        val x = preferredX.coerceIn(margin, maxX)
+        val y = if (showAbove) {
+            (startTopY - popupHeight - margin).coerceAtLeast(margin)
+        } else {
+            (endBottomY + margin).coerceAtMost((windowHeight - popupHeight - margin).coerceAtLeast(margin))
+        }
+        showAtLocation(view, Gravity.TOP or Gravity.START, x, y)
     }
 
     inner class Adapter(context: Context) :
@@ -200,10 +213,10 @@ class TextActionMenu(private val context: Context, private val callBack: CallBac
             holder.itemView.setOnLongClickListener {
                 if (AppConfig.contentSelectSpeakMod == 0) {
                     AppConfig.contentSelectSpeakMod = 1
-                    context.toastOnUi("切换为从选择的地方开始一直朗读")
+                    context.toastOnUi(R.string.content_select_speak_from_selection)
                 } else {
                     AppConfig.contentSelectSpeakMod = 0
-                    context.toastOnUi("切换为朗读选择内容")
+                    context.toastOnUi(R.string.content_select_speak_selected)
                 }
                 true
             }

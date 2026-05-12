@@ -11,6 +11,7 @@ import io.legado.app.help.source.sortUrls
 import io.legado.app.model.rss.Rss
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.utils.HtmlFormatter
+import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.isAbsUrl
 import io.legado.app.utils.stackTraceStr
 import kotlinx.coroutines.CoroutineScope
@@ -138,6 +139,77 @@ object Debug {
             }
     }
 
+    fun startDebug(scope: CoroutineScope, rssSource: RssSource, key: String) {
+        cancelDebug()
+        debugSource = rssSource.sourceUrl
+        startTime = System.currentTimeMillis()
+        when {
+            key.contains("::") -> {
+                val name = key.substringBefore("::")
+                val url = key.substringAfter("::")
+                log(debugSource, "⇒开始访问分类页:$url")
+                log(debugSource, "︾开始解析分类页")
+                sortDebug(scope, rssSource, name, url)
+            }
+
+            key.isAbsUrl() -> {
+                val ruleContent = rssSource.ruleContent
+                if (!rssSource.ruleArticles.isNullOrBlank() && rssSource.ruleDescription.isNullOrBlank()) {
+                    if (ruleContent.isNullOrEmpty()) {
+                        log(debugSource, "⇒内容规则为空，默认获取整个网页", state = 1000)
+                    } else {
+                        val rssArticle = RssArticle()
+                        rssArticle.origin = rssSource.sourceUrl
+                        rssArticle.link = key
+                        log(debugSource, "⇒开始访问内容页:$key")
+                        rssContentDebug(scope, rssArticle, ruleContent, rssSource)
+                    }
+                } else {
+                    log(debugSource, "⇒存在描述规则，不解析内容页")
+                    log(debugSource, "︽解析完成", state = 1000)
+                }
+            }
+
+            else -> {
+                val searchUrl = rssSource.searchUrl
+                if (searchUrl.isNullOrEmpty()) {
+                    log(debugSource, "⇒搜索URL为空", state = -1)
+                    return
+                }
+                log(debugSource, "⇒开始搜索关键字:$key")
+                log(debugSource, "︾开始解析搜索页")
+                sortDebug(scope, rssSource, "搜索", searchUrl, key)
+            }
+        }
+    }
+
+    private fun sortDebug(scope: CoroutineScope, rssSource: RssSource, name: String, url: String, key: String? = null) {
+        Rss.getArticles(scope, name, url, rssSource, 1, key)
+            .onSuccess {
+                if (it.first.isEmpty()) {
+                    log(debugSource, "⇒列表页解析成功，为空")
+                    log(debugSource, "︽解析完成", state = 1000)
+                } else {
+                    val ruleContent = rssSource.ruleContent
+                    if (!rssSource.ruleArticles.isNullOrBlank() && rssSource.ruleDescription.isNullOrBlank()) {
+                        log(debugSource, "︽列表页解析完成")
+                        log(debugSource, showTime = false)
+                        if (ruleContent.isNullOrEmpty()) {
+                            log(debugSource, "⇒内容规则为空，默认获取整个网页", state = 1000)
+                        } else {
+                            rssContentDebug(scope, it.first[0], ruleContent, rssSource)
+                        }
+                    } else {
+                        log(debugSource, "⇒存在描述规则，不解析内容页")
+                        log(debugSource, "︽解析完成", state = 1000)
+                    }
+                }
+            }
+            .onError {
+                log(debugSource, it.stackTraceStr, state = -1)
+            }
+    }
+
     private fun rssContentDebug(
         scope: CoroutineScope,
         rssArticle: RssArticle,
@@ -164,13 +236,13 @@ object Debug {
                 val book = Book()
                 book.origin = bookSource.bookSourceUrl
                 book.bookUrl = key
-                log(bookSource.bookSourceUrl, "⇒开始访问详情页:$key")
+                log(debugSource, "⇒开始访问详情页:$key")
                 infoDebug(scope, bookSource, book)
             }
 
             key.contains("::") -> {
                 val url = key.substringAfter("::")
-                log(bookSource.bookSourceUrl, "⇒开始访问发现页:$url")
+                log(debugSource, "⇒开始访问发现页:$url")
                 exploreDebug(scope, bookSource, url)
             }
 
@@ -179,7 +251,7 @@ object Debug {
                 val book = Book()
                 book.origin = bookSource.bookSourceUrl
                 book.tocUrl = url
-                log(bookSource.bookSourceUrl, "⇒开始访目录页:$url")
+                log(debugSource, "⇒开始访目录页:$url")
                 tocDebug(scope, bookSource, book)
             }
 
@@ -187,7 +259,7 @@ object Debug {
                 val url = key.substring(2)
                 val book = Book()
                 book.origin = bookSource.bookSourceUrl
-                log(bookSource.bookSourceUrl, "⇒开始访正文页:$url")
+                log(debugSource, "⇒开始访正文页:$url")
                 val chapter = BookChapter()
                 chapter.title = "调试"
                 chapter.url = url
@@ -195,7 +267,7 @@ object Debug {
             }
 
             else -> {
-                log(bookSource.bookSourceUrl, "⇒开始搜索关键字:$key")
+                log(debugSource, "⇒开始搜索关键字:$key")
                 searchDebug(scope, bookSource, key)
             }
         }

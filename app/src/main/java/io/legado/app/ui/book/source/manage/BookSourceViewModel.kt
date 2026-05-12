@@ -12,6 +12,7 @@ import io.legado.app.help.source.SourceHelp
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.cnCompare
+import io.legado.app.utils.normalizeFileName
 import io.legado.app.utils.outputStream
 import io.legado.app.utils.splitNotBlank
 import io.legado.app.utils.stackTraceStr
@@ -19,6 +20,8 @@ import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.writeToOutputStream
 import splitties.init.appCtx
 import java.io.File
+import java.util.Date
+import java.util.Locale
 
 /**
  * 书源管理数据修改
@@ -51,17 +54,11 @@ class BookSourceViewModel(application: Application) : BaseViewModel(application)
     fun del(sources: List<BookSourcePart>) {
         execute {
             SourceHelp.deleteBookSourceParts(sources)
-        }.onSuccess {
-            // 书源变化，触发自动备份
-            io.legado.app.help.storage.Backup.backupOnDataChange(context)
         }
     }
 
     fun update(vararg bookSource: BookSource) {
-        execute { appDb.bookSourceDao.update(*bookSource) }.onSuccess {
-            // 书源变化，触发自动备份
-            io.legado.app.help.storage.Backup.backupOnDataChange(context)
-        }
+        execute { appDb.bookSourceDao.update(*bookSource) }
     }
 
     fun upOrder(items: List<BookSourcePart>) {
@@ -129,7 +126,7 @@ class BookSourceViewModel(application: Application) : BaseViewModel(application)
         }
     }
 
-    private fun saveToFile(sources: List<BookSource>, success: (file: File) -> Unit) {
+    private fun saveToFile(sources: List<BookSource>, name: String, success: (file: File, name: String) -> Unit) {
         execute {
             val path = "${context.filesDir}/shareBookSource.json"
             FileUtils.delete(path)
@@ -139,7 +136,7 @@ class BookSourceViewModel(application: Application) : BaseViewModel(application)
             }
             file
         }.onSuccess {
-            success.invoke(it)
+            success.invoke(it, name)
         }.onError {
             context.toastOnUi(it.stackTraceStr)
         }
@@ -150,11 +147,12 @@ class BookSourceViewModel(application: Application) : BaseViewModel(application)
         searchKey: String?,
         sortAscending: Boolean,
         sort: BookSourceSort,
-        success: (file: File) -> Unit
+        success: (file: File, name: String) -> Unit
     ) {
         execute {
             val selection = adapter.selection
-            val selectedRate = selection.size.toFloat() / adapter.itemCount.toFloat()
+            val selectionSize = selection.size
+            val selectedRate = selectionSize.toFloat() / adapter.itemCount.toFloat()
             val sources = if (selectedRate == 1f) {
                 getBookSources(searchKey, sortAscending, sort)
             } else if (selectedRate < 0.3) {
@@ -166,7 +164,13 @@ class BookSourceViewModel(application: Application) : BaseViewModel(application)
                     keys.contains(it.bookSourceUrl)
                 }
             }
-            saveToFile(sources, success)
+            val name = if (selectionSize == 1) {
+                "bookSource_${selection.first().bookSourceName.normalizeFileName()}.json"
+            } else {
+                val timestamp = java.text.SimpleDateFormat("yyyyMMddHHmm", Locale.getDefault()).format(Date())
+                "bookSource_$timestamp.json"
+            }
+            saveToFile(sources, name, success)
         }
     }
 

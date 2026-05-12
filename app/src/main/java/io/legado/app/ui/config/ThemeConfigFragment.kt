@@ -11,10 +11,9 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.SeekBar
 import androidx.core.view.MenuProvider
+import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import io.legado.app.R
-import io.legado.app.base.AppContextWrapper
-import io.legado.app.constant.AppConst
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
 import io.legado.app.databinding.DialogEditTextBinding
@@ -22,16 +21,21 @@ import io.legado.app.databinding.DialogImageBlurringBinding
 import io.legado.app.help.LauncherIconHelp
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ThemeConfig
+import io.legado.app.help.http.addHeaders
+import io.legado.app.help.http.newCallResponse
+import io.legado.app.help.http.okHttpClient
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.prefs.ColorPreference
 import io.legado.app.lib.prefs.fragment.PreferenceFragment
 import io.legado.app.lib.theme.primaryColor
+import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.ui.file.HandleFileContract
-import io.legado.app.ui.widget.number.NumberPickerDialog
+import io.legado.app.ui.image.ImageCropContract
 import io.legado.app.ui.widget.seekbar.SeekBarChangeListener
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.FileUtils
+import io.legado.app.utils.ImageCropHelper
 import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.externalFiles
@@ -46,6 +50,7 @@ import io.legado.app.utils.removePref
 import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.toastOnUi
+import kotlinx.coroutines.launch
 import splitties.init.appCtx
 import java.io.FileOutputStream
 
@@ -57,17 +62,54 @@ class ThemeConfigFragment : PreferenceFragment(),
 
     private val requestCodeBgLight = 121
     private val requestCodeBgDark = 122
+    private val requestCodeBookInfoBg = 123
+    private val requestCodeBookInfoBgDark = 124
+    private var pendingImageCropRequest: ImageCropHelper.Request? = null
     private val selectImage = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { uri ->
-            when (it.requestCode) {
-                requestCodeBgLight -> setBgFromUri(uri, PreferKey.bgImage) {
-                    upTheme(false)
-                }
+            handleSelectedImage(uri, it.requestCode)
+        }
+    }
+    private val cropImage = registerForActivityResult(ImageCropContract()) { result ->
+        val request = pendingImageCropRequest ?: return@registerForActivityResult
+        pendingImageCropRequest = null
+        if (result == null) {
+            return@registerForActivityResult
+        }
+        if (java.io.File(result).exists()) {
+            applyCroppedImage(request.requestCode, result)
+        } else {
+            toastOnUi(getString(R.string.image_crop_failed, getString(R.string.unknown)))
+        }
+    }
 
-                requestCodeBgDark -> setBgFromUri(uri, PreferKey.bgImageN) {
-                    upTheme(true)
-                }
+    private fun handleSelectedImage(uri: Uri, requestCode: Int) {
+        if (uri.scheme?.lowercase() !in listOf("http", "https")) {
+            startImageCrop(uri, requestCode)
+            return
+        }
+        when (requestCode) {
+            requestCodeBgLight -> setBgFromUri(uri, PreferKey.bgImage) {
+                upPreferenceSummary(PreferKey.bgImage, getPrefString(PreferKey.bgImage))
+                upTheme(false)
             }
+
+            requestCodeBgDark -> setBgFromUri(uri, PreferKey.bgImageN) {
+                upPreferenceSummary(PreferKey.bgImageN, getPrefString(PreferKey.bgImageN))
+                upTheme(true)
+            }
+
+            requestCodeBookInfoBg -> setBgFromUri(uri, PreferKey.bookInfoBgImage) {
+                upPreferenceSummary(PreferKey.bookInfoBgImage, getPrefString(PreferKey.bookInfoBgImage))
+                recreateActivities()
+            }
+
+            requestCodeBookInfoBgDark -> setBgFromUri(uri, PreferKey.bookInfoBgImageN) {
+                upPreferenceSummary(PreferKey.bookInfoBgImageN, getPrefString(PreferKey.bookInfoBgImageN))
+                recreateActivities()
+            }
+
+            else -> startImageCrop(uri, requestCode)
         }
     }
 
@@ -78,8 +120,8 @@ class ThemeConfigFragment : PreferenceFragment(),
         }
         upPreferenceSummary(PreferKey.bgImage, getPrefString(PreferKey.bgImage))
         upPreferenceSummary(PreferKey.bgImageN, getPrefString(PreferKey.bgImageN))
-        upPreferenceSummary(PreferKey.barElevation, AppConfig.elevation.toString())
-        upPreferenceSummary(PreferKey.fontScale)
+        upPreferenceSummary(PreferKey.bookInfoBgImage, getPrefString(PreferKey.bookInfoBgImage))
+        upPreferenceSummary(PreferKey.bookInfoBgImageN, getPrefString(PreferKey.bookInfoBgImageN))
         findPreference<ColorPreference>(PreferKey.cBackground)?.let {
             it.onSaveColor = { color ->
                 if (!ColorUtils.isColorLight(color)) {
@@ -139,26 +181,32 @@ class ThemeConfigFragment : PreferenceFragment(),
         sharedPreferences ?: return
         when (key) {
             PreferKey.launcherIcon -> LauncherIconHelp.changeIcon(getPrefString(key))
+            PreferKey.mainTransparentStatusBar -> recreateActivities()
             PreferKey.transparentStatusBar -> recreateActivities()
             PreferKey.immNavigationBar -> recreateActivities()
             PreferKey.cPrimary,
             PreferKey.cAccent,
             PreferKey.cBackground,
-            PreferKey.cBBackground -> {
+            PreferKey.cBBackground,
+            PreferKey.tNavBar-> {
                 upTheme(false)
             }
 
             PreferKey.cNPrimary,
             PreferKey.cNAccent,
             PreferKey.cNBackground,
-            PreferKey.cNBBackground -> {
+            PreferKey.cNBBackground,
+            PreferKey.tNavBarN -> {
                 upTheme(true)
             }
 
             PreferKey.bgImage,
-            PreferKey.bgImageN -> {
+            PreferKey.bgImageN,
+            PreferKey.bookInfoBgImage,
+            PreferKey.bookInfoBgImageN -> {
                 upPreferenceSummary(key, getPrefString(key))
             }
+
         }
 
     }
@@ -166,37 +214,13 @@ class ThemeConfigFragment : PreferenceFragment(),
     @SuppressLint("PrivateResource")
     override fun onPreferenceTreeClick(preference: Preference): Boolean {
         when (val key = preference.key) {
-            PreferKey.barElevation -> NumberPickerDialog(requireContext())
-                .setTitle(getString(R.string.bar_elevation))
-                .setMaxValue(32)
-                .setMinValue(0)
-                .setValue(AppConfig.elevation)
-                .setCustomButton((R.string.btn_default_s)) {
-                    AppConfig.elevation = AppConst.sysElevation
-                    recreateActivities()
-                }
-                .show {
-                    AppConfig.elevation = it
-                    recreateActivities()
-                }
-
-            PreferKey.fontScale -> NumberPickerDialog(requireContext())
-                .setTitle(getString(R.string.font_scale))
-                .setMaxValue(16)
-                .setMinValue(8)
-                .setValue(10)
-                .setCustomButton((R.string.btn_default_s)) {
-                    putPrefInt(PreferKey.fontScale, 0)
-                    recreateActivities()
-                }
-                .show {
-                    putPrefInt(PreferKey.fontScale, it)
-                    recreateActivities()
-                }
-
             PreferKey.bgImage -> selectBgAction(false)
             PreferKey.bgImageN -> selectBgAction(true)
-            "themeList" -> ThemeListDialog().show(childFragmentManager, "themeList")
+            PreferKey.bookInfoBgImage -> selectBookInfoBgAction(false)
+            PreferKey.bookInfoBgImageN -> selectBookInfoBgAction(true)
+            "themeList" -> startActivity<ThemeManageActivity>()
+            "theme_manage" -> startActivity<ThemeManageActivity>()
+            "navigation_bar_manage" -> startActivity<NavigationBarManageActivity>()
             "saveDayTheme",
             "saveNightTheme" -> alertSaveTheme(key)
 
@@ -204,9 +228,6 @@ class ThemeConfigFragment : PreferenceFragment(),
                 putExtra("configTag", ConfigTag.COVER_CONFIG)
             }
 
-            "welcomeStyle" -> startActivity<ConfigActivity> {
-                putExtra("configTag", ConfigTag.WELCOME_CONFIG)
-            }
         }
         return super.onPreferenceTreeClick(preference)
     }
@@ -273,6 +294,28 @@ class ThemeConfigFragment : PreferenceFragment(),
         }
     }
 
+    private fun selectBookInfoBgAction(isNight: Boolean) {
+        val bgKey = if (isNight) PreferKey.bookInfoBgImageN else PreferKey.bookInfoBgImage
+        val actions = arrayListOf(getString(R.string.select_image))
+        if (!getPrefString(bgKey).isNullOrEmpty()) {
+            actions.add(getString(R.string.delete))
+        }
+        context?.selector(items = actions) { _, i ->
+            when (i) {
+                0 -> selectImage.launch {
+                    requestCode = if (isNight) requestCodeBookInfoBgDark else requestCodeBookInfoBg
+                    mode = HandleFileContract.IMAGE
+                }
+
+                1 -> {
+                    removePref(bgKey)
+                    upPreferenceSummary(bgKey, null)
+                    recreateActivities()
+                }
+            }
+        }
+    }
+
     private fun alertImageBlurring(preferKey: String, success: () -> Unit) {
         alert(R.string.background_image_blurring) {
             val alertBinding = DialogImageBlurringBinding.inflate(layoutInflater).apply {
@@ -317,16 +360,10 @@ class ThemeConfigFragment : PreferenceFragment(),
     private fun upPreferenceSummary(preferenceKey: String, value: String? = null) {
         val preference = findPreference<Preference>(preferenceKey) ?: return
         when (preferenceKey) {
-            PreferKey.barElevation -> preference.summary =
-                getString(R.string.bar_elevation_s, value)
-
-            PreferKey.fontScale -> {
-                val fontScale = AppContextWrapper.getFontScale(requireContext())
-                preference.summary = getString(R.string.font_scale_summary, fontScale)
-            }
-
             PreferKey.bgImage,
-            PreferKey.bgImageN -> preference.summary = if (value.isNullOrBlank()) {
+            PreferKey.bgImageN,
+            PreferKey.bookInfoBgImage,
+            PreferKey.bookInfoBgImageN -> preference.summary = if (value.isNullOrBlank()) {
                 getString(R.string.select_image)
             } else {
                 value
@@ -336,13 +373,110 @@ class ThemeConfigFragment : PreferenceFragment(),
         }
     }
 
+    private fun startImageCrop(uri: Uri, requestCode: Int) {
+        val aspect = ImageCropHelper.screenAspect(requireContext())
+        val prefix = when (requestCode) {
+            requestCodeBgLight -> "read_day"
+            requestCodeBgDark -> "read_night"
+            requestCodeBookInfoBg -> "book_info_day"
+            requestCodeBookInfoBgDark -> "book_info_night"
+            else -> "theme"
+        }
+        val request = ImageCropHelper.buildRequest(
+            context = requireContext(),
+            sourceUri = uri,
+            requestCode = requestCode,
+            aspectWidth = aspect.first,
+            aspectHeight = aspect.second,
+            dirName = "themeCroppedImages",
+            prefix = prefix,
+            targetWidth = 1600
+        )
+        pendingImageCropRequest = request
+        cropImage.launch(request.params)
+    }
+
+    private fun applyCroppedImage(requestCode: Int, path: String) {
+        when (requestCode) {
+            requestCodeBgLight -> {
+                putPrefString(PreferKey.bgImage, path)
+                upPreferenceSummary(PreferKey.bgImage, path)
+                upTheme(false)
+            }
+
+            requestCodeBgDark -> {
+                putPrefString(PreferKey.bgImageN, path)
+                upPreferenceSummary(PreferKey.bgImageN, path)
+                upTheme(true)
+            }
+
+            requestCodeBookInfoBg -> {
+                putPrefString(PreferKey.bookInfoBgImage, path)
+                upPreferenceSummary(PreferKey.bookInfoBgImage, path)
+                recreateActivities()
+            }
+
+            requestCodeBookInfoBgDark -> {
+                putPrefString(PreferKey.bookInfoBgImageN, path)
+                upPreferenceSummary(PreferKey.bookInfoBgImageN, path)
+                recreateActivities()
+            }
+        }
+    }
+
     private fun setBgFromUri(uri: Uri, preferenceKey: String, success: () -> Unit) {
+        if (uri.scheme?.lowercase() in listOf("http", "https")) {
+            lifecycleScope.launch {
+                kotlin.runCatching {
+                    appCtx.toastOnUi("下载背景图片中...")
+                    val analyzeUrl = AnalyzeUrl(uri.toString())
+                    val url = analyzeUrl.urlNoQuery
+                    var file = requireContext().externalFiles
+                    val res = okHttpClient.newCallResponse(0) {
+                        addHeaders(analyzeUrl.headerMap)
+                        url(url)
+                    }
+                    val contentType = res.header("Content-Type") ?: "image/jpeg"
+                    val imageType = when {
+                        contentType.contains("png", ignoreCase = true) -> "png"
+                        contentType.contains("gif", ignoreCase = true) -> "gif"
+                        contentType.contains("webp", ignoreCase = true) -> "webp"
+                        else -> "jpg"
+                    }
+                    val suffix = if (url.contains(".9.png", true)) {
+                        ".9.png"
+                    } else {
+                        ".$imageType"
+                    }
+                    val fileName = MD5Utils.md5Encode(url) + suffix
+                    file = FileUtils.createFileIfNotExist(file, preferenceKey, fileName)
+                    res.body.byteStream().use { inputStream ->
+                        FileOutputStream(file).use { outputStream ->
+                            inputStream.copyTo(outputStream)
+                        }
+                    }
+                    putPrefString(preferenceKey, file.absolutePath)
+                    if (isAdded && context != null) {
+                        success()
+                    }
+                }.onSuccess {
+                    appCtx.toastOnUi("设定成功")
+                }.onFailure {
+                    appCtx.toastOnUi(it.localizedMessage)
+                }
+            }
+            return
+        }
         readUri(uri) { fileDoc, inputStream ->
             kotlin.runCatching {
                 var file = requireContext().externalFiles
-                val suffix = fileDoc.name.substringAfterLast(".")
+                val suffix = if (fileDoc.name.contains(".9.png", true)) {
+                    ".9.png"
+                } else {
+                    "." + fileDoc.name.substringAfterLast(".")
+                }
                 val fileName = uri.inputStream(requireContext()).getOrThrow().use {
-                    MD5Utils.md5Encode(it) + ".$suffix"
+                    MD5Utils.md5Encode(it) + suffix
                 }
                 file = FileUtils.createFileIfNotExist(file, preferenceKey, fileName)
                 FileOutputStream(file).use {

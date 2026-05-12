@@ -1,5 +1,6 @@
 package io.legado.app.ui.config
 
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.viewModels
 import androidx.fragment.app.Fragment
@@ -7,6 +8,7 @@ import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.EventBus
 import io.legado.app.databinding.ActivityConfigBinding
+import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 
@@ -16,12 +18,18 @@ class ConfigActivity : VMBaseActivity<ActivityConfigBinding, ConfigViewModel>() 
     override val viewModel by viewModels<ConfigViewModel>()
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        applyHeaderColors()
         when (val configTag = intent.getStringExtra("configTag")) {
-            ConfigTag.OTHER_CONFIG -> replaceFragment<OtherConfigFragment>(configTag)
-            ConfigTag.THEME_CONFIG -> replaceFragment<ThemeConfigFragment>(configTag)
-            ConfigTag.BACKUP_CONFIG -> replaceFragment<BackupConfigFragment>(configTag)
-            ConfigTag.COVER_CONFIG -> replaceFragment<CoverConfigFragment>(configTag)
-            ConfigTag.WELCOME_CONFIG -> replaceFragment<WelcomeConfigFragment>(configTag)
+            ConfigTag.OTHER_CONFIG -> replaceFragment(configTag, OtherConfigFragment::class.java)
+            ConfigTag.THEME_CONFIG -> replaceFragment(configTag, ThemeConfigFragment::class.java)
+            ConfigTag.BACKUP_CONFIG -> replaceFragment(configTag, BackupConfigFragment::class.java)
+            ConfigTag.AI_CONFIG -> replaceFragment(configTag, AiConfigFragment::class.java)
+            ConfigTag.COVER_CONFIG -> replaceFragment(configTag, CoverConfigFragment::class.java)
+            ConfigTag.WELCOME_CONFIG -> replaceFragment(configTag, WelcomeConfigFragment::class.java)
+            ConfigTag.DISCOVERY_SUBSCRIPTION_CONFIG ->
+                replaceFragment(configTag, DiscoverySubscriptionConfigFragment::class.java)
+            ConfigTag.DISCOVERY_CONFIG -> replaceFragment(configTag, DiscoveryConfigFragment::class.java)
+            ConfigTag.SUBSCRIPTION_CONFIG -> replaceFragment(configTag, SubscriptionConfigFragment::class.java)
             else -> finish()
         }
     }
@@ -29,13 +37,18 @@ class ConfigActivity : VMBaseActivity<ActivityConfigBinding, ConfigViewModel>() 
     override fun setTitle(resId: Int) {
         super.setTitle(resId)
         binding.titleBar.setTitle(resId)
+        applyHeaderColors()
     }
 
-    inline fun <reified T : Fragment> replaceFragment(configTag: String) {
+    override fun onResume() {
+        super.onResume()
+        applyHeaderColors()
+    }
+
+    fun <T : Fragment> replaceFragment(configTag: String, fragmentClass: Class<T>) {
         intent.putExtra("configTag", configTag)
-        @Suppress("DEPRECATION")
         val configFragment = supportFragmentManager.findFragmentByTag(configTag)
-            ?: T::class.java.newInstance()
+            ?: fragmentClass.newInstance()
         supportFragmentManager.beginTransaction()
             .replace(R.id.configFrameLayout, configFragment, configTag)
             .commit()
@@ -46,6 +59,13 @@ class ConfigActivity : VMBaseActivity<ActivityConfigBinding, ConfigViewModel>() 
         observeEvent<String>(EventBus.RECREATE) {
             recreate()
         }
+    }
+
+    private fun applyHeaderColors() {
+        binding.titleBar.setTextColor(primaryTextColor)
+        binding.titleBar.setColorFilter(primaryTextColor)
+        binding.titleBar.setBackgroundColor(Color.TRANSPARENT)
+        binding.titleBar.elevation = 0f
     }
 
 }

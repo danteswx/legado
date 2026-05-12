@@ -18,14 +18,14 @@
 </template>
 
 <script setup lang="ts">
-import { isLegadoUrl } from '@/utils/utils'
+import { isLegadoUrl, lazyRegex } from '@/utils/utils'
 import API from '@api'
 import jump from '@/plugins/jump'
 import type { webReadConfig } from '@/web'
 
 const store = useBookStore()
 const readWidth = computed(() => store.config.readWidth)
-const fontSize = computed(() => store.config.fontSize)
+const lineImgWidth = computed(() => store.config.fontSize * 2)
 const bookUrl = computed(() => store.readingBook.bookUrl)
 
 const props = defineProps<{
@@ -37,15 +37,22 @@ const props = defineProps<{
   fontSize: string
 }>()
 
-const imgPattern = /<img[^>]*src=['"]([^'"]*(?:['"][^>]+\})?)['"][^>]*>/g
+const imgPatternStr = '<img[^>]*src=[\'"]([^\'"]*(?:[\'"][^>]+\\})?)[\'"][^>]*>'
+const imgPattern = lazyRegex(imgPatternStr)
+const imgPatternAll = lazyRegex(imgPatternStr, 'g')
+const imgDataUrlPattern = lazyRegex('data:image[^;]+;base64,[^,]{39,}')
 
 const replaceImage = (content: string) => {
-  return content.replace(imgPattern, (match, src) => {
+  return content.replace(imgPatternAll(), (match, src) => {
+    const dataUrl = src.match(imgDataUrlPattern())
+    if (dataUrl) {
+      return dataUrl[0]
+    }
     if (isLegadoUrl(src)) {
       const proxySrc = API.getProxyImageUrl(
         bookUrl.value,
         src,
-        fontSize.value * 2,
+        lineImgWidth.value,
       )
       return match.replace(src, proxySrc)
     }
@@ -54,8 +61,11 @@ const replaceImage = (content: string) => {
 }
 
 const getImageSrc = (content: string) => {
-  const imgPattern = /<img[^>]*src=['"]([^'"]*(?:['"][^>]+\})?)['"][^>]*>/
-  const src = content.match(imgPattern)![1] //reg tested in template
+  const src = content.match(imgPattern())![1] //reg tested in template
+  const dataUrl = src.match(imgDataUrlPattern())
+  if (dataUrl) {
+      return dataUrl[0] //现成的base64图片，去掉阅读格式后缀
+  }
   if (isLegadoUrl(src))
     return API.getProxyImageUrl(
       bookUrl.value,
@@ -85,12 +95,16 @@ const proxyImage = (event: Event) => {
  * 处理传入的IMG标签错误事件，自动替换图片的代理链接
  */
 const handleImgLoadError = (event: Event) => {
-  if ((event.target as HTMLElement)?.tagName === "IMG") {
-    console.log("[ChapterContent]: IMG Load Error, replace src:",
-      (event.target as HTMLImageElement)?.getAttribute("src"), "=>",
+  const target = event.target
+  if (target instanceof HTMLImageElement) {
+    const srcUrl = target.getAttribute("src")
+    console.log(
+      "[ChapterContent]: IMG Load Error, replace src:",
+      srcUrl,
+      "=>",
       API.getProxyImageUrl(
         bookUrl.value,
-        (event.target as HTMLImageElement)?.getAttribute("src") ?? "",
+        srcUrl ?? "",
         readWidth.value,
       )
     )
@@ -101,7 +115,7 @@ const handleImgLoadError = (event: Event) => {
 const calculateWordCount = (paragraph: string) => {
   //内嵌图片文字为1
   const imagePlaceHolder = ' '
-  return paragraph.replace(imgPattern, imagePlaceHolder).length
+  return paragraph.replace(imgPatternAll(), imagePlaceHolder).length
 }
 const chapterPos = computed(() => {
   let pos = -1

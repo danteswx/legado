@@ -1,14 +1,17 @@
 package io.legado.app.ui.widget
 
 import android.content.Context
+import android.graphics.Color
 import android.graphics.PorterDuff
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.Menu
+import android.view.MenuItem
 import android.widget.FrameLayout
+import android.widget.PopupMenu
+import android.widget.PopupWindow
 import androidx.annotation.MenuRes
 import androidx.annotation.StringRes
-import androidx.appcompat.widget.PopupMenu
 import io.legado.app.R
 import io.legado.app.databinding.ViewSelectActionBarBinding
 import io.legado.app.lib.theme.TintHelper
@@ -17,6 +20,7 @@ import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.elevation
 import io.legado.app.lib.theme.getPrimaryTextColor
 import io.legado.app.lib.theme.getSecondaryDisabledTextColor
+import io.legado.app.lib.theme.transparentNavBar
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.visible
@@ -33,14 +37,21 @@ class SelectActionBar @JvmOverloads constructor(
     private val disabledColor = context.getSecondaryDisabledTextColor(bgIsLight)
 
     private var callBack: CallBack? = null
-    private var selMenu: PopupMenu? = null
+    private var selMenu: Menu? = null
+    private var modernMenuPopup: PopupWindow? = null
+    private var menuItemClickListener: MenuItem.OnMenuItemClickListener? = null
     private val binding = ViewSelectActionBarBinding
         .inflate(LayoutInflater.from(context), this, true)
 
     init {
         if (!isInEditMode) {
-            setBackgroundColor(context.bottomBackground)
-            elevation = context.elevation
+            val transparentNavBar = context.transparentNavBar
+            if (transparentNavBar) {
+                setBackgroundColor(Color.TRANSPARENT)
+            } else {
+                setBackgroundColor(context.bottomBackground)
+                elevation = context.elevation
+            }
             binding.cbSelectedAll.setTextColor(primaryTextColor)
             TintHelper.setTint(binding.cbSelectedAll, context.accentColor, !bgIsLight)
             binding.ivMenuMore.setColorFilter(disabledColor, PorterDuff.Mode.SRC_IN)
@@ -49,7 +60,14 @@ class SelectActionBar @JvmOverloads constructor(
             }
             binding.btnRevertSelection.setOnClickListener { callBack?.revertSelection() }
             binding.btnSelectActionMain.setOnClickListener { callBack?.onClickSelectBarMainAction() }
-            binding.ivMenuMore.setOnClickListener { selMenu?.show() }
+            binding.ivMenuMore.setOnClickListener {
+                val menu = selMenu ?: return@setOnClickListener
+                modernMenuPopup = ModernActionPopup.show(
+                    binding.ivMenuMore,
+                    menu.visibleActions(),
+                    modernMenuPopup
+                )
+            }
             applyNavigationBarPadding()
         }
     }
@@ -65,18 +83,34 @@ class SelectActionBar @JvmOverloads constructor(
     }
 
     fun inflateMenu(@MenuRes resId: Int): Menu? {
-        selMenu = PopupMenu(context, binding.ivMenuMore)
-        selMenu?.inflate(resId)
+        val popupMenu = PopupMenu(context, binding.ivMenuMore)
+        popupMenu.inflate(resId)
+        selMenu = popupMenu.menu
         binding.ivMenuMore.visible()
-        return selMenu?.menu
+        return selMenu
     }
 
     fun setCallBack(callBack: CallBack) {
         this.callBack = callBack
     }
 
-    fun setOnMenuItemClickListener(listener: PopupMenu.OnMenuItemClickListener) {
-        selMenu?.setOnMenuItemClickListener(listener)
+    fun setOnMenuItemClickListener(listener: MenuItem.OnMenuItemClickListener) {
+        menuItemClickListener = listener
+    }
+
+    private fun Menu.visibleActions(): List<ModernActionPopup.Action> {
+        val actions = mutableListOf<ModernActionPopup.Action>()
+        for (index in 0 until size()) {
+            val item = getItem(index)
+            if (item.isVisible) {
+                actions.add(
+                    ModernActionPopup.Action(item.title.toString()) {
+                        menuItemClickListener?.onMenuItemClick(item)
+                    }
+                )
+            }
+        }
+        return actions
     }
 
     fun upCountView(selectCount: Int, allCount: Int) = binding.run {

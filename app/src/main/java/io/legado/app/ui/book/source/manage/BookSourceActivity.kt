@@ -8,7 +8,6 @@ import android.view.SubMenu
 import android.view.WindowManager
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.SearchView
 import androidx.core.os.bundleOf
 import androidx.lifecycle.Lifecycle
@@ -81,7 +80,7 @@ import kotlinx.coroutines.launch
  * 书源管理界面
  */
 class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceViewModel>(),
-    PopupMenu.OnMenuItemClickListener,
+    MenuItem.OnMenuItemClickListener,
     BookSourceAdapter.CallBack,
     SelectActionBar.CallBack,
     SearchView.OnQueryTextListener {
@@ -392,6 +391,17 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        adapter.upResumed(true)
+    }
+
+    override fun onPause() {
+        adapter.upResumed(false)
+        super.onPause()
+    }
+
+
     private fun initLiveDataGroup() {
         lifecycleScope.launch {
             appDb.bookSourceDao.flowGroups()
@@ -454,8 +464,8 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
         binding.selectActionBar.setCallBack(this)
     }
 
-    override fun onMenuItemClick(item: MenuItem?): Boolean {
-        when (item?.itemId) {
+    override fun onMenuItemClick(item: MenuItem): Boolean {
+        when (item.itemId) {
             R.id.menu_enable_selection -> viewModel.enableSelection(adapter.selection)
             R.id.menu_disable_selection -> viewModel.disableSelection(adapter.selection)
             R.id.menu_enable_explore -> viewModel.enableSelectExplore(adapter.selection)
@@ -470,11 +480,11 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
                 searchView.query?.toString(),
                 sortAscending,
                 sort
-            ) { file ->
+            ) { file, name ->
                 exportDir.launch {
                     mode = HandleFileContract.EXPORT
                     fileData = HandleFileContract.FileData(
-                        "bookSource.json",
+                        name,
                         file,
                         "application/json"
                     )
@@ -486,8 +496,8 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
                 searchView.query?.toString(),
                 sortAscending,
                 sort
-            ) {
-                share(it)
+            ) { file, name ->
+                share(file)
             }
 
             R.id.menu_check_selected_interval -> adapter.checkSelectedInterval()
@@ -751,9 +761,7 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
     }
 
     override fun searchBook(bookSource: BookSourcePart) {
-        startActivity<SearchActivity> {
-            putExtra("searchScope", SearchScope(bookSource).toString())
-        }
+        SearchActivity.start(this, bookSource)
     }
 
     override fun debug(bookSource: BookSourcePart) {

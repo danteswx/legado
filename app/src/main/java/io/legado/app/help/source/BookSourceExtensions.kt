@@ -6,8 +6,10 @@ import io.legado.app.constant.BookType
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.rule.ExploreKind
+import io.legado.app.ui.main.explore.ExploreAdapter.Companion.exploreInfoMapList
 import io.legado.app.utils.ACache
 import io.legado.app.utils.GSON
+import io.legado.app.utils.InfoMap
 import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.fromJsonArray
 import io.legado.app.utils.isJsonArray
@@ -27,7 +29,22 @@ private val exploreKindsMap by lazy { ConcurrentHashMap<String, List<ExploreKind
 private val aCache by lazy { ACache.get("explore") }
 
 private fun BookSource.getExploreKindsKey(): String {
-    return MD5Utils.md5Encode(bookSourceUrl + exploreUrl)
+    val sourceState = listOf(
+        MD5Utils.md5Encode16(getVariable()),
+        get("type"),
+        get("order"),
+        get("hostIndex"),
+        get("host")
+    ).joinToString("|")
+    return MD5Utils.md5Encode(
+        listOf(
+            bookSourceUrl,
+            exploreUrl.orEmpty(),
+            jsLib.orEmpty(),
+            lastUpdateTime.toString(),
+            sourceState
+        ).joinToString("\n")
+    )
 }
 
 private fun BookSourcePart.getExploreKindsKey(): String {
@@ -51,22 +68,43 @@ suspend fun BookSource.exploreKinds(): List<ExploreKind> {
         val kinds = arrayListOf<ExploreKind>()
         withContext(Dispatchers.IO) {
             kotlin.runCatching {
-                var ruleStr = exploreUrl
-                if (exploreUrl.startsWith("<js>", true)
-                    || exploreUrl.startsWith("@js:", true)
-                ) {
-                    ruleStr = aCache.getAsString(exploreKindsKey)
-                    if (ruleStr.isNullOrBlank()) {
-                        val jsStr = if (exploreUrl.startsWith("@")) {
-                            exploreUrl.substring(4)
-                        } else {
-                            exploreUrl.substring(4, exploreUrl.lastIndexOf("<"))
+                val ruleStr = when {
+                    exploreUrl.startsWith("@js:", true) -> {
+                        aCache.getAsString(exploreKindsKey)?.takeIf { it.isNotBlank() } ?: run {
+                            val exploreInfoMap = exploreInfoMapList[bookSourceUrl] ?: InfoMap(bookSourceUrl).also {
+                                exploreInfoMapList.put(bookSourceUrl, it)
+                            }
+                            runScriptWithContext {
+                                evalJS(exploreUrl.substring(4)) {
+                                    put("infoMap", exploreInfoMap)
+                                }?.toString()?.trim().orEmpty()
+                            }.also { rule ->
+                                if (rule.isValidExploreKindsRule()) {
+                                    aCache.put(exploreKindsKey, rule)
+                                }
+                            }
                         }
-                        ruleStr = runScriptWithContext {
-                            evalJS(jsStr).toString().trim()
-                        }
-                        aCache.put(exploreKindsKey, ruleStr)
                     }
+                    exploreUrl.startsWith("<js>", true) -> {
+                        aCache.getAsString(exploreKindsKey)?.takeIf { it.isNotBlank() } ?: run {
+                            val exploreInfoMap = exploreInfoMapList[bookSourceUrl] ?: InfoMap(bookSourceUrl).also {
+                                exploreInfoMapList.put(bookSourceUrl, it)
+                            }
+                            runScriptWithContext {
+                                evalJS(exploreUrl.substring(4, exploreUrl.lastIndexOf("<"))) {
+                                    put("infoMap", exploreInfoMap)
+                                }?.toString()?.trim().orEmpty()
+                            }.also { rule ->
+                                if (rule.isValidExploreKindsRule()) {
+                                    aCache.put(exploreKindsKey, rule)
+                                }
+                            }
+                        }
+                    }
+                    else -> exploreUrl
+                }
+                if (!ruleStr.isValidExploreKindsRule()) {
+                    return@runCatching
                 }
                 if (ruleStr.isJsonArray()) {
                     GSON.fromJsonArray<ExploreKind>(ruleStr).getOrThrow().let {
@@ -86,6 +124,14 @@ suspend fun BookSource.exploreKinds(): List<ExploreKind> {
         exploreKindsMap[exploreKindsKey] = kinds
         return kinds
     }
+}
+
+private fun String.isValidExploreKindsRule(): Boolean {
+    val rule = trim()
+    if (rule.isBlank()) return false
+    if (rule.equals("null", ignoreCase = true)) return false
+    if (rule.equals("undefined", ignoreCase = true)) return false
+    return true
 }
 
 suspend fun BookSourcePart.clearExploreKindsCache() {
@@ -116,6 +162,7 @@ fun BookSource.getBookType(): Int {
         BookSourceType.file -> BookType.text or BookType.webFile
         BookSourceType.image -> BookType.image
         BookSourceType.audio -> BookType.audio
+        BookSourceType.video -> BookType.video
         else -> BookType.text
     }
 }

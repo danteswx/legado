@@ -1,6 +1,7 @@
 package io.legado.app.ui.main.bookshelf.style2
 
 import android.annotation.SuppressLint
+import android.graphics.Rect
 import android.os.Bundle
 import android.view.View
 import androidx.appcompat.widget.SearchView
@@ -25,7 +26,9 @@ import io.legado.app.ui.book.group.GroupEditDialog
 import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.main.bookshelf.BaseBookshelfFragment
+import io.legado.app.utils.applyMainBottomBarPadding
 import io.legado.app.utils.cnCompare
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.flowWithLifecycleAndDatabaseChangeFirst
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.setEdgeEffectColor
@@ -59,10 +62,10 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
     private val binding by viewBinding(FragmentBookshelf2Binding::bind)
     private val bookshelfLayout by lazy { AppConfig.bookshelfLayout }
     private val booksAdapter: BaseBooksAdapter<*> by lazy {
-        if (bookshelfLayout == 0) {
-            BooksAdapterList(requireContext(), this)
-        } else {
+        if (bookshelfLayout >= 2) {
             BooksAdapterGrid(requireContext(), this)
+        } else {
+            BooksAdapterList(requireContext(), this)
         }
     }
     private var bookGroups: List<BookGroup> = emptyList()
@@ -70,9 +73,14 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
     override var groupId = BookGroup.IdRoot
     override var books: List<Book> = emptyList()
     private var enableRefresh = true
+    override var onlyUpdateRead = false
+    private val bookshelfMargin by lazy { AppConfig.bookshelfMargin }
+    private var itemCount = 0
+    private var totalRows = 0
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         setSupportToolbar(binding.titleBar.toolbar)
+        installModernBookshelfOverflow(binding.titleBar.toolbar)
         initRecyclerView()
         initBookGroupData()
         initBooksData()
@@ -80,34 +88,59 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
 
     private fun initRecyclerView() {
         binding.rvBookshelf.setEdgeEffectColor(primaryColor)
+        binding.rvBookshelf.clipToPadding = true
+        binding.rvBookshelf.applyMainBottomBarPadding()
         binding.refreshLayout.setColorSchemeColors(accentColor)
+        binding.refreshLayout.setProgressViewOffset(true, (-28).dpToPx(), 56.dpToPx())
         binding.refreshLayout.setOnRefreshListener {
             binding.refreshLayout.isRefreshing = false
-            activityViewModel.upToc(books)
-            // 检查WebDAV远端是否有更新
-            activityViewModel.checkAndRestoreFromWebDav()
+            activityViewModel.upToc(books, onlyUpdateRead)
         }
-        if (bookshelfLayout == 0) {
-            binding.rvBookshelf.layoutManager = LinearLayoutManager(context)
+        if (bookshelfLayout >= 2) {
+            binding.rvBookshelf.layoutManager = GridLayoutManager(context, bookshelfLayout)
         } else {
-            binding.rvBookshelf.layoutManager = GridLayoutManager(context, bookshelfLayout + 2)
+            binding.rvBookshelf.layoutManager = LinearLayoutManager(context)
         }
-        binding.rvBookshelf.itemAnimator = null
         binding.rvBookshelf.adapter = booksAdapter
-        booksAdapter.registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
-            override fun onItemRangeInserted(positionStart: Int, itemCount: Int) {
-                val layoutManager = binding.rvBookshelf.layoutManager
-                if (positionStart == 0 && layoutManager is LinearLayoutManager) {
-                    val scrollTo = layoutManager.findFirstVisibleItemPosition() - itemCount
-                    binding.rvBookshelf.scrollToPosition(max(0, scrollTo))
-                }
-            }
-
-            override fun onItemRangeMoved(fromPosition: Int, toPosition: Int, itemCount: Int) {
-                val layoutManager = binding.rvBookshelf.layoutManager
-                if (toPosition == 0 && layoutManager is LinearLayoutManager) {
-                    val scrollTo = layoutManager.findFirstVisibleItemPosition() - itemCount
-                    binding.rvBookshelf.scrollToPosition(max(0, scrollTo))
+        /**
+         * 采用 layoutManager?.onRestoreInstanceState(layoutState)
+         * 恢复滚动位置
+         * **/
+        binding.rvBookshelf.itemAnimator =  null
+        binding.rvBookshelf.addItemDecoration( object : RecyclerView.ItemDecoration() {
+            override fun getItemOffsets(
+                outRect: Rect,
+                view: View,
+                parent: RecyclerView,
+                state: RecyclerView.State
+            ) {
+                val position = parent.getChildAdapterPosition(view)
+                if (bookshelfLayout >= 2) {
+                    val spanCount = bookshelfLayout
+                    val rowIndex = position / spanCount
+                    when (rowIndex) {
+                        0 -> { //第一行加额外上边距
+                            outRect.set(bookshelfMargin, bookshelfMargin + 24, bookshelfMargin, bookshelfMargin)
+                        }
+                        totalRows - 1 -> { //最后一行加额外下边距
+                            outRect.set(bookshelfMargin, bookshelfMargin, bookshelfMargin, bookshelfMargin)
+                        }
+                        else -> {
+                            outRect.set(bookshelfMargin, bookshelfMargin, bookshelfMargin, bookshelfMargin)
+                        }
+                    }
+                } else {
+                    when (position) {
+                        0 -> {
+                            outRect.set(0, bookshelfMargin + 24, 0, bookshelfMargin)
+                        }
+                        itemCount - 1 -> {
+                            outRect.set(0, bookshelfMargin, 0, bookshelfMargin)
+                        }
+                        else -> {
+                            outRect.set(0, bookshelfMargin, 0, bookshelfMargin)
+                        }
+                    }
                 }
             }
         })
@@ -116,9 +149,14 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
     override fun upGroup(data: List<BookGroup>) {
         if (data != bookGroups) {
             bookGroups = data
-            booksAdapter.updateItems()
-            binding.tvEmptyMsg.isGone = getItemCount() > 0
-            binding.refreshLayout.isEnabled = enableRefresh && getItemCount() > 0
+            booksAdapter.updateItems(groupId)
+            itemCount = getItemCount()
+            val spanCount = bookshelfLayout
+            if (spanCount >= 2) {
+                totalRows = if (itemCount % spanCount == 0) itemCount / spanCount else itemCount / spanCount + 1
+            }
+            binding.tvEmptyMsg.isGone = itemCount > 0
+            binding.refreshLayout.isEnabled = enableRefresh && itemCount > 0
         }
     }
 
@@ -140,6 +178,7 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
                 binding.titleBar.title = "${getString(R.string.bookshelf)}(${it.groupName})"
                 binding.refreshLayout.isEnabled = it.enableRefresh
                 enableRefresh = it.enableRefresh
+                onlyUpdateRead = it.onlyUpdateRead
             }
         }
         booksFlowJob?.cancel()
@@ -175,9 +214,14 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
                 AppLog.put("书架更新出错", it)
             }.conflate().flowOn(Dispatchers.Default).collect { list ->
                 books = list
-                booksAdapter.updateItems()
-                binding.tvEmptyMsg.isGone = getItemCount() > 0
-                binding.refreshLayout.isEnabled = enableRefresh && getItemCount() > 0
+                booksAdapter.updateItems(groupId)
+                itemCount = getItemCount()
+                val spanCount = bookshelfLayout
+                if (spanCount >= 2) {
+                    totalRows = if (itemCount % spanCount == 0) itemCount / spanCount else itemCount / spanCount + 1
+                }
+                binding.tvEmptyMsg.isGone = itemCount > 0
+                binding.refreshLayout.isEnabled = enableRefresh && itemCount > 0
                 delay(100)
             }
         }
@@ -190,6 +234,11 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
             return true
         }
         return false
+    }
+
+    fun switchToGroupId(targetGroupId: Long) {
+        groupId = targetGroupId
+        initBooksData()
     }
 
     override fun onQueryTextSubmit(query: String?): Boolean {

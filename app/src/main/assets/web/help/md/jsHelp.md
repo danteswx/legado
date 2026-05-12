@@ -1,5 +1,5 @@
 # js变量和函数
-> 阅读使用[Rhino v1.8.0](https://github.com/mozilla/rhino) 作为JavaScript引擎以便于[调用Java类和方法](https://m.jb51.net/article/92138.htm)，查看[ECMAScript兼容性表格](https://mozilla.github.io/rhino/compat/engines.html)
+> 阅读使用[Rhino v1.8.1](https://github.com/mozilla/rhino) 作为JavaScript引擎以便于[调用Java类和方法](https://m.jb51.net/article/92138.htm)，查看[ECMAScript兼容性表格](https://mozilla.github.io/rhino/compat/engines.html)　
 
 > [Rhino运行时](https://github.com/mozilla/rhino/blob/master/rhino/src/main/java/org/mozilla/javascript/ScriptRuntime.java)懒加载导入的Java类和方法
 
@@ -13,7 +13,7 @@
 
 > 在书源规则中使用`@js` `<js>` `{{}}`可使用JavaScript调用阅读部分内置的类和方法
 
-> 注意为了安全，阅读会屏蔽部分java类调用，见[RhinoClassShutter](https://github.com/gedoor/legado/blob/master/modules/rhino/src/main/java/com/script/rhino/RhinoClassShutter.kt)
+> 注意为了安全，阅读会屏蔽部分java类调用，见[RhinoClassShutter](https://github.com/gedoor/legado/blob/master/modules/rhino/src/main/java/com/script/rhino/RhinoClassShutter.kt)　
 
 > 不同的书源规则中支持的调用的Java类和方法可能有所不同
 
@@ -33,26 +33,73 @@
 |title|章节当前标题 String|
 |src| 请求返回的源码|
 |nextChapterUrl|下一章节url|
+|isFromBookInfo|是否为详情页刷新|
 
 ## 当前类对象的可使用的部分方法
+函数带有默认值的函数会自动重载，可以不填。  
 
-### [RssJsExtensions](https://github.com/gedoor/legado/blob/master/app/src/main/java/io/legado/app/ui/rss/read/RssJsExtensions.kt)
-> 只能在订阅源`shouldOverrideUrlLoading`规则中使用  
+### [RssJsExtensions](https://github.com/Luoyacheng/legado/blob/main/app/src/main/java/io/legado/app/ui/rss/read/RssJsExtensions.kt)独有函数
+> 在订阅源`shouldOverrideUrlLoading`规则中使用  
+> 被下方`SourceLoginJsExtensions`类包含，也能使用这些函数  
 > 订阅添加跳转url拦截, js, 返回true拦截,js变量url,可以通过js打开url  
 > url跳转拦截规则不能执行耗时操作
-> 例子https://github.com/gedoor/legado/discussions/3259
 
-* 调用阅读搜索
-
+* 调用阅读搜索  
 ```js
-java.searchBook(bookName: String)
+* @param key 搜索关键词
+* @param searchScope 搜索作用域，为空时调用所以书源搜索
+//searchScope作用域,形式为`源名称::源地址`、或者`,`符号隔开的源分组名称
+//在书源调用时可写为java.searchBook(key, source)，仅本书源进行搜索
+java.searchBook(key: String, searchScope: String? = null)
 ```
 
-* 添加书架
-
+* 添加书架  
 ```js
 java.addBook(bookUrl: String)
 ```
+
+* 打开源界面  
+```js
+* @param name 为"sort"打开订阅源分类界面、为"rss"打开订阅源正文界面、为"explore"打开书源发现界面、"search"打开书籍搜索界面、"login"打开源登录界面
+* @param url 为传递到界面的链接，"sort"时为分类链接、"rss"时为正文链接、"explore"时为发现链接，"search"、"login"时该参数无意义
+//特别说明，"sort"时url可以传序列化后的键值对用来打开多个分类界面
+* @param title 为对应界面的标题，"search"时为搜索关键词，"login"时该参数无意义
+* @param origin 打开指定源界面的源地址
+java.open(name: String, url: String? = null, title: String? = null, origin: String? = null)
+```
+
+* 展示图片  
+```js
+java.showPhoto(src: String)
+```
+
+### [SourceLoginJsExtensions](https://github.com/Luoyacheng/legado/blob/main/app/src/main/java/io/legado/app/ui/login/SourceLoginJsExtensions.kt)独有函数
+> 只在`登录界面按钮`被触发、`界面按钮的回调`事件、`发现按钮`函数、`图片链接click键`、`购买规则`中有效
+```js
+//用内置浏览器打开本地html
+* @param url 指定网页的基础URL，解决本地网页跨越问题
+* @param html 加载的内容
+* @param preloadJs 预注入js，用法同订阅源预注入js规则
+* @param config 界面配置，json字符串，
+java.showBrowser(url: String, html: String, preloadJs: String? = null, config: String? = null)
+//复制文本到剪贴板
+java.copyText(text: String)
+//实时更新登录界面用户信息，upLoginData(null)会全部重置为默认值
+java.upLoginData(data: Map<String, String?>?)
+//刷新登录界面
+java.reLoginView(deltaUp: Boolean = false)
+//刷新书籍详情页
+java.refreshBookInfo()
+//刷新书籍目录页
+java.refreshBookToc()
+//刷新书籍正文内容
+java.refreshContent()
+//清除tts源的缓存，仅限tts源的登录界面
+java.clearTtsCache()
+//刷新发现，仅限发现按钮
+java.refreshExplore()
+```
+[showBrowser](https://github.com/Luoyacheng/legado/wiki/java.showBrowser%E5%87%BD%E6%95%B0%E4%BB%8B%E7%BB%8D)函数介绍
 
 ### [AnalyzeUrl](https://github.com/gedoor/legado/blob/master/app/src/main/java/io/legado/app/model/analyzeRule/AnalyzeUrl.kt) 部分函数
 > js中通过java.调用,只在`登录检查JS`规则中有效
@@ -103,10 +150,9 @@ java.put(key, value)
 
 ### [js扩展类](https://github.com/gedoor/legado/blob/master/app/src/main/java/io/legado/app/help/JsExtensions.kt) 部分函数
 
-* 链接解析[JsURL](https://github.com/gedoor/legado/blob/master/app/src/main/java/io/legado/app/utils/JsURL.kt)
+* 链接解析[JsURL](https://github.com/gedoor/legado/blob/master/app/src/main/java/io/legado/app/utils/JsURL.kt)　
 ```js
-java.toURL(url): JsURL
-java.toURL(url, baseUrl): JsURL
+java.toURL(url: String, baseUrl: String? = null): JsURL
 ```
 * 获取SystemWebView User-Agent
 ```js
@@ -114,37 +160,49 @@ java.getWebViewUA(): String
 ```
 * 网络请求
 ```js
-java.ajax(urlStr): String
-java.ajaxAll(urlList: Array<String>): Array<StrResponse>
-//返回StrResponse 方法body() code() message() headers() raw() toString() 
-java.connect(urlStr): StrResponse
 
-java.post(url: String, body: String, headerMap: Map<String, String>): Connection.Response
+java.ajax(urlStr, callTimeout: Int? = null): String
 
-java.get(url: String, headerMap: Map<String, String>): Connection.Response
+* 并发访问网络
+* @param skipRateLimit 为true时不受源并发率限制
+java.ajaxAll(urlList: Array<String>, skipRateLimit: Boolean = false): Array<StrResponse>
 
-java.head(url: String, headerMap: Map<String, String>): Connection.Response
+//ajaxTestAll会忽略网络访问错误，错误类型由callTime()获取，对应的错误码值（-1超过设定时间，-2超时，-3域名错误，-4连接被拒绝，-5连接被重置，-6SSL证书错误，-7其它错误），无错误时callTime()为响应时间
+java.ajaxTestAll(urlList: Array<String>, timeout: Int, skipRateLimit: Boolean = false): Array<StrResponse>
+
+java.connect(urlStr, header = null, callTimeout: Int? = null): StrResponse
+//返回的StrResponse对象具有的方法 body() code() message() headers() raw() toString() callTime()
+
+java.post(url: String, body: String, headerMap: Map<String, String>, timeout: Int? = null): Connection.Response
+
+java.get(url: String, headerMap: Map<String, String>, timeout: Int? = null): Connection.Response
+
+java.head(url: String, headerMap: Map<String, String>, timeout: Int? = null): Connection.Response
 
 * 使用webView访问网络
 * @param html 直接用webView载入的html, 如果html为空直接访问url
 * @param url html内如果有相对路径的资源不传入url访问不了
 * @param js 用来取返回值的js语句, 没有就返回整个源代码
+* @param cacheFirst 优先使用缓存,为true能提高访问速度
+* @param delayTime 延迟执行js的时间
 * @return 返回js获取的内容
-java.webView(html: String?, url: String?, js: String?): String?
+java.webView(html: String?, url: String?, js: String?, cacheFirst: Boolean = false): String?
 
 * 使用webView获取跳转url
-java.webViewGetOverrideUrl(html: String?, url: String?, js: String?, overrideUrlRegex: String): String?
+java.webViewGetOverrideUrl(html: String?, url: String?, js: String?, overrideUrlRegex: String, cacheFirst: Boolean = false, delayTime: Long = 0): String?
 
 * 使用webView获取资源url
-java.webViewGetSource(html: String?, url: String?, js: String?, sourceRegex: String): String?
+java.webViewGetOverrideUrl(html: String?, url: String?, js: String?, overrideUrlRegex: String, cacheFirst: Boolean = false, delayTime: Long = 0): String?
 
 * 使用内置浏览器打开链接，可用于获取验证码 手动验证网站防爬
 * @param url 要打开的链接
 * @param title 浏览器的标题
-java.startBrowser(url: String, title: String)
+* @param html 本地html代码
+java.startBrowser(url: String, title: String, html: String? = null)
 
 * 使用内置浏览器打开链接，并等待网页结果 .body()获取网页内容
-java.startBrowserAwait(url: String, title: String, refetchAfterSuccess: Boolean? = true): StrResponse
+* @param refetchAfterSuccess 为false时获取最终展示界面的源码
+java.startBrowserAwait(url: String, title: String, refetchAfterSuccess: Boolean = false, html: String? = null): StrResponse
 ```
 * 调试
 ```js
@@ -159,6 +217,21 @@ java.getVerificationCode(imageUrl)
 ```js
 java.longToast(msg: Any?)
 java.toast(msg: Any?)
+```
+* 获取用户阅读配置
+```js
+java.getReadBookConfig(): String
+java.getReadBookConfigMap(): Map<String, Any>
+```
+* 获取用户主题配置
+```js
+java.getThemeConfig(): String
+java.getThemeConfigMap(): Map<String, Any?>
+```
+* 获取用户主题模式
+```js
+* @return 0 跟随系统，1 亮色主题，2 暗色主题，3 墨水屏
+fun getThemeMode(): String
 ```
 * 从网络(由java.cacheFile实现)、本地读取JavaScript文件，导入上下文请手动`eval(String(...))`
 ```js
@@ -188,11 +261,10 @@ java.get*ByteArrayContent(url: String, path: String): ByteArray?
 ```
 * URI编码
 ```js
-java.encodeURI(str: String) //默认enc="UTF-8"
-java.encodeURI(str: String, enc: String)
+java.encodeURI(str: String, enc: String = "UTF-8")
 ```
 * base64
-> flags参数可省略，默认Base64.NO_WRAP，查看[flags参数说明](https://blog.csdn.net/zcmain/article/details/97051870)
+> flags参数可省略，默认Base64.NO_WRAP，查看[flags参数说明](https://blog.csdn.net/zcmain/article/details/97051870)　
 ```js
 java.base64Decode(str: String)
 java.base64Decode(str: String, charset: String)
@@ -221,6 +293,12 @@ java.hexEncodeToString(utf8: String)
 ```js
 java.randomUUID()
 java.androidId()
+```
+* 应用版本
+```js
+java.getAppVersionName(): String
+java.getAppVersionCode(): Long
+java.getAppVariant(): String
 ```
 * 繁简转换
 ```js
@@ -291,17 +369,12 @@ java.createAsymmetricCrypto(transformation)
 > 解密加密参数 data支持ByteArray|Base64String|HexString|InputStream  
 ```js
 //解密为ByteArray String
-cipher.decrypt(data,  usePublicKey: Boolean? = true
-)
-cipher.decryptStr(data, usePublicKey: Boolean? = true
-)
+cipher.decrypt(data,  usePublicKey: Boolean? = true)
+cipher.decryptStr(data, usePublicKey: Boolean? = true)
 //加密为ByteArray Base64字符 HEX字符
-cipher.encrypt(data,  usePublicKey: Boolean? = true
-)
-cipher.encryptBase64(data,  usePublicKey: Boolean? = true
-)
-cipher.encryptHex(data,  usePublicKey: Boolean? = true
-)
+cipher.encrypt(data,  usePublicKey: Boolean? = true)
+cipher.encryptBase64(data,  usePublicKey: Boolean? = true)
+cipher.encryptHex(data,  usePublicKey: Boolean? = true)
 ```
 * 签名
 > 输入参数 key 支持ByteArray|**Utf8String**
@@ -326,8 +399,8 @@ java.digestBase64Str(data: String, algorithm: String,): String?
 ```
 * md5
 ```js
-java.md5Encode(str)
-java.md5Encode16(str)
+java.md5Encode(str: String)
+java.md5Encode16(str: String)
 ```
 * HMac
 ```js
@@ -369,6 +442,12 @@ order // 手动排序
 originOrder //书源排序
 variable // 自定义书籍变量信息(用于书源规则检索书籍信息)
  ```
+## book对象的部分可用函数
+ * 自定义书籍变量存取
+```js
+book.putVariable(key: String, variable: String?)
+book.getVariable(key: String): String?
+```
 
 ## chapter对象的部分可用属性
 > 使用方法: 在js中或{{}}中使用chapter.属性的方式即可获取.如在正文内容后加上 ##{{chapter.title+chapter.index}} 可以净化 章节标题+序号(如 第二章 天仙下凡2) 这一类的字符.
@@ -384,6 +463,18 @@ variable // 自定义书籍变量信息(用于书源规则检索书籍信息)
  end // 章节终止位置
  variable //变量
  ```
+ ## chapter对象的部分可用函数
+ * 自定义章节变量存取
+```js
+chapter.putVariable(key: String, variable: String?)
+chapter.getVariable(key: String): String?
+//在函数回调或登录界面等地方调用，chapter自身不会进行保存，需要调用chapter.update()
+```
+ * 章节信息存储
+```js
+ chapter.putLyric(value: String?) // 存储音频章节歌词
+ chapter.putImgUrl(value: String?) // 存储章节图标链接，比如标题上的段评图标链接
+ ```
  
 ## source对象的部分可用函数
 * 获取书源url
@@ -392,10 +483,14 @@ source.getKey()
 ```
 * 书源变量存取
 ```js
-source.setVariable(variable: String?)
+source.putVariable(variable: String?)
 source.getVariable()
 ```
-
+* 自定义书源变量存取
+```js
+source.put(key: String, variable: String?)
+source.get(key: String): String?
+```
 * 登录头操作
 ```js
 获取登录头
@@ -416,29 +511,41 @@ login函数获取登录信息键值
 source.getLoginInfoMap().get(key: String)
 清除登录信息
 source.removeLoginInfo()
+login函数存放登录信息，  
+在登录界面时请调用java.upLoginData
+source.putLoginInfo()
+```
+* 书源缓存刷新
+```js
+刷新发现
+source.refreshExplore()
+刷新jslib
+source.refreshJSLib()
 ```
 ## cookie对象的部分可用函数
 ```js
 获取全部cookie
-cookie.getCookie(url)
+cookie.getCookie(url: String)
 获取cookie某一键值
-cookie.getKey(url,key)
+cookie.getKey(url: String, key: String)
 设置cookie
-cookie.setCookie(url,cookie)
+cookie.setCookie(url: String, cookie: String)
 替换cookie
-cookie.replaceCookie(url,cookie)
+cookie.replaceCookie(url: String, cookie: String)
 删除cookie
-cookie.removeCookie(url)
+cookie.removeCookie(url: String)
+设置内置浏览器cookie
+cookie.setWebCookie(url: String, cookie: String)
 ```
 
 ## cache对象的部分可用函数
 > saveTime单位:秒，可省略  
 > 保存至数据库和缓存文件(50M)，保存的内容较大时请使用`getFile putFile`
 ```js
-保存
-cache.put(key: String, value: String, saveTime: Int)
-读取数据库
-cache.get(key: String): String?
+保存,saveTime为0时无过期时间
+cache.put(key: String, value: String, saveTime: Int = 0)
+读取数据库,onlyDisk为true时只从磁盘读取
+cache.get(key: String, onlyDisk: Boolean = false): String?
 删除
 cache.delete(key: String)
 缓存文件内容
@@ -456,6 +563,13 @@ cache.deleteMemory(key: String)
 ## 跳转外部链接/应用函数
 ```js
 // 跳转外部链接，传入http链接或者scheme跳转到浏览器或其他应用
-java.openUrl(url:String)
 // 指定mimeType，可以跳转指定类型应用，例如（video/*）
-java.openUrl(url:String,mimeType:String)
+java.openUrl(url: String, mimeType: String = null)
+```
+## 视频播放器函数
+```js
+* @param url 视频播放链接
+* @param title 视频的标题
+* @param isFloat 是否悬浮窗打开
+java.openVideoPlayer(url: String, title: String, isFloat: Boolean = false)
+```

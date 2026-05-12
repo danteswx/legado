@@ -1,5 +1,9 @@
 package io.legado.app.help.source
 
+import android.content.Intent
+import android.os.Build
+import androidx.annotation.RequiresApi
+import androidx.core.content.ContextCompat
 import io.legado.app.constant.SourceType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BaseSource
@@ -9,13 +13,16 @@ import io.legado.app.data.entities.RssSource
 import io.legado.app.help.AppCacheManager
 import io.legado.app.help.config.SourceConfig
 import io.legado.app.help.coroutine.Coroutine
-import io.legado.app.help.storage.Backup
 import io.legado.app.model.AudioPlay
 import io.legado.app.model.ReadBook
 import io.legado.app.model.ReadManga
+import io.legado.app.model.VideoPlay
+import io.legado.app.service.VideoPlayService
+import io.legado.app.ui.video.VideoPlayerActivity
 import io.legado.app.utils.EncoderUtils
 import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.splitNotBlank
+import io.legado.app.utils.startActivity
 import io.legado.app.utils.toastOnUi
 import splitties.init.appCtx
 
@@ -40,6 +47,8 @@ object SourceHelp {
             return AudioPlay.bookSource
         } else if (ReadManga.bookSource?.bookSourceUrl == key) {
             return ReadManga.bookSource
+        } else if (VideoPlay.source?.getKey() == key) {
+            return VideoPlay.source
         }
         return appDb.bookSourceDao.getBookSource(key)
             ?: appDb.rssSourceDao.getByKey(key)
@@ -138,8 +147,6 @@ object SourceHelp {
         }
         bookSourcesGroup[false]?.let {
             appDb.bookSourceDao.insert(*it.toTypedArray())
-            // 书源导入，触发自动备份
-            Backup.backupOnDataChange(appCtx)
         }
         Coroutine.async {
             adjustSortNumber()
@@ -175,6 +182,25 @@ object SourceHelp {
                 bookSource.customOrder = index
             }
             appDb.bookSourceDao.upOrder(sources)
+        }
+    }
+
+    fun openVideoPlayer(source: BaseSource?, url: String, title: String, isFloat: Boolean) {
+        if (isFloat) {
+            val intent = Intent(appCtx, VideoPlayService::class.java).apply {
+                putExtra("videoUrl", url)
+                putExtra("videoTitle", title)
+                putExtra("sourceKey", source?.getKey())
+                putExtra("sourceType", source?.getSourceType())
+            }
+            ContextCompat.startForegroundService(appCtx, intent)
+        } else {
+            appCtx.startActivity<VideoPlayerActivity> {
+                putExtra("videoUrl", url)
+                putExtra("videoTitle", title)
+                putExtra("sourceKey", source?.getKey())
+                putExtra("sourceType", source?.getSourceType())
+            }
         }
     }
 

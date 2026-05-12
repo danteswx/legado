@@ -29,7 +29,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import splitties.init.appCtx
 import java.util.concurrent.Executors
-import kotlin.coroutines.coroutineContext
 import kotlin.math.min
 
 class SearchModel(private val scope: CoroutineScope, private val callBack: CallBack) {
@@ -91,9 +90,10 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                 withTimeout(30000L) {
                     WebBook.searchBookAwait(
                         it, searchKey, searchPage,
-                        filter = { name, author ->
+                        filter = { name, author, kind ->
                             !precision || name.contains(searchKey) ||
-                                    author.contains(searchKey)
+                                    author.contains(searchKey) ||
+                                    kind?.contains(searchKey) == true
                         })
                 }
             }.onEach { items ->
@@ -118,11 +118,14 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
             val copyData = ArrayList(searchBooks)
             val equalData = arrayListOf<SearchBook>()
             val containsData = arrayListOf<SearchBook>()
+            val tagsData = arrayListOf<SearchBook>()
             val otherData = arrayListOf<SearchBook>()
             copyData.forEach {
-                coroutineContext.ensureActive()
+                currentCoroutineContext().ensureActive()
                 if (it.name == searchKey || it.author == searchKey) {
                     equalData.add(it)
+                } else if (it.kind?.contains(searchKey) == true) {
+                    tagsData.add(it)
                 } else if (it.name.contains(searchKey) || it.author.contains(searchKey)) {
                     containsData.add(it)
                 } else {
@@ -130,25 +133,37 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                 }
             }
             newDataS.forEach { nBook ->
-                coroutineContext.ensureActive()
+                currentCoroutineContext().ensureActive()
                 if (nBook.name == searchKey || nBook.author == searchKey) {
                     var hasSame = false
                     equalData.forEach { pBook ->
-                        coroutineContext.ensureActive()
+                        currentCoroutineContext().ensureActive()
                         if (pBook.name == nBook.name && pBook.author == nBook.author) {
-                            pBook.addOrigin(nBook.origin)
+                            pBook.addOrigin(nBook.origin, nBook.bookUrl)
                             hasSame = true
                         }
                     }
                     if (!hasSame) {
                         equalData.add(nBook)
                     }
+                } else if (nBook.kind?.contains(searchKey) == true) {
+                    var hasSame = false
+                    tagsData.forEach { pBook ->
+                        currentCoroutineContext().ensureActive()
+                        if (pBook.name == nBook.name && pBook.author == nBook.author) {
+                            pBook.addOrigin(nBook.origin, nBook.bookUrl)
+                            hasSame = true
+                        }
+                    }
+                    if (!hasSame) {
+                        tagsData.add(nBook)
+                    }
                 } else if (nBook.name.contains(searchKey) || nBook.author.contains(searchKey)) {
                     var hasSame = false
                     containsData.forEach { pBook ->
-                        coroutineContext.ensureActive()
+                        currentCoroutineContext().ensureActive()
                         if (pBook.name == nBook.name && pBook.author == nBook.author) {
-                            pBook.addOrigin(nBook.origin)
+                            pBook.addOrigin(nBook.origin, nBook.bookUrl)
                             hasSame = true
                         }
                     }
@@ -158,9 +173,9 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                 } else if (!precision) {
                     var hasSame = false
                     otherData.forEach { pBook ->
-                        coroutineContext.ensureActive()
+                        currentCoroutineContext().ensureActive()
                         if (pBook.name == nBook.name && pBook.author == nBook.author) {
-                            pBook.addOrigin(nBook.origin)
+                            pBook.addOrigin(nBook.origin, nBook.bookUrl)
                             hasSame = true
                         }
                     }
@@ -169,13 +184,14 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                     }
                 }
             }
-            coroutineContext.ensureActive()
+            currentCoroutineContext().ensureActive()
             equalData.sortByDescending { it.origins.size }
+            equalData.addAll(tagsData.sortedByDescending { it.origins.size })
             equalData.addAll(containsData.sortedByDescending { it.origins.size })
             if (!precision) {
                 equalData.addAll(otherData)
             }
-            coroutineContext.ensureActive()
+            currentCoroutineContext().ensureActive()
             searchBooks = equalData
         }
     }

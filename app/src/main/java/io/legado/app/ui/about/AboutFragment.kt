@@ -89,21 +89,17 @@ class AboutFragment : PreferenceFragmentCompat() {
      */
     private fun showUpdateLog() {
         waitDialog.show()
-        (AppUpdate.gitHubUpdate as? AppUpdateGitHub)?.run {
-            getChangeLog(lifecycleScope)
-                .onSuccess { changeLog ->
-                    showDialogFragment(
-                        TextDialog(getString(R.string.update_log), changeLog, TextDialog.Mode.MD)
-                    )
-                }.onError {
-                    // 降级到本地文件
-                    appCtx.toastOnUi("从GitHub获取失败，显示本地日志")
-                    val mdText = String(requireContext().assets.open("updateLog.md").readBytes())
-                    showDialogFragment(TextDialog(getString(R.string.update_log), mdText, TextDialog.Mode.MD))
-                }.onFinally {
-                    waitDialog.dismiss()
-                }
-        }
+        AppUpdateGitHub.getChangeLog(lifecycleScope)
+            .onSuccess { changeLog ->
+                showDialogFragment(
+                    TextDialog(getString(R.string.update_log), changeLog, TextDialog.Mode.MD)
+                )
+            }.onError {
+                appCtx.toastOnUi("从 GitHub 获取失败，显示本地日志")
+                showMdFile(getString(R.string.update_log), "updateLog.md")
+            }.onFinally {
+                waitDialog.dismiss()
+            }
     }
 
     /**
@@ -111,20 +107,15 @@ class AboutFragment : PreferenceFragmentCompat() {
      */
     private fun checkUpdate() {
         waitDialog.show()
-        AppUpdate.gitHubUpdate?.run {
-            check(lifecycleScope)
-                .onSuccess {
-                    showDialogFragment(
-                        UpdateDialog(it)
-                    )
-                }.onError {
-                    appCtx.toastOnUi("${getString(R.string.check_update)}\n${it.localizedMessage}")
-                }.onFinally {
-                    waitDialog.dismiss()
-                }
-        }
+        AppUpdate.gitHubUpdate.check(lifecycleScope)
+            .onSuccess {
+                showDialogFragment(UpdateDialog(it))
+            }.onError {
+                appCtx.toastOnUi("${getString(R.string.check_update)}\n${it.localizedMessage}")
+            }.onFinally {
+                waitDialog.dismiss()
+            }
     }
-
 
     /**
      * 加入qq群

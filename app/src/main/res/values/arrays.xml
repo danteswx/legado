@@ -10,6 +10,21 @@
 		<item>Audio</item>
 		<item>Image</item>
 		<item>File</item>
+		<item>Video</item>
+	</string-array>
+
+	<string-array name="layout_type">
+		<item>列表</item>
+		<item>单列</item>
+		<item>双列</item>
+		<item>瀑布</item>
+        <item>三列</item>
+	</string-array>
+
+	<string-array name="rss_type">
+		<item>网页</item>
+		<item>图片</item>
+		<item>视频</item>
 	</string-array>
 
 	<string-array name="group_style">
@@ -75,7 +90,16 @@
 		<item>@string/screen_landscape</item>
 		<item>@string/screen_sensor</item>
 		<item>@string/screen_portrait_reversed</item>
+        <item>@string/screen_landscape_reversed</item>
 	</string-array>
+
+    <string-array name="click_image_way_title">
+        <item>默认行为</item>
+        <item>预览图片</item>
+        <item>兼容旧版</item>
+        <item>关闭点击</item>
+        <item>双击生效</item>
+    </string-array>
 
 	<string-array name="double_page_title">
 		<item>Single page</item>
@@ -97,6 +121,7 @@
 		<item>icon4</item>
 		<item>icon5</item>
 		<item>icon6</item>
+        <item>icon7</item>
 	</string-array>
 
 	<string-array name="chinese_mode">
@@ -153,13 +178,6 @@
 	</string-array>
 
 
-	<string-array name="default_app_variant">
-		<item>@string/default_version</item>
-		<item>@string/official_version</item>
-		<item>@string/beta_release_version</item>
-		<item>@string/beta_releaseA_version</item>
-	</string-array>
-
 	<string-array name="default_home_page_value">
 		<item>bookshelf</item>
 		<item>explore</item>
@@ -167,11 +185,30 @@
 		<item>my</item>
 	</string-array>
 
-	<string-array name="default_app_variant_value">
-		<item>default_version</item>
-		<item>official_version</item>
-		<item>beta_release_version</item>
-		<item>beta_releaseA_version</item>
+	<string-array name="discovery_page_mode_entries">
+		<item>@string/discovery_page_mode_modern</item>
+		<item>@string/discovery_page_mode_legacy</item>
+	</string-array>
+
+	<string-array name="discovery_page_mode_values">
+		<item>modern</item>
+		<item>legacy</item>
+	</string-array>
+
+	<string-array name="rss_page_mode_entries">
+		<item>@string/rss_page_mode_modern</item>
+		<item>@string/rss_page_mode_legacy</item>
+	</string-array>
+
+	<string-array name="page_mode_values">
+		<item>modern</item>
+		<item>legacy</item>
+	</string-array>
+
+	<string-array name="bottom_bar_effect_mode_entries">
+		<item>常规</item>
+		<item>玻璃</item>
+		<item>磨砂玻璃</item>
 	</string-array>
 
 	<string-array name="tip_color">

@@ -6,7 +6,6 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.SubMenu
 import androidx.activity.viewModels
-import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.SearchView
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
@@ -55,7 +54,7 @@ import kotlinx.coroutines.launch
  * 订阅源管理
  */
 class RssSourceActivity : VMBaseActivity<ActivityRssSourceBinding, RssSourceViewModel>(),
-    PopupMenu.OnMenuItemClickListener,
+    MenuItem.OnMenuItemClickListener,
     SelectActionBar.CallBack,
     RssSourceAdapter.CallBack {
 
@@ -151,25 +150,25 @@ class RssSourceActivity : VMBaseActivity<ActivityRssSourceBinding, RssSourceView
         return super.onCompatOptionsItemSelected(item)
     }
 
-    override fun onMenuItemClick(item: MenuItem?): Boolean {
-        when (item?.itemId) {
+    override fun onMenuItemClick(item: MenuItem): Boolean {
+        when (item.itemId) {
             R.id.menu_enable_selection -> viewModel.enableSelection(adapter.selection)
             R.id.menu_disable_selection -> viewModel.disableSelection(adapter.selection)
             R.id.menu_add_group -> selectionAddToGroups()
             R.id.menu_remove_group -> selectionRemoveFromGroups()
             R.id.menu_top_sel -> viewModel.topSource(*adapter.selection.toTypedArray())
             R.id.menu_bottom_sel -> viewModel.bottomSource(*adapter.selection.toTypedArray())
-            R.id.menu_export_selection -> viewModel.saveToFile(adapter.selection) { file ->
+            R.id.menu_export_selection -> viewModel.saveToFile(adapter.selection) { file, name ->
                 exportResult.launch {
                     mode = HandleFileContract.EXPORT
                     fileData = HandleFileContract.FileData(
-                        "exportRssSource.json", file, "application/json"
+                        name, file, "application/json"
                     )
                 }
             }
 
-            R.id.menu_share_source -> viewModel.saveToFile(adapter.selection) {
-                share(it)
+            R.id.menu_share_source -> viewModel.saveToFile(adapter.selection) { file, name ->
+                share(file)
             }
 
             R.id.menu_check_selected_interval -> adapter.checkSelectedInterval()
@@ -337,6 +336,16 @@ class RssSourceActivity : VMBaseActivity<ActivityRssSourceBinding, RssSourceView
                 delay(100)
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        adapter.upResumed(true)
+    }
+
+    override fun onPause() {
+        adapter.upResumed(false)
+        super.onPause()
     }
 
     override fun upCountView() {

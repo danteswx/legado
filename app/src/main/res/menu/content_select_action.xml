@@ -23,6 +23,10 @@
         android:title="@string/dict" />
 
     <item
+        android:id="@+id/menu_ask_ai"
+        android:title="@string/ask_ai" />
+
+    <item
         android:id="@+id/menu_search_content"
         android:title="@string/search_content"
         app:showAsAction="never" />

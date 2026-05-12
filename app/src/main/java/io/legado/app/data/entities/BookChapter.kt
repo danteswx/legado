@@ -55,7 +55,8 @@ data class BookChapter(
     var end: Long? = null,              // 章节终止位置
     var startFragmentId: String? = null,  //EPUB书籍当前章节的fragmentId
     var endFragmentId: String? = null,    //EPUB书籍下一章节的fragmentId
-    var variable: String? = null        //变量
+    var variable: String? = null,        //变量
+    var imgUrl: String? = null // 标题段评图或者视频封面
 ) : Parcelable, RuleDataInterface {
 
     @delegate:Transient
@@ -63,6 +64,29 @@ data class BookChapter(
     @IgnoredOnParcel
     override val variableMap: HashMap<String, String> by lazy {
         GSON.fromJsonObject<HashMap<String, String>>(variable).getOrNull() ?: hashMapOf()
+    }
+
+    fun putImgUrl(value: String?) {
+        imgUrl =value
+        update()
+    }
+
+    fun putLyric(value: String?) { //存入歌词文本
+        if (super.putVariable("lyric", value)) {
+            variable = GSON.toJson(variableMap)
+            update()
+        }
+    }
+
+    fun putDanmaku(value: String?) { //存入弹幕文本
+        if (super.putVariable("danmaku", value)) {
+            variable = GSON.toJson(variableMap)
+            update()
+        }
+    }
+
+    fun update() {
+        appDb.bookChapterDao.update(this)
     }
 
     @Ignore
@@ -97,10 +121,23 @@ data class BookChapter(
         return bookUrl + url
     }
 
+    fun contentCacheIdentity(): String {
+        if (!isVolume && url.isNotBlank()) {
+            return runCatching { "url|" + getAbsoluteURL() }
+                .getOrElse { "url|$url" }
+        }
+        return "title|" + title.trim()
+    }
+
+    fun contentCacheFileName(suffix: String = "nb"): String {
+        return "c-${MD5Utils.md5Encode16(contentCacheIdentity())}.$suffix"
+    }
+
     fun getDisplayTitle(
         replaceRules: List<ReplaceRule>? = null,
         useReplace: Boolean = true,
         chineseConvert: Boolean = true,
+        replaceBook: ReplaceBook? = null
     ): String {
         var displayTitle = title.replace(AppPattern.rnRegex, "")
         if (chineseConvert) {
@@ -115,9 +152,12 @@ data class BookChapter(
                     try {
                         val mDisplayTitle = if (item.isRegex) {
                             displayTitle.replace(
+                                item.name,
                                 item.regex,
                                 item.replacement,
-                                item.getValidTimeoutMillisecond()
+                                item.getValidTimeoutMillisecond(),
+                                this@BookChapter,
+                                replaceBook
                             )
                         } else {
                             displayTitle.replace(item.pattern, item.replacement)
@@ -125,10 +165,10 @@ data class BookChapter(
                         if (mDisplayTitle.isNotBlank()) {
                             displayTitle = mDisplayTitle
                         }
-                    } catch (e: RegexTimeoutException) {
+                    } catch (_: RegexTimeoutException) {
                         item.isEnabled = false
                         appDb.replaceRuleDao.update(item)
-                    } catch (e: CancellationException) {
+                    } catch (_: CancellationException) {
                         return@run
                     } catch (e: Exception) {
                         AppLog.put("${item.name}替换出错\n替换内容\n${displayTitle}", e)
@@ -173,4 +213,3 @@ data class BookChapter(
         return String.format("%05d-%s.ttf", index, titleMD5)
     }
 }
-
