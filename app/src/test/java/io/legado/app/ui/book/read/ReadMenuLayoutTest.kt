@@ -100,6 +100,20 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun discoverSourcePickerHighlightsAndScrollsToSelectedSource() {
+        val exploreFragment = repoFile("app/src/main/java/io/legado/app/ui/main/explore/ExploreFragment.kt").readText()
+        val sourceSelectDialog = repoFile("app/src/main/java/io/legado/app/ui/widget/SourceSelectDialog.kt").readText()
+
+        assertTrue(exploreFragment.contains("selectedKey = selectedDiscoverSourcePart?.bookSourceUrl"))
+        assertTrue(sourceSelectDialog.contains("val selectedIndex = filteredItems.indexOfFirst"))
+        assertTrue(sourceSelectDialog.contains("recyclerView.scrollToPosition(selectedIndex)"))
+        assertTrue(sourceSelectDialog.contains("holder.bind(displayName(item), selected)"))
+        assertTrue(sourceSelectDialog.contains("val accentColor = context.accentColor"))
+        assertTrue(sourceSelectDialog.contains("ColorUtils.adjustAlpha(accentColor, 0.16f)"))
+        assertFalse(sourceSelectDialog.contains("selectedPrefix + displayName(item)"))
+    }
+
+    @Test
     fun primaryReadBottomMenuUsesOptionAOrder() {
         val menu = parseXml(repoFile("app/src/main/res/menu/read_bottom_primary.xml"))
         val items = menu.childElements("item")

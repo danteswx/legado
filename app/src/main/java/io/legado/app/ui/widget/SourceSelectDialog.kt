@@ -17,10 +17,12 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.legado.app.R
 import io.legado.app.lib.theme.UiCorner
+import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.applyUiBodyTypeface
 import io.legado.app.lib.theme.applyUiLabelStyle
 import io.legado.app.lib.theme.applyUiSectionTitleStyle
 import io.legado.app.lib.theme.primaryTextColor
+import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.dpToPx
 
 object SourceSelectDialog {
@@ -39,6 +41,15 @@ object SourceSelectDialog {
         if (items.isEmpty()) return
         var dialog: AlertDialog? = null
         var filteredItems = items.toList()
+        lateinit var recyclerView: RecyclerView
+        fun scrollToSelectedItem() {
+            val selectedIndex = filteredItems.indexOfFirst { itemKey(it) == selectedKey }
+            if (selectedIndex >= 0) {
+                recyclerView.post {
+                    recyclerView.scrollToPosition(selectedIndex)
+                }
+            }
+        }
         val adapter = object : RecyclerView.Adapter<SourceViewHolder>() {
             override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SourceViewHolder {
                 return SourceViewHolder(SourceOptionView(parent.context))
@@ -48,8 +59,8 @@ object SourceSelectDialog {
 
             override fun onBindViewHolder(holder: SourceViewHolder, position: Int) {
                 val item = filteredItems[position]
-                val selectedPrefix = if (itemKey(item) == selectedKey) "✓ " else ""
-                holder.bind(selectedPrefix + displayName(item)) {
+                val selected = itemKey(item) == selectedKey
+                holder.bind(displayName(item), selected) {
                     dialog?.dismiss()
                     onSelect(item)
                 }
@@ -78,6 +89,7 @@ object SourceSelectDialog {
                         }
                     }
                     adapter.notifyDataSetChanged()
+                    scrollToSelectedItem()
                     return true
                 }
             })
@@ -88,7 +100,7 @@ object SourceSelectDialog {
             }
         }
         searchView.applyUiBodyTypeface(context)
-        val recyclerView = RecyclerView(context).apply {
+        recyclerView = RecyclerView(context).apply {
             layoutManager = LinearLayoutManager(context)
             this.adapter = adapter
             overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
@@ -137,6 +149,7 @@ object SourceSelectDialog {
         dialog.setOnShowListener {
             container.requestFocus()
             searchView.clearFocus()
+            scrollToSelectedItem()
             dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
         }
         dialog.show()
@@ -144,6 +157,19 @@ object SourceSelectDialog {
     }
 
     private class SourceOptionView(context: android.content.Context) : TextView(context) {
+        private val accentColor = context.accentColor
+        private val normalTextColor = context.primaryTextColor
+        private val selectedBackground = UiCorner.actionSelector(
+            ColorUtils.adjustAlpha(accentColor, 0.16f),
+            ColorUtils.adjustAlpha(accentColor, 0.24f),
+            UiCorner.actionRadius(context)
+        )
+        private val normalBackground = UiCorner.actionSelector(
+            Color.TRANSPARENT,
+            ContextCompat.getColor(context, R.color.background_menu),
+            UiCorner.actionRadius(context)
+        )
+
         init {
             layoutParams = RecyclerView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -157,19 +183,20 @@ object SourceSelectDialog {
             applyUiLabelStyle(context)
             textSize = 15f
             setPadding(18.dpToPx(), 0, 18.dpToPx(), 0)
-            background = UiCorner.actionSelector(
-                Color.TRANSPARENT,
-                ContextCompat.getColor(context, R.color.background_menu),
-                UiCorner.actionRadius(context)
-            )
             isClickable = true
             isFocusable = true
+        }
+
+        fun bindSelection(selected: Boolean) {
+            setTextColor(if (selected) accentColor else normalTextColor)
+            background = if (selected) selectedBackground else normalBackground
         }
     }
 
     private class SourceViewHolder(private val rowView: SourceOptionView) : RecyclerView.ViewHolder(rowView) {
-        fun bind(title: CharSequence, onClick: () -> Unit) {
+        fun bind(title: CharSequence, selected: Boolean, onClick: () -> Unit) {
             rowView.text = title
+            rowView.bindSelection(selected)
             rowView.setOnClickListener { onClick() }
         }
     }
