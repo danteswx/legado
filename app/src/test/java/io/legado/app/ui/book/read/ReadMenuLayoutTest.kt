@@ -515,6 +515,17 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun pageAnimCardsApplySelectionToReadViewImmediately() {
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val applyPageAnimSample = readMenu
+            .substringAfter("private fun applyPageAnimSample(anim: Int?) {")
+            .substringBefore("\n    private fun updateThemeControlsFromConfig")
+
+        assertTrue(applyPageAnimSample.contains("ReadBook.book?.setPageAnim(anim ?: -1)"))
+        assertTrue(applyPageAnimSample.contains("ReadBook.callBack?.upPageAnim(true)"))
+    }
+
+    @Test
     fun backgroundPanelShowsImageSamplesAndContinuousControls() {
         val layout = readMenuLayout()
         val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()

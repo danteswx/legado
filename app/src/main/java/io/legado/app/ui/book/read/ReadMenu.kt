@@ -3169,6 +3169,7 @@ class ReadMenu @JvmOverloads constructor(
 
     private fun applyPageAnimSample(anim: Int?) {
         ReadBook.book?.setPageAnim(anim ?: -1)
+        ReadBook.callBack?.upPageAnim(true)
         ReadBook.loadContent(resetPageOffset = false)
         updatePageTurnControls()
         updateThemePresetCards()
