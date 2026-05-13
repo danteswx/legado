@@ -140,8 +140,6 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private var discoveryModeLoaded = false
 
     private companion object {
-        const val MENU_DISCOVER_LOGIN = 1
-        const val MENU_DISCOVER_SWITCH_LAYOUT = 2
         const val DISCOVER_LAYOUT_LIST = 0
         const val DISCOVER_LAYOUT_GRID = 1
         private const val DISCOVER_GRID_COLUMNS_SETTING_NAME = "discover_grid_columns"
@@ -440,7 +438,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             showDiscoverSettingsDialog()
         }
         binding.btnDiscoverMore.setOnClickListener {
-            showDiscoverMoreMenu()
+            openSelectedSourceLogin()
         }
         updateDiscoverTagFilterButtonState()
         updateDiscoverSearchButtonState()
@@ -483,32 +481,6 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private fun updateDiscoverLoginButtonState() {
         binding.btnDiscoverMore.alpha = 1f
         binding.llDiscoverSourceRow.post(::updateDiscoverSourceNameWidth)
-    }
-
-    private fun showDiscoverMoreMenu() {
-        PopupMenu(requireContext(), binding.btnDiscoverMore).apply {
-            menu.add(Menu.NONE, MENU_DISCOVER_LOGIN, Menu.NONE, R.string.login).apply {
-                isEnabled = selectedDiscoverSourcePart?.hasLoginUrl == true
-                setIcon(R.drawable.ic_bottom_person)
-            }
-            menu.add(Menu.NONE, MENU_DISCOVER_SWITCH_LAYOUT, Menu.NONE, R.string.switchLayout).apply {
-                setIcon(R.drawable.ic_view_quilt)
-            }
-            setOnMenuItemClickListener { item ->
-                when (item.itemId) {
-                    MENU_DISCOVER_LOGIN -> {
-                        openSelectedSourceLogin()
-                        true
-                    }
-                    MENU_DISCOVER_SWITCH_LAYOUT -> {
-                        switchDiscoverBookLayout()
-                        true
-                    }
-                    else -> false
-                }
-            }
-            show()
-        }
     }
 
     private fun switchDiscoverBookLayout() {

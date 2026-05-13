@@ -140,10 +140,10 @@
                         android:layout_width="@dimen/discover_top_action_button_size"
                         android:layout_height="@dimen/discover_top_action_button_size"
                         android:background="@drawable/bg_discover_embedded_action"
-                        android:contentDescription="@string/menu"
+                        android:contentDescription="@string/login"
                         android:padding="@dimen/discover_top_action_button_padding"
                         android:scaleType="centerInside"
-                        android:src="@drawable/ic_more_vert"
+                        android:src="@drawable/ic_bottom_person"
                         android:tint="@color/primaryText" />
 
                 </LinearLayout>

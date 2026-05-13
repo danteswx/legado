@@ -14,6 +14,7 @@ import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.ScrollView
+import android.widget.SeekBar
 import android.widget.TextView
 import androidx.cardview.widget.CardView
 import androidx.activity.result.contract.ActivityResultContracts
@@ -26,6 +27,7 @@ import io.legado.app.R
 import io.legado.app.constant.EventBus
 import io.legado.app.data.entities.Book
 import io.legado.app.help.config.AdvancedTitleConfig
+import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.lib.dialogs.SelectItem
@@ -176,6 +178,25 @@ class AdvancedTitleConfigDialog : DialogFragment() {
         val heightFactorEdit = edit(AdvancedTitleConfig.heightFactor.toString()).apply {
             hint = getString(R.string.advanced_title_height_factor_hint)
         }
+        val titleSizeProgress = ReadBookConfig.titleSize.coerceIn(0, 20)
+        val titleSizeValue = TextView(context).apply {
+            text = titleSizeProgress.toString()
+            gravity = Gravity.END
+            setTextColor(ContextCompat.getColor(context, R.color.primaryText))
+        }
+        val titleSizeSeekBar = SeekBar(context).apply {
+            max = 20
+            progress = titleSizeProgress
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                    titleSizeValue.text = progress.toString()
+                }
+
+                override fun onStartTrackingTouch(seekBar: SeekBar) = Unit
+
+                override fun onStopTrackingTouch(seekBar: SeekBar) = Unit
+            })
+        }
         val openEditorButton = button(getString(R.string.advanced_title_open_editor)).apply {
             setOnClickListener { openJsonEditor() }
         }
@@ -222,6 +243,13 @@ class AdvancedTitleConfigDialog : DialogFragment() {
             text = getString(R.string.advanced_title_dialog_title)
             textSize = 18f
             setPadding(0, 2.dpToPx(), 0, 8.dpToPx())
+        })
+        root.addView(label(getString(R.string.title_font_size)))
+        root.addView(LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(titleSizeSeekBar, LinearLayout.LayoutParams(0, 40.dpToPx(), 1f))
+            addView(titleSizeValue, LinearLayout.LayoutParams(42.dpToPx(), ViewGroup.LayoutParams.WRAP_CONTENT))
         })
         root.addView(label(getString(R.string.advanced_title_scope_label)))
         root.addView(scopeGroup)
@@ -326,6 +354,8 @@ class AdvancedTitleConfigDialog : DialogFragment() {
                     }
                     AdvancedTitleConfig.lottieJson = json
                     AdvancedTitleConfig.lottiePath = null
+                    ReadBookConfig.titleSize = titleSizeSeekBar.progress.coerceIn(0, titleSizeSeekBar.max)
+                    ReadBookConfig.save()
                     val parsedHeight = heightFactorEdit.text?.toString()?.trim()?.toIntOrNull()
                     AdvancedTitleConfig.heightFactor = (parsedHeight
                         ?: AdvancedTitleConfig.DEFAULT_HEIGHT_FACTOR).coerceIn(30, 120)
