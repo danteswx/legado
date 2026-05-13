@@ -362,10 +362,16 @@ class CoverImageView @JvmOverloads constructor(
                 drawNameAuthor(pathName, currentName, currentAuthor, true)
             }
             var options = RequestOptions().set(OkHttpModelLoader.loadOnlyWifiOption, loadOnlyWifi)
-            if (sourceOrigin != null) {
-                options = options.set(OkHttpModelLoader.sourceOriginOption, sourceOrigin)
+            val optionSourceOrigin = sourceOrigin ?: findSourceOrigin(path, currentName, currentAuthor)
+            if (optionSourceOrigin != null) {
+                options = options.set(OkHttpModelLoader.sourceOriginOption, optionSourceOrigin)
             }
-            val thumbFile = if (useThumb) CoverThumbnailCache.existing(context, thumbKey) else null
+            val thumbFile = if (useThumb) {
+                CoverThumbnailCache.existing(context, thumbKey)
+                    ?: CoverThumbnailCache.existing(context, "${optionSourceOrigin ?: sourceOrigin}|$path|$currentName|$currentAuthor")
+            } else {
+                null
+            }
             var builder = if (thumbFile != null) {
                 ImageLoader.load(context, thumbFile)
             } else if (fragment != null && lifecycle != null) {
@@ -432,6 +438,23 @@ class CoverImageView @JvmOverloads constructor(
                 })
                 .into(this)
         }
+    }
+
+    private fun findSourceOrigin(path: String?, name: String?, author: String?): String? {
+        if (!path.isNullOrBlank()) {
+            runCatching {
+                io.legado.app.data.appDb.bookDao.getBookByCover(path)?.origin
+            }.getOrNull()?.let { return it }
+            runCatching {
+                io.legado.app.data.appDb.searchBookDao.getSearchBookByCover(path)?.origin
+            }.getOrNull()?.let { return it }
+        }
+        if (!name.isNullOrBlank() && !author.isNullOrBlank()) {
+            runCatching {
+                io.legado.app.data.appDb.bookDao.getBook(name, author)?.origin
+            }.getOrNull()?.let { return it }
+        }
+        return null
     }
 
     override fun onDetachedFromWindow() {

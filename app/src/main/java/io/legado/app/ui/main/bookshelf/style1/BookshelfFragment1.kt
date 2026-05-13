@@ -79,6 +79,10 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
         binding.btnMore.setOnClickListener {
             showModernBookshelfMenu(it)
         }
+        binding.btnBookshelfLayoutToggle.setOnClickListener {
+            switchBookshelfLayout()
+        }
+        updateBookshelfLayoutToggleIcon()
         binding.llTitleSelect.setOnClickListener {
             showGroupSwitchMenu(it)
         }
@@ -152,6 +156,22 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
 
     override fun upSort() {
         adapter.notifyDataSetChanged()
+    }
+
+    private fun switchBookshelfLayout() {
+        AppConfig.bookshelfLayout = if (AppConfig.bookshelfLayout >= 2) 0 else 2
+        updateBookshelfLayoutToggleIcon()
+        activity?.recreate()
+    }
+
+    private fun updateBookshelfLayoutToggleIcon() {
+        binding.btnBookshelfLayoutToggle.setImageResource(
+            if (AppConfig.bookshelfLayout >= 2) {
+                R.drawable.ic_lucide_layout_list
+            } else {
+                R.drawable.ic_lucide_layout_grid
+            }
+        )
     }
 
     private fun selectSavedGroup() {
