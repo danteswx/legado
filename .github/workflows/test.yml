@@ -2,22 +2,10 @@ name: Test Build
 
 on:
   push:
-    branches:
-      - '**'  # 支持所有分支
-    paths:
-      - '**'
-      # - '!**/assets/**'
-      # - '!**.md'
-      - '!**/ISSUE_TEMPLATE/**'
-      - '!**/modules/web/**'
+    branches-ignore:
+      - master
+      - main
   pull_request:
-    paths-ignore:
-      - '**/modules/web/**'
-  workflow_run:
-    workflows: [Build Web]
-    branches: [master]
-    types:
-      - completed
   workflow_dispatch:
 
 concurrency:
@@ -25,60 +13,107 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-
-  prepare:
+  book-source-test:
+    name: Book Source Tests
     runs-on: ubuntu-latest
-    if: ${{ !startsWith(github.event.head_commit.message, 'Merge pull request') }}
-    outputs:
-      version: ${{ steps.set-ver.outputs.version }}
-      versionL: ${{ steps.set-ver.outputs.versionL }}
     steps:
-      - id: set-ver
+      - uses: actions/checkout@v4
+
+      - name: Run book source tests
+        shell: bash
         run: |
-          echo "version=$(date -d "8 hour" -u +3.%y.%m%d%H)" >> $GITHUB_OUTPUT
-          echo "versionL=$(date -d "8 hour" -u +3.%y.%m%d%H%M)" >> $GITHUB_OUTPUT
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("tests")
+          files = sorted(root.rglob("*.json"))
+          if not files:
+              raise SystemExit("No book source test files found under tests/")
+
+          required_fields = ("bookSourceName", "bookSourceUrl", "bookSourceType")
+          total = 0
+
+          for path in files:
+              with path.open("r", encoding="utf-8-sig") as fp:
+                  data = json.load(fp)
+
+              sources = data if isinstance(data, list) else [data]
+              if not sources:
+                  raise SystemExit(f"{path}: empty book source list")
+
+              for index, source in enumerate(sources, start=1):
+                  if not isinstance(source, dict):
+                      raise SystemExit(f"{path}#{index}: expected object, got {type(source).__name__}")
+
+                  missing = [field for field in required_fields if field not in source]
+                  if missing:
+                      raise SystemExit(f"{path}#{index}: missing fields: {', '.join(missing)}")
+
+                  for field in ("bookSourceName", "bookSourceUrl"):
+                      value = source[field]
+                      if not isinstance(value, str) or not value.strip():
+                          raise SystemExit(f"{path}#{index}: {field} must be a non-empty string")
+
+                  if not isinstance(source["bookSourceType"], int):
+                      raise SystemExit(f"{path}#{index}: bookSourceType must be an integer")
+
+                  total += 1
+
+          print(f"Validated {total} book source test cases from {len(files)} file(s).")
+          PY
 
   build:
-    needs: prepare
+    name: Build
+    needs: book-source-test
     runs-on: ubuntu-latest
     env:
       product: app
-      type: release
-      VERSION: ${{ needs.prepare.outputs.version }}
-      VERSIONL: ${{ needs.prepare.outputs.versionL }}
       GITHUB_REPOSITORY: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Set version
+        id: set-version
+        shell: bash
+        run: |
+          VERSION="$(date -d "8 hour" -u +3.%y.%m%d%H%M)"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=${VERSION}"
+
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: 21
+
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 11
           run_install: false
-      - name: Build Web Assets
+
+      - name: Build web assets
         working-directory: modules/web
         run: |
           pnpm i
           pnpm build
+
       - name: Clear 18PlusList.txt
         run: |
-          echo "清空18PlusList.txt"
-          echo "">$GITHUB_WORKSPACE/app/src/main/assets/18PlusList.txt
-      - name: Release Apk Sign
+          echo "" > "$GITHUB_WORKSPACE/app/src/main/assets/18PlusList.txt"
+
+      - name: Generate release signing key
         run: |
-          echo "给apk增加签名"
           keytool -genkeypair -v \
-            -keystore $GITHUB_WORKSPACE/app/legado.jks \
+            -keystore "$GITHUB_WORKSPACE/app/legado.jks" \
             -storepass gedoor_legado \
             -keypass gedoor_legado \
             -alias legado \
@@ -87,116 +122,58 @@ jobs:
             -validity 10000 \
             -dname "CN=Legado CI, OU=CI, O=Legado, L=CI, ST=CI, C=CN" \
             -noprompt
-          sed '$a\RELEASE_STORE_FILE=./legado.jks'          $GITHUB_WORKSPACE/gradle.properties -i
-          sed '$a\RELEASE_KEY_ALIAS=legado'                 $GITHUB_WORKSPACE/gradle.properties -i
-          sed '$a\RELEASE_STORE_PASSWORD=gedoor_legado'     $GITHUB_WORKSPACE/gradle.properties -i
-          sed '$a\RELEASE_KEY_PASSWORD=gedoor_legado'       $GITHUB_WORKSPACE/gradle.properties -i
+          {
+            echo "RELEASE_STORE_FILE=./legado.jks"
+            echo "RELEASE_KEY_ALIAS=legado"
+            echo "RELEASE_STORE_PASSWORD=gedoor_legado"
+            echo "RELEASE_KEY_PASSWORD=gedoor_legado"
+          } >> "$GITHUB_WORKSPACE/gradle.properties"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: 9.5.0
 
-      - name: Build With Gradle
+      - name: Build release APK
         run: |
-          echo "统一版本号"
-          echo "VERSION_NAME=${{ env.VERSION }}"
-          echo "开始构建 release 版本"
           chmod +x gradlew
-          ./gradlew -PVERSION_NAME="${{ env.VERSION }}" assembleAppRelease --build-cache --parallel --daemon --warning-mode all
-          echo "修改APK文件名"
-          mkdir -p ${{ github.workspace }}/apk/
-          for file in `ls ${{ github.workspace }}/app/build/outputs/apk/*/*/*.apk`; do
-            mv "$file" ${{ github.workspace }}/apk/legado_${{ env.product }}_${{ env.VERSION }}.apk
-          done
-          echo "移动mapping文件"
-          mkdir -p ${{ github.workspace }}/mapping/
-          for file in `ls ${{ github.workspace }}/app/build/outputs/mapping/*/mapping.txt`; do
-            mv "$file" ${{ github.workspace }}/mapping/mapping.txt
-          done
+          ./gradlew -PVERSION_NAME="${VERSION}" assembleAppRelease --build-cache --parallel --daemon --warning-mode all
 
-      - name: Move Missing Rules Files
+      - name: Organize build outputs
         run: |
-          echo "移动missing_rules.txt文件"
-          mkdir -p ${{ github.workspace }}/mapping/
-          for file in `ls ${{ github.workspace }}/app/build/outputs/mapping/*/missing_rules.txt`; do
-            mv "$file" ${{ github.workspace }}/mapping/missing_rules.txt
+          shopt -s nullglob
+          mkdir -p "${{ github.workspace }}/apk"
+          mkdir -p "${{ github.workspace }}/mapping"
+          for file in "${{ github.workspace }}"/app/build/outputs/apk/*/*/*.apk; do
+            cp "$file" "${{ github.workspace }}/apk/legado_${{ env.product }}_${VERSION}.apk"
+          done
+          for file in "${{ github.workspace }}"/app/build/outputs/mapping/*/mapping.txt; do
+            cp "$file" "${{ github.workspace }}/mapping/mapping.txt"
+          done
+          for file in "${{ github.workspace }}"/app/build/outputs/mapping/*/missing_rules.txt; do
+            cp "$file" "${{ github.workspace }}/mapping/missing_rules.txt"
           done
 
-      - name: Upload Missing Rules File To Artifact
+      - name: Check build outputs
+        run: |
+          test -d "${{ github.workspace }}/apk"
+          test -n "$(find "${{ github.workspace }}/apk" -maxdepth 1 -name 'legado_*.apk' -print -quit)"
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: legado.${{ env.product }}.mapping.missing_rules
-          if-no-files-found: ignore
-          path: ${{ github.workspace }}/mapping/missing_rules.txt
-
-      - name: Check Build production
-        run: |
-          if [ ! -d ${{ github.workspace }}/apk ]; then
-            echo "Build production not found! Check gradle logs."
-            exit 1
-          fi
-          cd ${{ github.workspace }}/apk/
-          if [ ! -e legado_*.apk ]; then
-            echo "Build production not found! Check gradle logs."
-            exit 1
-          fi
-
-      - name: Upload App To Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: legado.${{ env.product }}
-          if-no-files-found: ignore
+          name: legado.app
+          if-no-files-found: error
           path: ${{ github.workspace }}/apk/*.apk
 
-      - name: Upload Mapping File To Artifact
+      - name: Upload mapping artifact
         uses: actions/upload-artifact@v4
         with:
-          name: legado.${{ env.product }}.mapping
+          name: legado.app.mapping
           if-no-files-found: ignore
           path: ${{ github.workspace }}/mapping/mapping.txt
 
-  release:
-    needs: [ prepare, build ]
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
-    env:
-      VERSION: ${{ needs.prepare.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
+      - name: Upload missing rules artifact
+        uses: actions/upload-artifact@v4
         with:
-          fetch-depth: 0  # 获取完整历史和所有 tags
-      - uses: actions/download-artifact@v4
-        with:
-          path: apk/
-
-      - working-directory: apk/
-        run: |
-          mv */*.apk .
-          rm -rf */
-
-      - name: Generate Changelog
-        run: |
-          echo "## 阅读 Legado ${{ env.VERSION }}" > release_notes.md
-          echo "" >> release_notes.md
-          echo "### 下载" >> release_notes.md
-          echo "- [legado_app_${{ env.VERSION }}.apk](https://github.com/${{ github.repository }}/releases/download/${{ env.VERSION }}/legado_app_${{ env.VERSION }}.apk)" >> release_notes.md
-          echo "" >> release_notes.md
-          echo "### 更新内容" >> release_notes.md
-          echo "" >> release_notes.md
-          python3 .github/scripts/generate_changelog.py >> release_notes.md
-          echo "" >> release_notes.md
-          echo "---" >> release_notes.md
-          echo "*自动构建版本*" >> release_notes.md
-
-      - name: Publish Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: legado_app_${{ env.VERSION }}
-          tag_name: ${{ env.VERSION }}
-          body_path: release_notes.md
-          draft: false
-          prerelease: false
-          files: ${{ github.workspace }}/apk/*.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: legado.app.mapping.missing_rules
+          if-no-files-found: ignore
+          path: ${{ github.workspace }}/mapping/missing_rules.txt
