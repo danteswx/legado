@@ -5,9 +5,12 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
-import android.widget.PopupWindow
 import android.view.SubMenu
 import android.view.View
+import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.PopupWindow
+import android.widget.ScrollView
 import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.SearchView
 import androidx.core.os.bundleOf
@@ -19,6 +22,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.flexbox.FlexboxLayout
 import com.script.rhino.runScriptWithContext
 import io.legado.app.R
 import io.legado.app.base.VMBaseFragment
@@ -48,6 +52,7 @@ import io.legado.app.ui.book.source.edit.BookSourceEditActivity
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.login.SourceLoginJsExtensions
 import io.legado.app.ui.main.MainFragmentInterface
+import io.legado.app.ui.widget.DetailSeekBar
 import io.legado.app.ui.widget.RoundedTagBarView
 import io.legado.app.ui.widget.RowUiDialog
 import io.legado.app.ui.widget.SourceSelectDialog
@@ -115,41 +120,58 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private var discoverBookshelfFlowJob: Job? = null
     private var discoverLoadJob: Job? = null
     private var discoverActionJob: Job? = null
-    private val discoverSources = mutableListOf<BookSourcePart>()
-    private val discoverAllTagItems = mutableListOf<DiscoverTagItem>()
-    private val discoverTagItems = mutableListOf<DiscoverTagItem>()
-    private val discoverSelectItems = mutableListOf<DiscoverTagItem>()
-    private val discoverSettingItems = mutableListOf<DiscoverTagItem>()
-    private val discoverMajorGroups = mutableListOf<String>()
-    private val discoverBookshelf = linkedSetOf<String>()
-    private val discoverBooks = linkedSetOf<SearchBook>()
+    private val discoverSources get() = viewModel.sources
+    private val discoverAllTagItems get() = viewModel.allTagItems
+    private val discoverTagItems get() = viewModel.tagItems
+    private val discoverSelectItems get() = viewModel.selectItems
+    private val discoverSettingItems get() = viewModel.settingItems
+    private val discoverMajorGroups get() = viewModel.majorGroups
+    private val discoverBookshelf get() = viewModel.bookshelf
+    private val discoverBooks get() = viewModel.books
     private val blockedButtonActions = hashMapOf<String, MutableSet<String>>()
-    private var selectedDiscoverSourcePart: BookSourcePart? = null
-    private var selectedDiscoverSource: BookSource? = null
-    private var discoverCurrentUrl: String? = null
-    private var discoverPage = 1
-    private var discoverHasMore = true
+    private var selectedDiscoverSourcePart: BookSourcePart?
+        get() = viewModel.sourcePart
+        set(value) { viewModel.sourcePart = value }
+    private var selectedDiscoverSource: BookSource?
+        get() = viewModel.source
+        set(value) { viewModel.source = value }
+    private var discoverCurrentUrl: String?
+        get() = viewModel.currentUrl
+        set(value) { viewModel.currentUrl = value }
+    private var discoverPage: Int
+        get() = viewModel.page
+        set(value) { viewModel.page = value }
+    private var discoverHasMore: Boolean
+        get() = viewModel.hasMore
+        set(value) { viewModel.hasMore = value }
     private var discoverLoading = false
-    private var selectedDiscoverMajorGroup: String? = null
-    private var selectedDiscoverTagIndex = -1
-    private var selectedDiscoverUrlIndex = -1
+    private var selectedDiscoverMajorGroup: String?
+        get() = viewModel.majorGroup
+        set(value) { viewModel.majorGroup = value }
+    private var selectedDiscoverTagIndex: Int
+        get() = viewModel.tagIndex
+        set(value) { viewModel.tagIndex = value }
+    private var selectedDiscoverUrlIndex: Int
+        get() = viewModel.urlIndex
+        set(value) { viewModel.urlIndex = value }
     private var discoverRequestVersion = 0L
     private var discoverSourceVersion = 0L
     private var discoverLoadingSignals = 0
     private var discoverLoadingGeneration = 0L
-    private var discoveryModeLoaded = false
+    private var discoveryModeLoaded: Boolean
+        get() = viewModel.modeLoaded
+        set(value) { viewModel.modeLoaded = value }
 
     private companion object {
         const val DISCOVER_LAYOUT_LIST = 0
         const val DISCOVER_LAYOUT_GRID = 1
-        private const val DISCOVER_GRID_COLUMNS_SETTING_NAME = "discover_grid_columns"
-        private val DISCOVER_GRID_COLUMN_VALUES = arrayOf<String?>("2", "3", "4")
+        private const val DISCOVER_GRID_COLUMNS_MIN = 2
+        private const val DISCOVER_GRID_COLUMNS_MAX = 7
     }
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         setSupportToolbar(binding.titleBar.toolbar)
         usingModernDiscovery = AppConfig.modernDiscoveryPage
-        discoveryModeLoaded = false
         binding.swipeRefreshLayout.setColorSchemeColors(accentColor)
         binding.swipeRefreshLayout.setProgressViewOffset(true, (-28).dpToPx(), 56.dpToPx())
         binding.swipeRefreshLayout.setOnChildScrollUpCallback { _, _ ->
@@ -408,6 +430,10 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         }
         applyDiscoverBookLayout()
         binding.rvDiscoverBooks.adapter = discoverBookAdapter
+        if (discoverBooks.isNotEmpty()) {
+            discoverBookAdapter.setItems(discoverBooks.toList())
+            binding.tvDiscoverEmpty.gone()
+        }
         binding.rvDiscoverBooks.setEdgeEffectColor(primaryColor)
         binding.rvDiscoverBooks.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
@@ -584,9 +610,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                         ?: AppConfig.modernDiscoverySourceUrl
                     val selected = discoverSources.firstOrNull { it.bookSourceUrl == keepSource }
                         ?: discoverSources.first()
-                    if (selectedDiscoverSourcePart?.bookSourceUrl != selected.bookSourceUrl
-                        || discoverTagItems.isEmpty()
-                    ) {
+                    val needsInitialLoad = selectedDiscoverSourcePart?.bookSourceUrl != selected.bookSourceUrl
+                            || (discoverTagItems.isEmpty() && discoverBooks.isEmpty())
+                    if (needsInitialLoad) {
                         selectDiscoverSource(selected)
                     } else {
                         updateDiscoverSourceTitle()
@@ -868,7 +894,8 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     private fun showDiscoverSettingsDialog() {
         val rows = buildDiscoverSettingsRows()
-        if (rows.isEmpty()) return
+        val showGridColumns = normalizeDiscoverBookLayout(AppConfig.modernDiscoveryLayout) == DISCOVER_LAYOUT_GRID
+        if (rows.isEmpty() && !showGridColumns) return
         val itemMap = discoverSettingItems.associateBy { it.toDiscoverRowUi().name }
         RowUiDialog.show(
             requireContext(),
@@ -882,11 +909,6 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             ),
             object : RowUiDialog.Callback {
                 override fun onValueChanged(rowUi: RowUi, value: String) {
-                    if (rowUi.name == DISCOVER_GRID_COLUMNS_SETTING_NAME) {
-                        AppConfig.modernDiscoveryGridColumns = value.toIntOrNull() ?: return
-                        applyDiscoverBookLayout()
-                        return
-                    }
                     val item = itemMap[rowUi.name] ?: return
                     when (rowUi.type) {
                         RowUi.Type.select -> handleDiscoverSelectValue(item, value)
@@ -902,36 +924,52 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     }
                 }
             }
-        )
+        ).also { dialog ->
+            if (showGridColumns) {
+                addDiscoverGridColumnsSeekBar(dialog.findViewById(android.R.id.content))
+            }
+        }
     }
 
     private fun buildDiscoverSettingsRows(): List<RowUi> {
-        return buildList {
-            if (normalizeDiscoverBookLayout(AppConfig.modernDiscoveryLayout) == DISCOVER_LAYOUT_GRID) {
-                add(discoverGridColumnsRow())
-            }
-            addAll(discoverSettingItems.map { it.toDiscoverRowUi() })
-        }
+        return discoverSettingItems.map { it.toDiscoverRowUi() }
     }
 
     private fun buildDiscoverSettingsValues(): Map<String, String> {
         return buildMap {
-            if (normalizeDiscoverBookLayout(AppConfig.modernDiscoveryLayout) == DISCOVER_LAYOUT_GRID) {
-                put(DISCOVER_GRID_COLUMNS_SETTING_NAME, AppConfig.modernDiscoveryGridColumns.toString())
-            }
             putAll(discoverSettingItems.associate {
                 it.toDiscoverRowUi().name to currentDiscoverSelectValue(it)
             })
         }
     }
 
-    private fun discoverGridColumnsRow(): RowUi {
-        return RowUi(
-            name = DISCOVER_GRID_COLUMNS_SETTING_NAME,
-            type = RowUi.Type.select,
-            chars = DISCOVER_GRID_COLUMN_VALUES,
-            default = AppConfig.modernDiscoveryGridColumns.toString(),
-            viewName = getString(R.string.discover_grid_columns)
+    private fun addDiscoverGridColumnsSeekBar(content: View?) {
+        val root = content as? ViewGroup ?: return
+        val dialogView = root.getChildAt(0) as? ViewGroup ?: return
+        val panelRoot = dialogView.getChildAt(0) as? LinearLayout ?: return
+        val scrollView = panelRoot.getChildAt(1) as? ScrollView ?: return
+        val form = scrollView.getChildAt(0) as? FlexboxLayout ?: return
+        val seekBar = DetailSeekBar(requireContext()).apply {
+            max = DISCOVER_GRID_COLUMNS_MAX - DISCOVER_GRID_COLUMNS_MIN
+            progress = (AppConfig.modernDiscoveryGridColumns - DISCOVER_GRID_COLUMNS_MIN)
+                .coerceIn(0, max)
+            valueFormat = { (it + DISCOVER_GRID_COLUMNS_MIN).toString() }
+            onChanged = { progress ->
+                AppConfig.modernDiscoveryGridColumns = progress + DISCOVER_GRID_COLUMNS_MIN
+                applyDiscoverBookLayout()
+            }
+        }
+        seekBar.findViewById<android.widget.TextView>(R.id.tv_seek_title)
+            ?.setText(R.string.discover_grid_columns)
+        form.addView(
+            seekBar,
+            0,
+            FlexboxLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(4.dpToPx(), 6.dpToPx(), 4.dpToPx(), 6.dpToPx())
+            }
         )
     }
 
@@ -1267,6 +1305,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     discoverPage += 1
                     discoverBooks.addAll(newBooks)
                     discoverBookAdapter.setItems(discoverBooks.toList())
+                    restoreDiscoverScrollIfNeeded()
                     binding.tvDiscoverEmpty.gone()
                 }
             } catch (_: CancellationException) {
@@ -1369,7 +1408,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     }
 
     override fun onPause() {
-        if (!usingModernDiscovery) {
+        if (usingModernDiscovery) {
+            saveDiscoverScrollPosition()
+        } else {
             adapter.upResumed(false)
             searchView?.clearFocus()
             adapter.onPause()
@@ -1377,8 +1418,44 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         super.onPause()
     }
 
+    private fun saveDiscoverScrollPosition() {
+        val layoutManager = binding.rvDiscoverBooks.layoutManager as? LinearLayoutManager ?: return
+        val position = layoutManager.findFirstVisibleItemPosition()
+        if (position == RecyclerView.NO_POSITION) return
+        val view = layoutManager.findViewByPosition(position)
+        viewModel.scrollPosition = position
+        viewModel.scrollOffset = view?.top ?: 0
+    }
+
+    private fun restoreDiscoverScrollIfNeeded() {
+        val position = viewModel.scrollPosition
+        if (position == RecyclerView.NO_POSITION || position >= discoverBooks.size) return
+        binding.rvDiscoverBooks.post {
+            (binding.rvDiscoverBooks.layoutManager as? LinearLayoutManager)
+                ?.scrollToPositionWithOffset(position, viewModel.scrollOffset)
+            viewModel.scrollPosition = RecyclerView.NO_POSITION
+            viewModel.scrollOffset = 0
+        }
+    }
+
     override fun onDestroyView() {
-        stopModernMode()
+        if (usingModernDiscovery) {
+            saveDiscoverScrollPosition()
+        }
+        sourceMenuPopup?.dismiss()
+        sourceMenuPopup = null
+        tagFilterPopup?.dismiss()
+        tagFilterPopup = null
+        discoverSourceFlowJob?.cancel()
+        discoverSourceFlowJob = null
+        discoverBookshelfFlowJob?.cancel()
+        discoverBookshelfFlowJob = null
+        discoverActionJob?.cancel()
+        discoverActionJob = null
+        discoverLoadJob?.cancel()
+        discoverLoadJob = null
+        discoverLoading = false
+        clearDiscoverLoading()
         oldModeInitialized = false
         modernModeInitialized = false
         groupsMenu = null
