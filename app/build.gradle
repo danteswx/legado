@@ -149,6 +149,7 @@ android {
     sourceSets {
         // Adds exported schema location as test app assets.
         androidTest.assets.srcDirs += files("$projectDir/schemas".toString())
+        androidTest.assets.srcDirs += files("$rootDir/tests".toString())
     }
     lint {
         checkDependencies = true
