@@ -323,6 +323,22 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun readMenuFastScrollRecyclerViewsAllHaveIdsForFastScrollerAnchors() {
+        val layout = readMenuLayout()
+        val fastScrollRecyclerView =
+            "io.legado.app.ui.widget.recycler.scroller.FastScrollRecyclerView"
+
+        val missingIds = layout.elementsByName(fastScrollRecyclerView)
+            .filter { it.androidAttr("id").isBlank() }
+            .map { it.androidAttr("tag").ifBlank { it.tagName } }
+
+        assertTrue(
+            "FastScrollRecyclerView must have android:id for FastScroller anchor. Missing: $missingIds",
+            missingIds.isEmpty()
+        )
+    }
+
+    @Test
     fun settingsPanelUsesNativeGlassRowsInsteadOfEmbeddedPreferenceSurface() {
         val layout = readMenuLayout()
         val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
@@ -1499,6 +1515,21 @@ class ReadMenuLayoutTest {
                 val child = children.item(index)
                 if (child is Element) {
                     addAll(child.elementsByAndroidText(text))
+                }
+            }
+        }
+    }
+
+    private fun Element.elementsByName(name: String): List<Element> {
+        val children = childNodes
+        return buildList {
+            if (tagName == name) {
+                add(this@elementsByName)
+            }
+            for (index in 0 until children.length) {
+                val child = children.item(index)
+                if (child is Element) {
+                    addAll(child.elementsByName(name))
                 }
             }
         }
