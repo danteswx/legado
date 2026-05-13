@@ -277,8 +277,13 @@ object ReadBookConfig {
     var pageAnim: Int
         get() = config.curPageAnim()
         set(@PageAnim.Anim value) {
-            config.setCurPageAnim(value)
+            setGlobalPageAnim(value)
         }
+
+    private fun setGlobalPageAnim(@PageAnim.Anim value: Int) {
+        configList.forEach { it.setCurPageAnim(value) }
+        shareConfig.setCurPageAnim(value)
+    }
 
     const val AUTO_READ_MODE_SCROLL = 0
     const val AUTO_READ_MODE_TIMED = 1

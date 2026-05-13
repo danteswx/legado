@@ -72,7 +72,8 @@ data class ReadMenuThemeSuite(
         ReadBookConfig.lineSpacingExtra = lineSpacingExtra
         ReadBookConfig.paragraphSpacing = paragraphSpacing
         ReadBookConfig.pageAnim = pageAnim
-        ReadBook.book?.setPageAnim(pageAnim)
+        ReadBook.book?.setPageAnim(null)
+        ReadBook.saveRead()
         AppConfig.pageAnimationSpeed = pageAnimationSpeed
         ReadBookConfig.bgBrightness = bgBrightness
         ReadBookConfig.bgSaturation = bgSaturation
@@ -120,7 +121,7 @@ data class ReadMenuThemeSuite(
                 letterSpacing = ReadBookConfig.letterSpacing,
                 lineSpacingExtra = ReadBookConfig.lineSpacingExtra,
                 paragraphSpacing = ReadBookConfig.paragraphSpacing,
-                pageAnim = ReadBook.pageAnim(),
+                pageAnim = ReadBookConfig.pageAnim,
                 pageAnimationSpeed = AppConfig.pageAnimationSpeed,
                 bgBrightness = ReadBookConfig.bgBrightness,
                 bgSaturation = ReadBookConfig.bgSaturation,

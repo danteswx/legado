@@ -3131,12 +3131,12 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     private fun updatePageAnimSampleCards() {
-        val explicitAnim = ReadBook.book?.config?.pageAnim?.takeIf { it >= 0 }
+        val currentAnim = ReadBookConfig.pageAnim
         pageAnimSampleBindings.forEach { sample ->
             val selected = if (sample.anim == null) {
-                explicitAnim == null
+                false
             } else {
-                explicitAnim == sample.anim
+                currentAnim == sample.anim
             }
             bindPageAnimSampleCard(sample, selected)
         }
@@ -3168,7 +3168,10 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     private fun applyPageAnimSample(anim: Int?) {
-        ReadBook.book?.setPageAnim(anim ?: -1)
+        val pageAnim = anim ?: PageAnim.coverPageAnim
+        ReadBookConfig.pageAnim = pageAnim
+        ReadBook.book?.setPageAnim(null)
+        ReadBook.saveRead()
         ReadBook.callBack?.upPageAnim(true)
         ReadBook.loadContent(resetPageOffset = false)
         updatePageTurnControls()
@@ -3337,7 +3340,7 @@ class ReadMenu @JvmOverloads constructor(
                 abs(ReadBookConfig.letterSpacing - preset.letterSpacing) < 0.01f &&
                 ReadBookConfig.lineSpacingExtra == preset.lineSpacingExtra &&
                 ReadBookConfig.paragraphSpacing == preset.paragraphSpacing &&
-                ReadBook.pageAnim() == preset.pageAnim &&
+                ReadBookConfig.pageAnim == preset.pageAnim &&
                 AppConfig.pageAnimationSpeed == preset.pageAnimationSpeed &&
                 ReadBookConfig.bgBrightness == preset.bgBrightness &&
                 ReadBookConfig.bgSaturation == preset.bgSaturation &&
