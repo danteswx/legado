@@ -23,6 +23,7 @@ import com.bumptech.glide.request.target.Target
 import io.legado.app.constant.AppPattern
 import io.legado.app.help.CoverThumbnailCache
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.CoverCollectionManager
 import io.legado.app.help.glide.ImageLoader
 import io.legado.app.help.glide.OkHttpModelLoader
 import io.legado.app.lib.theme.accentColor
@@ -282,7 +283,17 @@ class CoverImageView @JvmOverloads constructor(
         fragment: Fragment? = null,
         lifecycle: Lifecycle? = null
     ) {
-        load(searchBook.coverUrl, searchBook.name, searchBook.author, loadOnlyWifi, searchBook.origin, fragment, lifecycle)
+        val collectionCover = CoverCollectionManager.selectedCollectionCover(searchBook)
+        load(
+            collectionCover ?: searchBook.coverUrl,
+            searchBook.name,
+            searchBook.author,
+            loadOnlyWifi,
+            searchBook.origin,
+            fragment,
+            lifecycle,
+            forcePath = collectionCover != null
+        )
     }
 
     fun load(
@@ -292,7 +303,18 @@ class CoverImageView @JvmOverloads constructor(
         lifecycle: Lifecycle? = null,
         onLoadFinish: (() -> Unit)? = null
     ) {
-       load(book.getDisplayCover(), book.name, book.author, loadOnlyWifi, book.origin, fragment, lifecycle, onLoadFinish)
+        val collectionCover = CoverCollectionManager.selectedCollectionCover(book)
+        load(
+            collectionCover ?: book.getDisplayCover(),
+            book.name,
+            book.author,
+            loadOnlyWifi,
+            book.origin,
+            fragment,
+            lifecycle,
+            onLoadFinish,
+            forcePath = collectionCover != null
+        )
     }
 
     fun loadThumb(
@@ -301,8 +323,9 @@ class CoverImageView @JvmOverloads constructor(
         fragment: Fragment? = null,
         lifecycle: Lifecycle? = null
     ) {
+        val collectionCover = CoverCollectionManager.selectedCollectionCover(book)
         load(
-            book.getDisplayCover(),
+            collectionCover ?: book.getDisplayCover(),
             book.name,
             book.author,
             loadOnlyWifi,
@@ -310,7 +333,8 @@ class CoverImageView @JvmOverloads constructor(
             fragment,
             lifecycle,
             null,
-            true
+            true,
+            forcePath = collectionCover != null
         )
     }
 
@@ -323,7 +347,8 @@ class CoverImageView @JvmOverloads constructor(
         fragment: Fragment? = null,
         lifecycle: Lifecycle? = null,
         onLoadFinish: (() -> Unit)? = null,
-        preferThumb: Boolean = false
+        preferThumb: Boolean = false,
+        forcePath: Boolean = false
     ) {
         val currentAuthor = author?.replace(AppPattern.bdRegex, "")?.trim()?.also {
             this.author = it
@@ -339,7 +364,8 @@ class CoverImageView @JvmOverloads constructor(
             sourceOrigin.orEmpty(),
             loadOnlyWifi.toString(),
             AppConfig.useDefaultCover.toString(),
-            useThumb.toString()
+            useThumb.toString(),
+            forcePath.toString()
         ).joinToString("|")
         if (loadedKey == newLoadKey && drawable != null) {
             return
@@ -347,7 +373,7 @@ class CoverImageView @JvmOverloads constructor(
         loadKey = newLoadKey
         this.bitmapPath = path
         val thumbKey = "$sourceOrigin|$path|$currentName|$currentAuthor"
-        if (AppConfig.useDefaultCover) {
+        if (AppConfig.useDefaultCover && !forcePath) {
             loadedKey = newLoadKey
             ImageLoader.load(context, BookCover.defaultDrawable)
                 .centerCrop()
