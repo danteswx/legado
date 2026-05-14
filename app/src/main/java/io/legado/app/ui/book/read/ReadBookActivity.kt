@@ -1609,6 +1609,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                 if (AppConfig.readBarStyleFollowPage) {
                     postEvent(EventBus.UPDATE_READ_ACTION_BAR, true)
                 }
+                binding.readMenu.persistActiveThemeSuiteChange()
             }
 
             TEXT_ACCENT_COLOR -> {
@@ -1626,6 +1627,7 @@ class ReadBookActivity : BaseReadBookActivity(),
                     postEvent(EventBus.UPDATE_READ_ACTION_BAR, true)
                 }
                 binding.readMenu.reset()
+                binding.readMenu.persistActiveThemeSuiteChange()
             }
 
             TIP_COLOR -> {

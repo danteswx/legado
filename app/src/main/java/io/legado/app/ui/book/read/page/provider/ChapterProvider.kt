@@ -144,6 +144,7 @@ object ChapterProvider {
     }
 
     private var upViewSizeRunnable: Runnable? = null
+    private val builtInTypefaceCache = mutableMapOf<String, Typeface>()
 
     private data class TypefacePlan(
         val typeface: Typeface?,
@@ -222,10 +223,7 @@ object ChapterProvider {
         val builtInWeightPlan = BuiltInReadFonts.weightPlan(fontPath, targetWeight)
         if (builtInWeightPlan != null) {
             return kotlin.runCatching {
-                val assetTypeface = Typeface.createFromAsset(
-                    appCtx.assets,
-                    builtInWeightPlan.assetPath
-                )
+                val assetTypeface = builtInTypeface(builtInWeightPlan.assetPath)
                 val weightedTypeface = if (
                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
                     builtInWeightPlan.variable
@@ -258,7 +256,7 @@ object ChapterProvider {
         return kotlin.runCatching {
             val builtInAssetPath = BuiltInReadFonts.assetPath(fontPath)
             when {
-                builtInAssetPath != null -> Typeface.createFromAsset(appCtx.assets, builtInAssetPath)
+                builtInAssetPath != null -> builtInTypeface(builtInAssetPath)
 
                 fontPath.isContentScheme() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> {
                     appCtx.contentResolver
@@ -284,6 +282,14 @@ object ChapterProvider {
             ReadBookConfig.save()
             Typeface.SANS_SERIF
         } ?: Typeface.DEFAULT
+    }
+
+    private fun builtInTypeface(assetPath: String): Typeface {
+        return synchronized(builtInTypefaceCache) {
+            builtInTypefaceCache.getOrPut(assetPath) {
+                Typeface.createFromAsset(appCtx.assets, assetPath)
+            }
+        }
     }
 
     private fun getPaints(
@@ -345,12 +351,7 @@ object ChapterProvider {
     }
 
     private fun readTextWeight(): Int {
-        val progress = ReadBookConfig.textWeight.coerceIn(0, 100)
-        return if (progress <= 50) {
-            300 + (progress / 50f * 100f).toInt()
-        } else {
-            400 + ((progress - 50) / 50f * 500f).toInt()
-        }.coerceIn(300, 900)
+        return BuiltInReadFonts.targetWeight(ReadBookConfig.textWeight)
     }
 
     /**

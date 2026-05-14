@@ -22,6 +22,7 @@ import android.text.TextUtils
 import android.util.AttributeSet
 import android.view.Gravity
 import android.view.LayoutInflater
+import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
 import android.view.View.MeasureSpec
@@ -64,7 +65,6 @@ import io.legado.app.databinding.ViewReadBackgroundCardBinding
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.config.AdvancedTitleConfig
 import io.legado.app.help.config.AppConfig
-import io.legado.app.help.config.BuiltInReadFonts
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ReadTipConfig
@@ -251,76 +251,10 @@ class ReadMenu @JvmOverloads constructor(
                 { setSystemFont(0) }
             ),
             FontSample(
-                newFontSampleCard(),
-                R.string.read_style_font_harmonyos_sans,
-                builtInTypeface(BuiltInReadFonts.HARMONYOS_SANS_SC),
-                { isBuiltInFontSelected(BuiltInReadFonts.HARMONYOS_SANS_SC) },
-                { setBuiltInFont(BuiltInReadFonts.HARMONYOS_SANS_SC) }
-            ),
-            FontSample(
-                newFontSampleCard(),
-                R.string.read_style_font_sans,
-                builtInTypeface(BuiltInReadFonts.SOURCE_HAN_SANS_CN),
-                { isBuiltInFontSelected(BuiltInReadFonts.SOURCE_HAN_SANS_CN) },
-                { setBuiltInFont(BuiltInReadFonts.SOURCE_HAN_SANS_CN) }
-            ),
-            FontSample(
-                newFontSampleCard(),
-                R.string.read_style_font_wenyuan_sans_vf,
-                builtInTypeface(BuiltInReadFonts.WEN_YUAN_SANS_SC_VF),
-                { isBuiltInFontSelected(BuiltInReadFonts.WEN_YUAN_SANS_SC_VF) },
-                { setBuiltInFont(BuiltInReadFonts.WEN_YUAN_SANS_SC_VF) }
-            ),
-            FontSample(
-                newFontSampleCard(),
-                R.string.read_style_font_mi_sans_vf,
-                builtInTypeface(BuiltInReadFonts.MI_SANS_VF),
-                { isBuiltInFontSelected(BuiltInReadFonts.MI_SANS_VF) },
-                { setBuiltInFont(BuiltInReadFonts.MI_SANS_VF) }
-            ),
-            FontSample(
-                newFontSampleCard(),
-                R.string.read_style_font_alimama_fang_yuan_ti_vf,
-                builtInTypeface(BuiltInReadFonts.ALIMAMA_FANG_YUAN_TI_VF),
-                { isBuiltInFontSelected(BuiltInReadFonts.ALIMAMA_FANG_YUAN_TI_VF) },
-                { setBuiltInFont(BuiltInReadFonts.ALIMAMA_FANG_YUAN_TI_VF) }
-            ),
-            FontSample(
-                newFontSampleCard(),
-                R.string.read_style_font_lxgw_wenkai_screen,
-                builtInTypeface(BuiltInReadFonts.LXGW_WENKAI_SCREEN),
-                { isBuiltInFontSelected(BuiltInReadFonts.LXGW_WENKAI_SCREEN) },
-                { setBuiltInFont(BuiltInReadFonts.LXGW_WENKAI_SCREEN) }
-            ),
-            FontSample(
-                newFontSampleCard(),
-                R.string.read_style_font_lxgw_neo_xihei,
-                builtInTypeface(BuiltInReadFonts.LXGW_NEO_XIHEI),
-                { isBuiltInFontSelected(BuiltInReadFonts.LXGW_NEO_XIHEI) },
-                { setBuiltInFont(BuiltInReadFonts.LXGW_NEO_XIHEI) }
-            ),
-            FontSample(
-                newFontSampleCard(),
-                R.string.read_style_font_lxgw_fasmart_gothic,
-                builtInTypeface(BuiltInReadFonts.LXGW_FASMART_GOTHIC),
-                { isBuiltInFontSelected(BuiltInReadFonts.LXGW_FASMART_GOTHIC) },
-                { setBuiltInFont(BuiltInReadFonts.LXGW_FASMART_GOTHIC) }
-            ),
-            FontSample(
-                newFontSampleCard(),
-                R.string.read_style_font_lxgw_zhenkai,
-                builtInTypeface(BuiltInReadFonts.LXGW_ZHENKAI_GB),
-                { isBuiltInFontSelected(BuiltInReadFonts.LXGW_ZHENKAI_GB) },
-                { setBuiltInFont(BuiltInReadFonts.LXGW_ZHENKAI_GB) }
-            ),
-            FontSample(
                 newFontSampleCard(false),
                 R.string.read_menu_add_custom_font,
                 Typeface.DEFAULT,
-                {
-                    ReadBookConfig.textFont.isNotBlank() &&
-                        BuiltInReadFonts.assetPath(ReadBookConfig.textFont) == null
-                },
+                { ReadBookConfig.textFont.isNotBlank() },
                 { openFontSelectDialog() }
             )
         )
@@ -405,17 +339,10 @@ class ReadMenu @JvmOverloads constructor(
     private val themePresets by lazy { ReadMenuThemePreset.defaultPresets() }
     private val themeCardBindings by lazy {
         listOf(
-            binding.themeCardFollowSystem,
-            binding.themeCardDark,
-            binding.themeCardPaper,
-            binding.themeCardEyeGreen,
-            binding.themeCardQuietBlue,
-            binding.themeCardNight
+            binding.themeCardFollowSystem
         )
     }
     private val dynamicThemeCardBindings = mutableListOf<ViewReadThemeCardBinding>()
-    private var selectedThemeDeleteButton: AppCompatImageButton? = null
-    private var selectedThemeDeleteButtonAnimator: ValueAnimator? = null
     private val menuTopIn: Animation by lazy {
         loadAnimation(context, R.anim.anim_readbook_top_in)
     }
@@ -476,9 +403,8 @@ class ReadMenu @JvmOverloads constructor(
     }
     private val menuInListener = object : Animation.AnimationListener {
         override fun onAnimationStart(animation: Animation) {
-            binding.tvSourceAction.text =
-                ReadBook.bookSource?.bookSourceName ?: context.getString(R.string.book_source)
-            binding.tvSourceAction.isGone = ReadBook.isLocalBook
+            binding.tvSourceAction.gone()
+            updateTopBarLoginAction()
             callBack.upSystemUiVisibility()
         }
 
@@ -532,6 +458,7 @@ class ReadMenu @JvmOverloads constructor(
         setupSearchPanel()
         setupTocPanel()
         setupAloudPanel()
+        setupTopBarLoginAction()
         val topBarTextColor = textColor
         val additionTextColor = if (immersiveMenu) {
             ColorUtils.withAlpha(ColorUtils.lightenColor(topBarTextColor), 0.75f)
@@ -543,6 +470,7 @@ class ReadMenu @JvmOverloads constructor(
         titleBar.setColorFilter(topBarTextColor)
         tvChapterName.setTextColor(additionTextColor)
         tvChapterUrl.setTextColor(additionTextColor)
+        tvSourceAction.gone()
         if (AppConfig.isEInkMode) {
             titleBar.setBackgroundResource(R.drawable.bg_eink_border_bottom)
         }
@@ -1131,6 +1059,30 @@ class ReadMenu @JvmOverloads constructor(
         taggedText("panel_aloud_backstage").setOnClickListener {
             runMenuOut { activity?.finish() }
         }
+    }
+
+    private fun setupTopBarLoginAction() = binding.run {
+        val loginItem = titleBar.menu.findItem(R.id.menu_login)
+            ?: titleBar.menu.add(0, R.id.menu_login, 0, R.string.login).apply {
+                setIcon(R.drawable.ic_lucide_link_2)
+                setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
+            }
+        loginItem.setIcon(R.drawable.ic_lucide_link_2)
+        loginItem.title = context.getString(R.string.login)
+        titleBar.toolbar.setOnMenuItemClickListener { item ->
+            if (item.itemId == R.id.menu_login) {
+                callBack.showLogin()
+                true
+            } else {
+                false
+            }
+        }
+        updateTopBarLoginAction()
+    }
+
+    private fun updateTopBarLoginAction() = binding.run {
+        titleBar.menu.findItem(R.id.menu_login)?.isVisible =
+            !ReadBook.isLocalBook && !ReadBook.bookSource?.loginUrl.isNullOrEmpty()
     }
 
     private fun updateAloudControls() = binding.run {
@@ -2547,6 +2499,7 @@ class ReadMenu @JvmOverloads constructor(
         val showFooterMode = activeLayoutMarginAdjustMode == LayoutMarginAdjustMode.Footer
         val showTipMode = showHeaderMode || showFooterMode
         val showVerticalSpinboxes = !showTextStyleMode
+        val useTitleStackLayout = showTitleMode
 
         layoutMarginAdjustPreview.setAccentColor(context.accentColor)
         layoutMarginAdjustPreview.setMode(
@@ -2575,7 +2528,7 @@ class ReadMenu @JvmOverloads constructor(
         layoutMarginSpinboxBottom.visible(showVerticalSpinboxes)
         layoutMarginSpinboxLeft.visible(showHorizontal)
         layoutMarginSpinboxRight.visible(showHorizontal)
-        syncLayoutMarginSpinboxLayout(showHorizontal)
+        syncLayoutMarginSpinboxLayout(showHorizontal, useTitleStackLayout)
         layoutTextStyleControls.gone(!showTextStyleMode)
         layoutMarginTitleSize.gone(!showTitleMode)
         llLayoutMarginTitleMode.gone(!showTitleMode)
@@ -2608,10 +2561,21 @@ class ReadMenu @JvmOverloads constructor(
         }
     }
 
-    private fun syncLayoutMarginSpinboxLayout(useBodyCrossLayout: Boolean) = binding.run {
+    private fun syncLayoutMarginSpinboxLayout(
+        useBodyCrossLayout: Boolean,
+        useTitleStackLayout: Boolean
+    ) = binding.run {
         val unset = ConstraintLayout.LayoutParams.UNSET
         val previewId = R.id.layout_margin_adjust_preview
         if (useBodyCrossLayout) {
+            layoutMarginAdjustPreview.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                topToTop = ConstraintSet.PARENT_ID
+                bottomToBottom = ConstraintSet.PARENT_ID
+                topToBottom = unset
+                bottomToTop = unset
+                topMargin = 0
+                bottomMargin = 0
+            }
             layoutMarginSpinboxTop.updateLayoutParams<ConstraintLayout.LayoutParams> {
                 startToStart = previewId
                 endToEnd = previewId
@@ -2674,7 +2638,74 @@ class ReadMenu @JvmOverloads constructor(
                 topMargin = 0
                 bottomMargin = 0
             }
+            layoutMarginTitleSize.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                topToBottom = R.id.layout_margin_spinbox_bottom
+                topMargin = 8.dpToPx()
+            }
+            llLayoutMarginTitleMode.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                topToBottom = R.id.layout_margin_title_size
+                topMargin = 8.dpToPx()
+            }
+        } else if (useTitleStackLayout) {
+            layoutMarginSpinboxTop.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                startToStart = ConstraintSet.PARENT_ID
+                endToStart = R.id.layout_margin_spinbox_bottom
+                topToTop = ConstraintSet.PARENT_ID
+                startToEnd = unset
+                endToEnd = unset
+                topToBottom = unset
+                bottomToTop = unset
+                bottomToBottom = unset
+                horizontalBias = 0.5f
+                verticalBias = 0f
+                marginStart = 0
+                marginEnd = 10.dpToPx()
+                topMargin = 0
+                bottomMargin = 0
+            }
+            layoutMarginSpinboxBottom.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                startToEnd = R.id.layout_margin_spinbox_top
+                endToEnd = ConstraintSet.PARENT_ID
+                topToTop = ConstraintSet.PARENT_ID
+                startToStart = unset
+                endToStart = unset
+                topToBottom = unset
+                bottomToTop = unset
+                bottomToBottom = unset
+                horizontalBias = 0.5f
+                verticalBias = 0f
+                marginStart = 10.dpToPx()
+                marginEnd = 0
+                topMargin = 0
+                bottomMargin = 0
+            }
+            layoutMarginAdjustPreview.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                startToStart = ConstraintSet.PARENT_ID
+                endToEnd = ConstraintSet.PARENT_ID
+                topToBottom = R.id.layout_margin_spinbox_top
+                bottomToTop = unset
+                topToTop = unset
+                bottomToBottom = unset
+                topMargin = 8.dpToPx()
+                bottomMargin = 0
+            }
+            layoutMarginTitleSize.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                topToBottom = R.id.layout_margin_adjust_preview
+                topMargin = 10.dpToPx()
+            }
+            llLayoutMarginTitleMode.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                topToBottom = R.id.layout_margin_title_size
+                topMargin = 8.dpToPx()
+            }
         } else {
+            layoutMarginAdjustPreview.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                topToTop = ConstraintSet.PARENT_ID
+                bottomToBottom = ConstraintSet.PARENT_ID
+                topToBottom = unset
+                bottomToTop = unset
+                topMargin = 0
+                bottomMargin = 0
+            }
             layoutMarginSpinboxTop.updateLayoutParams<ConstraintLayout.LayoutParams> {
                 endToStart = previewId
                 topToTop = previewId
@@ -2735,6 +2766,14 @@ class ReadMenu @JvmOverloads constructor(
                 topMargin = 0
                 bottomMargin = 0
             }
+            layoutMarginTitleSize.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                topToBottom = R.id.layout_margin_spinbox_bottom
+                topMargin = 8.dpToPx()
+            }
+            llLayoutMarginTitleMode.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                topToBottom = R.id.layout_margin_title_size
+                topMargin = 8.dpToPx()
+            }
         }
     }
 
@@ -2744,7 +2783,7 @@ class ReadMenu @JvmOverloads constructor(
                 .coerceAtLeast(1.dpToPx())
 
             LayoutMarginAdjustMode.Body -> 300.dpToPx()
-            LayoutMarginAdjustMode.Title -> 220.dpToPx()
+            LayoutMarginAdjustMode.Title -> 352.dpToPx()
             LayoutMarginAdjustMode.Header,
             LayoutMarginAdjustMode.Footer -> {
                 val tipTopMargin = (layoutTipControls.layoutParams as? ViewGroup.MarginLayoutParams)
@@ -3175,6 +3214,7 @@ class ReadMenu @JvmOverloads constructor(
         ReadBook.callBack?.upPageAnim(true)
         ReadBook.loadContent(resetPageOffset = false)
         updatePageTurnControls()
+        persistActiveThemeSuiteChange()
         updateThemePresetCards()
     }
 
@@ -3188,13 +3228,10 @@ class ReadMenu @JvmOverloads constructor(
         updateFontButtons()
     }
 
-    private fun updateThemePresetCards() {
+    private fun updateThemePresetCards(revealSuite: ReadMenuThemeSuite? = null) {
         val currentBgType = ReadBookConfig.durConfig.curBgType()
         val currentBg = ReadBookConfig.durConfig.curBgStr()
         val currentText = ReadBookConfig.durConfig.curTextColor()
-        val currentSuite = ReadMenuThemeSuiteStore.captureCurrent(
-            context.getString(R.string.read_menu_theme_current)
-        )
         val savedSuites = ReadMenuThemeSuiteStore.load(context)
         val explicitSavedIndex = ReadMenuThemeSuiteStore.explicitSavedIndex(context, savedSuites)
         val selectedPresetIndex = if (explicitSavedIndex == -1) {
@@ -3209,12 +3246,13 @@ class ReadMenu @JvmOverloads constructor(
             selectedPresetIndex == -1 -> ReadMenuThemeSuiteStore.selectedSavedIndex(context, savedSuites)
             else -> -1
         }
-        val needsCurrentCard = selectedPresetIndex == -1 && selectedSavedIndex == -1
-        val suiteCards = savedSuites.mapIndexed { savedIndex, suite ->
+        val savedThemeCards = savedSuites.mapIndexed { savedIndex, suite ->
             ThemeSuiteCard(suite, savedIndex == selectedSavedIndex, true)
-        } +
-                listOfNotNull(currentSuite.takeIf { needsCurrentCard }?.let { ThemeSuiteCard(it, true, false) })
-        syncThemeSuiteCards(suiteCards.size)
+        }
+        val revealIndex = savedThemeCards.indexOfFirst {
+            revealSuite != null && it.suite.createdAt == revealSuite.createdAt
+        }
+        syncThemeSuiteCards(savedThemeCards.size, revealIndex)
         themeCardBindings.zip(themePresets).forEachIndexed { presetIndex, (card, preset) ->
             bindThemePresetCard(
                 card,
@@ -3222,108 +3260,72 @@ class ReadMenu @JvmOverloads constructor(
                 presetIndex == selectedPresetIndex
             )
         }
-        dynamicThemeCardBindings.zip(suiteCards).forEach { (card, item) ->
-            bindThemeSuiteCard(card, item.suite, item.selected, item.custom)
+        var revealCard: ViewReadThemeCardBinding? = null
+        dynamicThemeCardBindings.zip(savedThemeCards).forEachIndexed { index, (card, themeCard) ->
+            bindThemeSuiteCard(card, themeCard.suite, themeCard.selected, themeCard.custom)
+            if (index == revealIndex) {
+                revealCard = card
+            }
         }
-        showSelectedThemeDeleteButton(
-            dynamicThemeCardBindings.getOrNull(selectedSavedIndex),
-            savedSuites.getOrNull(selectedSavedIndex)
-        )
         bindThemeAddCard(binding.themeCardAdd)
+        revealCard?.let { animateThemeSuiteCardReveal(it) }
     }
 
-    private fun syncThemeSuiteCards(count: Int) = binding.run {
-        selectedThemeDeleteButtonAnimator?.cancel()
-        selectedThemeDeleteButtonAnimator = null
-        selectedThemeDeleteButton?.animate()?.cancel()
-        selectedThemeDeleteButton?.let { llThemePresetRow.removeView(it) }
-        selectedThemeDeleteButton = null
+    private fun syncThemeSuiteCards(count: Int, revealIndex: Int = -1) = binding.run {
         dynamicThemeCardBindings.forEach { llThemePresetRow.removeView(it.root) }
         dynamicThemeCardBindings.clear()
-        repeat(count) {
+        repeat(count) { index ->
             val card = ViewReadThemeCardBinding.inflate(LayoutInflater.from(context), llThemePresetRow, false)
-            card.root.layoutParams = LinearLayout.LayoutParams(96.dpToPx(), ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                marginEnd = 8.dpToPx()
+            val reveal = index == revealIndex
+            card.root.alpha = if (reveal) 0f else 1f
+            card.root.layoutParams = LinearLayout.LayoutParams(
+                if (reveal) 0 else 96.dpToPx(),
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                marginEnd = if (reveal) 0 else 8.dpToPx()
             }
-            llThemePresetRow.addView(card.root, llThemePresetRow.childCount - 1)
+            val insertIndex = llThemePresetRow.indexOfChild(themeCardAdd.root)
+                .takeIf { it >= 0 }
+                ?: llThemePresetRow.childCount
+            llThemePresetRow.addView(card.root, insertIndex)
             dynamicThemeCardBindings.add(card)
         }
     }
 
-    private fun showSelectedThemeDeleteButton(
-        selectedCard: ViewReadThemeCardBinding?,
-        suite: ReadMenuThemeSuite?
-    ) = binding.run {
-        selectedThemeDeleteButtonAnimator?.cancel()
-        selectedThemeDeleteButtonAnimator = null
-        selectedThemeDeleteButton?.animate()?.cancel()
-        selectedThemeDeleteButton?.let { llThemePresetRow.removeView(it) }
-        selectedThemeDeleteButton = null
-        if (selectedCard == null || suite == null) {
-            return@run
-        }
-        val button = AppCompatImageButton(context).apply {
-            contentDescription = context.getString(R.string.delete)
-            setImageResource(R.drawable.ic_outline_delete)
-            imageTintList = ColorStateList.valueOf(context.getCompatColor(R.color.error))
-            background = roundedRect(
-                ColorUtils.adjustAlpha(textColor, 0.06f),
-                12f.dpToPx(),
-                1.dpToPx(),
-                ColorUtils.adjustAlpha(textColor, 0.12f)
-            )
-            scaleType = ImageView.ScaleType.CENTER
-            setPadding(10.dpToPx(), 10.dpToPx(), 10.dpToPx(), 10.dpToPx())
-            setOnClickListener { deleteThemeSuite(suite) }
-        }
-        button.alpha = 0f
-        button.isEnabled = false
-        button.layoutParams = LinearLayout.LayoutParams(0, 70.dpToPx()).apply {
-            marginEnd = 8.dpToPx()
-        }
-        llThemePresetRow.addView(button, llThemePresetRow.indexOfChild(selectedCard.root) + 1)
-        selectedThemeDeleteButton = button
-        animateThemeDeleteButtonReveal(button)
-    }
-
-    private fun animateThemeDeleteButtonReveal(button: AppCompatImageButton) = binding.run {
-        selectedThemeDeleteButtonAnimator = ValueAnimator.ofInt(0, 42.dpToPx()).apply {
-            duration = 180L
+    private fun animateThemeSuiteCardReveal(card: ViewReadThemeCardBinding) = binding.run {
+        val targetWidth = 96.dpToPx()
+        val targetMargin = 8.dpToPx()
+        card.root.animate().cancel()
+        card.root.alpha = 0f
+        ValueAnimator.ofInt(0, targetWidth).apply {
+            duration = 220L
             interpolator = DecelerateInterpolator(1.4f)
             addUpdateListener { animator ->
-                button.updateLayoutParams<LinearLayout.LayoutParams> {
-                    width = animator.animatedValue as Int
+                val width = animator.animatedValue as Int
+                val progress = width / targetWidth.toFloat()
+                card.root.updateLayoutParams<LinearLayout.LayoutParams> {
+                    this.width = width
+                    marginEnd = (targetMargin * progress).roundToInt()
                 }
             }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
-                    selectedThemeDeleteButtonAnimator = null
-                    revealThemeDeleteIcon(button)
+                    card.root.updateLayoutParams<LinearLayout.LayoutParams> {
+                        width = targetWidth
+                        marginEnd = targetMargin
+                    }
                 }
             })
             start()
         }
-        hsvThemePresets.post {
-            val targetRight = button.left + 42.dpToPx()
-            val visibleRight = hsvThemePresets.scrollX + hsvThemePresets.width
-            if (button.right > visibleRight || targetRight > visibleRight) {
-                hsvThemePresets.smoothScrollTo(
-                    (targetRight - hsvThemePresets.width + 16.dpToPx()).coerceAtLeast(0),
-                    0
-                )
-            }
-        }
-    }
-
-    private fun revealThemeDeleteIcon(button: AppCompatImageButton) {
-        button.animate()
+        card.root.animate()
             .alpha(1f)
-            .setDuration(110L)
+            .setDuration(160L)
             .setInterpolator(DecelerateInterpolator(1.4f))
-            .withEndAction {
-                button.isEnabled = true
-            }
             .start()
+        hsvThemePresets.post {
+            hsvThemePresets.smoothScrollTo(llThemePresetRow.width, 0)
+        }
     }
 
     private fun isThemePresetSelected(
@@ -3337,9 +3339,32 @@ class ReadMenu @JvmOverloads constructor(
                 currentText == preset.textColor &&
                 ReadBookConfig.textSize == preset.textSize &&
                 ReadBookConfig.textWeight == preset.textWeight &&
+                ReadBookConfig.textBold == preset.textBold &&
+                ReadBookConfig.textFont == preset.textFont &&
+                AppConfig.systemTypefaces == preset.systemTypeface &&
                 abs(ReadBookConfig.letterSpacing - preset.letterSpacing) < 0.01f &&
                 ReadBookConfig.lineSpacingExtra == preset.lineSpacingExtra &&
                 ReadBookConfig.paragraphSpacing == preset.paragraphSpacing &&
+                ReadBookConfig.paddingTop == preset.paddingTop &&
+                ReadBookConfig.paddingBottom == preset.paddingBottom &&
+                ReadBookConfig.paddingLeft == preset.paddingLeft &&
+                ReadBookConfig.paddingRight == preset.paddingRight &&
+                ReadBookConfig.titleTopSpacing == preset.titleTopSpacing &&
+                ReadBookConfig.titleBottomSpacing == preset.titleBottomSpacing &&
+                ReadBookConfig.titleSize == preset.titleSize &&
+                ReadBookConfig.titleMode == preset.titleMode &&
+                ReadTipConfig.headerMode == preset.headerMode &&
+                ReadBookConfig.headerPaddingTop == preset.headerPaddingTop &&
+                ReadBookConfig.headerPaddingBottom == preset.headerPaddingBottom &&
+                ReadBookConfig.headerPaddingLeft == preset.headerPaddingLeft &&
+                ReadBookConfig.headerPaddingRight == preset.headerPaddingRight &&
+                ReadBookConfig.showHeaderLine == preset.showHeaderLine &&
+                ReadTipConfig.footerMode == preset.footerMode &&
+                ReadBookConfig.footerPaddingTop == preset.footerPaddingTop &&
+                ReadBookConfig.footerPaddingBottom == preset.footerPaddingBottom &&
+                ReadBookConfig.footerPaddingLeft == preset.footerPaddingLeft &&
+                ReadBookConfig.footerPaddingRight == preset.footerPaddingRight &&
+                ReadBookConfig.showFooterLine == preset.showFooterLine &&
                 ReadBookConfig.pageAnim == preset.pageAnim &&
                 AppConfig.pageAnimationSpeed == preset.pageAnimationSpeed &&
                 ReadBookConfig.bgBrightness == preset.bgBrightness &&
@@ -3373,13 +3398,7 @@ class ReadMenu @JvmOverloads constructor(
         selected: Boolean,
         custom: Boolean
     ) {
-        card.themeCardPreview.background = roundedRect(
-            suite.backgroundColor.takeIf { it != Color.TRANSPARENT }
-                ?: ColorUtils.adjustAlpha(textColor, 0.06f),
-            12f.dpToPx(),
-            if (selected) 2.dpToPx() else 1.dpToPx(),
-            if (selected) context.accentColor else ColorUtils.adjustAlpha(textColor, 0.12f)
-        )
+        card.themeCardPreview.background = themeSuitePreviewBackground(suite, selected, custom)
         bindThemeCardPreviewText(card, suite.textColor)
         card.tvThemeCardLabel.text = suite.name
         card.tvThemeCardLabel.setTextColor(if (selected) context.accentColor else textColor)
@@ -3391,6 +3410,23 @@ class ReadMenu @JvmOverloads constructor(
         )
         card.tvThemeCardBadge.isVisible = custom
         card.root.setOnClickListener { applySavedThemeSuite(suite) }
+        card.root.setOnLongClickListener {
+            showThemeSuiteActions(suite)
+            true
+        }
+    }
+
+    private fun showThemeSuiteActions(suite: ReadMenuThemeSuite) {
+        val actions = listOf(
+            context.getString(R.string.read_menu_theme_rename),
+            context.getString(R.string.delete)
+        )
+        context.selector(suite.name, actions) { _, index ->
+            when (index) {
+                0 -> renameThemeSuite(suite)
+                1 -> deleteThemeSuite(suite)
+            }
+        }
     }
 
     private fun bindThemeCardPreviewText(card: ViewReadThemeCardBinding, previewTextColor: Int) {
@@ -3403,6 +3439,27 @@ class ReadMenu @JvmOverloads constructor(
         card.tvThemeCardBody.text = ReadMenuThemePreset.DEFAULT_PREVIEW_BODY
         card.tvThemeCardTitle.setTextColor(previewTextColor)
         card.tvThemeCardBody.setTextColor(ColorUtils.adjustAlpha(previewTextColor, 0.72f))
+    }
+
+    private fun themeSuitePreviewBackground(
+        suite: ReadMenuThemeSuite,
+        selected: Boolean,
+        custom: Boolean
+    ): Drawable {
+        val color = suite.backgroundColor.takeIf { it != Color.TRANSPARENT }
+            ?: ColorUtils.adjustAlpha(textColor, 0.06f)
+        val strokeWidth = if (selected) 2.dpToPx() else 1.dpToPx()
+        val strokeColor = if (selected) {
+            context.accentColor
+        } else {
+            ColorUtils.adjustAlpha(textColor, 0.12f)
+        }
+        return roundedRect(
+            color,
+            12f.dpToPx(),
+            strokeWidth,
+            strokeColor
+        )
     }
 
     private fun bindThemeAddCard(card: ViewReadThemeCardBinding) {
@@ -3422,7 +3479,7 @@ class ReadMenu @JvmOverloads constructor(
         card.tvThemeCardLabel.setTextColor(textColor)
         card.ivThemeCardCheck.isVisible = false
         card.tvThemeCardBadge.isVisible = false
-        card.root.setOnClickListener { saveCurrentThemeSuite() }
+        card.root.setOnClickListener { addCurrentThemeSuite() }
     }
 
     private fun deleteThemeSuite(suite: ReadMenuThemeSuite) {
@@ -3431,14 +3488,43 @@ class ReadMenu @JvmOverloads constructor(
         updateThemePresetCards()
     }
 
+    fun persistActiveThemeSuiteChange() {
+        if (ReadMenuThemeSuiteStore.updateActiveFromCurrent(context)) {
+            updateThemePresetCards()
+        }
+    }
+
     private fun applyThemePreset(preset: ReadMenuThemePreset) {
         ReadBookConfig.durConfig.setCurBg(preset.bgType, preset.bgValue)
         ReadBookConfig.durConfig.setCurTextColor(preset.textColor)
         ReadBookConfig.textSize = preset.textSize
         ReadBookConfig.textWeight = preset.textWeight
+        ReadBookConfig.textBold = preset.textBold
+        ReadBookConfig.textFont = preset.textFont
+        AppConfig.systemTypefaces = preset.systemTypeface
         ReadBookConfig.letterSpacing = preset.letterSpacing
         ReadBookConfig.lineSpacingExtra = preset.lineSpacingExtra
         ReadBookConfig.paragraphSpacing = preset.paragraphSpacing
+        ReadBookConfig.paddingTop = preset.paddingTop
+        ReadBookConfig.paddingBottom = preset.paddingBottom
+        ReadBookConfig.paddingLeft = preset.paddingLeft
+        ReadBookConfig.paddingRight = preset.paddingRight
+        ReadBookConfig.titleTopSpacing = preset.titleTopSpacing
+        ReadBookConfig.titleBottomSpacing = preset.titleBottomSpacing
+        ReadBookConfig.titleSize = preset.titleSize
+        ReadBookConfig.titleMode = preset.titleMode
+        ReadTipConfig.headerMode = preset.headerMode
+        ReadBookConfig.headerPaddingTop = preset.headerPaddingTop
+        ReadBookConfig.headerPaddingBottom = preset.headerPaddingBottom
+        ReadBookConfig.headerPaddingLeft = preset.headerPaddingLeft
+        ReadBookConfig.headerPaddingRight = preset.headerPaddingRight
+        ReadBookConfig.showHeaderLine = preset.showHeaderLine
+        ReadTipConfig.footerMode = preset.footerMode
+        ReadBookConfig.footerPaddingTop = preset.footerPaddingTop
+        ReadBookConfig.footerPaddingBottom = preset.footerPaddingBottom
+        ReadBookConfig.footerPaddingLeft = preset.footerPaddingLeft
+        ReadBookConfig.footerPaddingRight = preset.footerPaddingRight
+        ReadBookConfig.showFooterLine = preset.showFooterLine
         ReadBookConfig.pageAnim = preset.pageAnim
         ReadBook.book?.setPageAnim(preset.pageAnim)
         AppConfig.pageAnimationSpeed = preset.pageAnimationSpeed
@@ -3456,7 +3542,7 @@ class ReadMenu @JvmOverloads constructor(
         finishThemeSuiteApplied()
     }
 
-    private fun finishThemeSuiteApplied() {
+    private fun finishThemeSuiteApplied(revealSuite: ReadMenuThemeSuite? = null) {
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(1, 2, 5, 6, 9, 11))
         if (AppConfig.readBarStyleFollowPage) {
@@ -3467,24 +3553,33 @@ class ReadMenu @JvmOverloads constructor(
         updateThemeControlsFromConfig()
         updateBackgroundControlsFromConfig()
         updateBackgroundSampleCards()
-        updateThemePresetCards()
+        updateThemePresetCards(revealSuite = revealSuite)
         reset()
         if (activeBottomTab != BottomTab.Theme) {
             showBottomPanel(BottomTab.Theme)
         }
     }
 
-    private fun saveCurrentThemeSuite() {
-        context.alert(R.string.read_menu_theme_save_current) {
+    private fun addCurrentThemeSuite() {
+        val name = context.getString(
+            R.string.read_menu_theme_default_name,
+            ReadMenuThemeSuiteStore.load(context).size + 1
+        )
+        val suite = ReadMenuThemeSuiteStore.captureDefaultPreset(name, themePresets.first())
+        ReadMenuThemeSuiteStore.save(context, suite)
+        ReadMenuThemeSuiteStore.select(context, suite)
+        suite.applyToReader()
+        context.toastOnUi(context.getString(R.string.read_menu_theme_saved, suite.name))
+        finishThemeSuiteApplied(revealSuite = suite)
+    }
+
+    private fun renameThemeSuite(suite: ReadMenuThemeSuite) {
+        context.alert(R.string.read_menu_theme_rename) {
             val alertBinding = DialogEditTextBinding.inflate(LayoutInflater.from(context)).apply {
                 editView.hint = context.getString(R.string.read_menu_theme_save_name)
                 editView.setSingleLine()
-                editView.setText(
-                    context.getString(
-                        R.string.read_menu_theme_default_name,
-                        ReadMenuThemeSuiteStore.load(context).size + 1
-                    )
-                )
+                editView.setText(suite.name)
+                editView.setSelection(0, editView.text?.length ?: 0)
             }
             customView { alertBinding.root }
             okButton {
@@ -3493,9 +3588,9 @@ class ReadMenu @JvmOverloads constructor(
                     context.toastOnUi(R.string.read_menu_theme_empty_name)
                     return@okButton
                 }
-                val suite = ReadMenuThemeSuiteStore.captureCurrent(name)
-                val selectedSuite = ReadMenuThemeSuiteStore.saveOrSelectExisting(context, suite)
-                context.toastOnUi(context.getString(R.string.read_menu_theme_saved, selectedSuite.name))
+                val renamed = ReadMenuThemeSuiteStore.rename(context, suite, name)
+                    ?: return@okButton
+                ReadMenuThemeSuiteStore.select(context, renamed)
                 updateThemePresetCards()
             }
             cancelButton()
@@ -3521,23 +3616,7 @@ class ReadMenu @JvmOverloads constructor(
         ReadBookConfig.save()
         updateFontButtons()
         postEvent(EventBus.UP_CONFIG, arrayListOf(2, 5))
-    }
-
-    private fun setBuiltInFont(assetPath: String) {
-        ReadBookConfig.textFont = BuiltInReadFonts.uri(assetPath)
-        ReadBookConfig.save()
-        updateFontButtons()
-        postEvent(EventBus.UP_CONFIG, arrayListOf(2, 5))
-    }
-
-    private fun isBuiltInFontSelected(assetPath: String): Boolean {
-        return ReadBookConfig.textFont == BuiltInReadFonts.uri(assetPath)
-    }
-
-    private fun builtInTypeface(assetPath: String): Typeface {
-        return runCatching {
-            Typeface.createFromAsset(context.assets, assetPath)
-        }.getOrDefault(Typeface.DEFAULT)
+        persistActiveThemeSuiteChange()
     }
 
     private fun updateFontButtons() = binding.run {
@@ -3632,6 +3711,7 @@ class ReadMenu @JvmOverloads constructor(
                 postEvent(EventBus.UPDATE_READ_ACTION_BAR, true)
             }
             updateBackgroundSampleCards()
+            persistActiveThemeSuiteChange()
             ColorPickerDialog.newBuilder()
                 .setColor(color)
                 .setShowAlphaSlider(false)
@@ -3668,6 +3748,7 @@ class ReadMenu @JvmOverloads constructor(
                 postEvent(EventBus.UPDATE_READ_ACTION_BAR, true)
             }
             updateBackgroundSampleCards()
+            persistActiveThemeSuiteChange()
         }
     }
 
@@ -3727,6 +3808,7 @@ class ReadMenu @JvmOverloads constructor(
         updateLayoutMarginPreview()
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(8, 9, 6))
+        persistActiveThemeSuiteChange()
     }
 
     private fun setTextSize(progress: Int) {
@@ -3736,6 +3818,7 @@ class ReadMenu @JvmOverloads constructor(
         updateLayoutMarginPreview()
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
+        persistActiveThemeSuiteChange()
     }
 
     private fun setLayoutLetterSpacing(progress: Int) = binding.run {
@@ -3746,6 +3829,7 @@ class ReadMenu @JvmOverloads constructor(
         updateLayoutMarginPreview()
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
+        persistActiveThemeSuiteChange()
     }
 
     private fun setLayoutLineSpacing(progress: Int) = binding.run {
@@ -3756,6 +3840,7 @@ class ReadMenu @JvmOverloads constructor(
         updateLayoutMarginPreview()
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
+        persistActiveThemeSuiteChange()
     }
 
     private fun setLayoutParagraphSpacing(progress: Int) = binding.run {
@@ -3766,6 +3851,7 @@ class ReadMenu @JvmOverloads constructor(
         updateLayoutMarginPreview()
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
+        persistActiveThemeSuiteChange()
     }
 
     private fun setLayoutBodyPadding(progress: Int, seekBar: SeekBar, valueView: TextView, setter: (Int) -> Unit) {
@@ -3779,6 +3865,7 @@ class ReadMenu @JvmOverloads constructor(
         updateLayoutMarginPreview()
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(10, 5))
+        persistActiveThemeSuiteChange()
     }
 
     private fun setLayoutTitleSize(progress: Int) = binding.run {
@@ -3791,6 +3878,7 @@ class ReadMenu @JvmOverloads constructor(
         updateLayoutMarginPreview()
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
+        persistActiveThemeSuiteChange()
     }
 
     private fun setLayoutTitleTopSpacing(progress: Int) = binding.run {
@@ -3804,6 +3892,7 @@ class ReadMenu @JvmOverloads constructor(
         updateLayoutMarginPreview()
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
+        persistActiveThemeSuiteChange()
     }
 
     private fun setLayoutTitleBottomSpacing(progress: Int) = binding.run {
@@ -3817,6 +3906,7 @@ class ReadMenu @JvmOverloads constructor(
         updateLayoutMarginPreview()
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(8, 5))
+        persistActiveThemeSuiteChange()
     }
 
     private fun setLayoutTitleMode(mode: Int) {
@@ -3825,6 +3915,7 @@ class ReadMenu @JvmOverloads constructor(
         updateTitleModeButtons()
         updateLayoutMarginPreview()
         postEvent(EventBus.UP_CONFIG, arrayListOf(5))
+        persistActiveThemeSuiteChange()
     }
 
     private fun setLayoutTipPadding(progress: Int, seekBar: SeekBar, valueView: TextView, setter: (Int) -> Unit) {
@@ -3838,6 +3929,7 @@ class ReadMenu @JvmOverloads constructor(
         updateLayoutMarginPreview()
         ReadBookConfig.save()
         postEvent(EventBus.UP_CONFIG, arrayListOf(2))
+        persistActiveThemeSuiteChange()
     }
 
     private fun setHeaderDisplayMode(mode: Int) {
@@ -3845,6 +3937,7 @@ class ReadMenu @JvmOverloads constructor(
         ReadBookConfig.save()
         updateTipSettingValues()
         postEvent(EventBus.UP_CONFIG, arrayListOf(2))
+        persistActiveThemeSuiteChange()
     }
 
     private fun setFooterDisplayMode(mode: Int) {
@@ -3852,6 +3945,7 @@ class ReadMenu @JvmOverloads constructor(
         ReadBookConfig.save()
         updateTipSettingValues()
         postEvent(EventBus.UP_CONFIG, arrayListOf(2))
+        persistActiveThemeSuiteChange()
     }
 
     private fun setHeaderDividerVisible(visible: Boolean) {
@@ -3859,6 +3953,7 @@ class ReadMenu @JvmOverloads constructor(
         ReadBookConfig.save()
         updateTipSettingValues()
         postEvent(EventBus.UP_CONFIG, arrayListOf(2))
+        persistActiveThemeSuiteChange()
     }
 
     private fun setFooterDividerVisible(visible: Boolean) {
@@ -3866,6 +3961,7 @@ class ReadMenu @JvmOverloads constructor(
         ReadBookConfig.save()
         updateTipSettingValues()
         postEvent(EventBus.UP_CONFIG, arrayListOf(2))
+        persistActiveThemeSuiteChange()
     }
 
     private fun bindBackgroundSeek(
@@ -3909,6 +4005,34 @@ class ReadMenu @JvmOverloads constructor(
         return GradientDrawable().apply {
             setColor(color)
             cornerRadius = radius
+            if (strokeWidth > 0) {
+                setStroke(strokeWidth, strokeColor)
+            }
+        }
+    }
+
+    private fun roundedRectCorners(
+        color: Int,
+        radius: Float,
+        topLeft: Boolean,
+        topRight: Boolean,
+        bottomRight: Boolean,
+        bottomLeft: Boolean,
+        strokeWidth: Int = 0,
+        strokeColor: Int = Color.TRANSPARENT
+    ): GradientDrawable {
+        return GradientDrawable().apply {
+            setColor(color)
+            cornerRadii = floatArrayOf(
+                if (topLeft) radius else 0f,
+                if (topLeft) radius else 0f,
+                if (topRight) radius else 0f,
+                if (topRight) radius else 0f,
+                if (bottomRight) radius else 0f,
+                if (bottomRight) radius else 0f,
+                if (bottomLeft) radius else 0f,
+                if (bottomLeft) radius else 0f
+            )
             if (strokeWidth > 0) {
                 setStroke(strokeWidth, strokeColor)
             }
@@ -4416,14 +4540,14 @@ class ReadMenu @JvmOverloads constructor(
             if (ReadBook.isLocalBook) {
                 return@OnClickListener
             }
+            val url = tvChapterUrl.tag as? String ?: return@OnClickListener
             if (AppConfig.readUrlInBrowser) {
-                context.openUrl(tvChapterUrl.text.toString().substringBefore(",{"))
+                context.openUrl(url.substringBefore(",{"))
             } else {
                 Coroutine.async {
                     context.startActivity<WebViewActivity> {
-                        val url = tvChapterUrl.text.toString()
                         val bookSource = ReadBook.bookSource
-                        putExtra("title", tvChapterName.text)
+                        putExtra("title", tvChapterUrl.text)
                         putExtra("url", url)
                         putExtra("sourceOrigin", bookSource?.bookSourceUrl)
                         putExtra("sourceName", bookSource?.bookSourceName)
@@ -4516,10 +4640,12 @@ class ReadMenu @JvmOverloads constructor(
                 .setCustomButton(R.string.btn_default_s) {
                     AppConfig.pageAnimationSpeed = 300
                     updatePageTurnControls()
+                    persistActiveThemeSuiteChange()
                 }
                 .show {
                     AppConfig.pageAnimationSpeed = it
                     updatePageTurnControls()
+                    persistActiveThemeSuiteChange()
                 }
         }
         panelPageVolumeKey.setOnClickListener {
@@ -4551,7 +4677,7 @@ class ReadMenu @JvmOverloads constructor(
                 applyThemePreset(preset)
             }
         }
-        binding.themeCardAdd.root.setOnClickListener { saveCurrentThemeSuite() }
+        binding.themeCardAdd.root.setOnClickListener { addCurrentThemeSuite() }
         fontSampleBindings.forEach { sample ->
             sample.binding.root.setOnClickListener { sample.onClick() }
         }
@@ -4712,24 +4838,28 @@ class ReadMenu @JvmOverloads constructor(
             ReadBookConfig.bgBrightness = it.coerceIn(0, 100)
             ReadBookConfig.save()
             postEvent(EventBus.UP_CONFIG, arrayListOf(1, 3))
+            persistActiveThemeSuiteChange()
         }
         bindBackgroundSeek(seekBackgroundSaturation, tvBackgroundSaturationValue) {
             ReadBookConfig.bgSaturation = it.coerceIn(0, 100)
             ReadBookConfig.save()
             postEvent(EventBus.UP_CONFIG, arrayListOf(1, 3))
+            persistActiveThemeSuiteChange()
         }
         bindBackgroundSeek(seekBackgroundAlpha, tvBackgroundAlphaValue) {
             ReadBookConfig.bgAlpha = it.coerceIn(0, 100)
             ReadBookConfig.save()
             postEvent(EventBus.UP_CONFIG, arrayListOf(3))
+            persistActiveThemeSuiteChange()
         }
         seekThemeFontWeight.setOnSeekBarChangeListener(object : SeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
                 updateThemeFontWeightValue(progress)
-                if (fromUser) setFontWeight(progress)
             }
 
-            override fun onStopTrackingTouch(seekBar: SeekBar) = Unit
+            override fun onStopTrackingTouch(seekBar: SeekBar) {
+                setFontWeight(seekBar.progress)
+            }
         })
         seekThemeTextSize.setOnSeekBarChangeListener(object : SeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
@@ -4747,21 +4877,24 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     fun upBookView() {
-        binding.titleBar.title = ReadBook.curTextChapter?.title ?: ReadBook.book?.name
+        binding.titleBar.title = null
+        binding.titleBar.subtitle = null
+        binding.tvChapterName.text = ReadBook.book?.name.orEmpty()
+        binding.tvChapterName.visible()
+        updateTopBarLoginAction()
         ReadBook.curTextChapter?.let {
-            binding.tvChapterName.text = it.title
-            binding.tvChapterName.visible()
+            binding.tvChapterUrl.text = it.title
             if (!ReadBook.isLocalBook) {
-                binding.tvChapterUrl.text = it.chapter.getAbsoluteURL()
-                binding.tvChapterUrl.visible()
+                binding.tvChapterUrl.tag = it.chapter.getAbsoluteURL()
             } else {
-                binding.tvChapterUrl.gone()
+                binding.tvChapterUrl.tag = null
             }
+            binding.tvChapterUrl.visible()
             upSeekBar()
             binding.tvTocPrevChapter.isEnabled = ReadBook.durChapterIndex != 0
             binding.tvTocNextChapter.isEnabled = ReadBook.durChapterIndex != ReadBook.simulatedChapterSize - 1
         } ?: let {
-            binding.tvChapterName.gone()
+            binding.tvChapterUrl.tag = null
             binding.tvChapterUrl.gone()
         }
     }

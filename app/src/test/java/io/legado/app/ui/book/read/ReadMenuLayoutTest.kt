@@ -398,6 +398,27 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun readerTopBarShowsBookAndChapterInAdditionWithLoginIconAction() {
+        val layout = readMenuLayout()
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+
+        assertTrue(repoFile("app/src/main/res/drawable/ic_lucide_link_2.xml").exists())
+        assertEquals("16sp", layout.elementById("tv_chapter_name").androidAttr("textSize"))
+        assertEquals("12sp", layout.elementById("tv_chapter_url").androidAttr("textSize"))
+        assertEquals("gone", layout.elementById("tv_source_action").androidAttr("visibility"))
+        assertTrue(readMenu.contains("setupTopBarLoginAction()"))
+        assertTrue(readMenu.contains("titleBar.menu.add(0, R.id.menu_login"))
+        assertTrue(readMenu.contains("setIcon(R.drawable.ic_lucide_link_2)"))
+        assertTrue(readMenu.contains("callBack.showLogin()"))
+        assertTrue(readMenu.contains("binding.titleBar.title = null"))
+        assertTrue(readMenu.contains("binding.tvChapterName.text = ReadBook.book?.name.orEmpty()"))
+        assertTrue(readMenu.contains("binding.tvChapterUrl.text = it.title"))
+        assertTrue(readMenu.contains("binding.tvChapterUrl.tag = it.chapter.getAbsoluteURL()"))
+        assertTrue(readMenu.contains("val url = tvChapterUrl.tag as? String ?: return@OnClickListener"))
+        assertFalse(readMenu.contains("binding.titleBar.title = ReadBook.curTextChapter?.title"))
+    }
+
+    @Test
     fun readerNavigationSpacerUsesBookBackground() {
         val activityLayout = parseXml(repoFile("app/src/main/res/layout/activity_book_read.xml"))
         val baseReadActivity = repoFile("app/src/main/java/io/legado/app/ui/book/read/BaseReadBookActivity.kt").readText()
@@ -423,6 +444,16 @@ class ReadMenuLayoutTest {
         assertTrue(baseReadActivity.contains("setNavigationBarColorAuto(navigationColor)"))
         assertFalse(readMenu.contains("fun navigationBarSpacerColor(): Int"))
         assertFalse(readMenu.contains("bottomTabNavigationSurfaceColor"))
+    }
+
+    @Test
+    fun readerPageFooterNavigationSpacerDoesNotAddExtraBottomPadding() {
+        val pageView = repoFile("app/src/main/java/io/legado/app/ui/book/read/page/PageView.kt").readText()
+        val viewExtensions = repoFile("app/src/main/java/io/legado/app/utils/ViewExtensions.kt").readText()
+
+        assertTrue(viewExtensions.contains("fun View.applyNavigationBarPadding("))
+        assertTrue(pageView.contains("binding.vwNavigationBar.applyNavigationBarPadding(extraPaddingDp = 0)"))
+        assertFalse(pageView.contains("binding.vwNavigationBar.applyNavigationBarPadding()"))
     }
 
     @Test
@@ -778,22 +809,20 @@ class ReadMenuLayoutTest {
     @Test
     fun themePresetsAreInSingleHorizontalRow() {
         val layout = readMenuLayout()
+        val layoutXml = repoFile("app/src/main/res/layout/view_read_menu.xml").readText()
         val presetScroller = layout.elementById("hsv_theme_presets")
         val presetRow = layout.elementById("ll_theme_preset_row")
-        val presetCards = listOf(
-            "theme_card_follow_system",
-            "theme_card_dark",
-            "theme_card_paper",
-            "theme_card_eye_green",
-            "theme_card_quiet_blue",
-            "theme_card_night"
-        ).map { id -> layout.elementById(id) }
+        val presetCard = layout.elementById("theme_card_follow_system")
 
         assertEquals("horizontal", presetRow.androidAttr("orientation"))
-        presetCards.forEach { card ->
-            assertTrue(card.hasAncestor(presetRow))
-            assertTrue(card.hasAncestor(presetScroller))
-        }
+        assertTrue(presetCard.hasAncestor(presetRow))
+        assertTrue(presetCard.hasAncestor(presetScroller))
+        assertFalse(layoutXml.contains("theme_card_dark"))
+        assertFalse(layoutXml.contains("theme_card_paper"))
+        assertFalse(layoutXml.contains("theme_card_eye_green"))
+        assertFalse(layoutXml.contains("theme_card_quiet_blue"))
+        assertFalse(layoutXml.contains("theme_card_night"))
+        assertTrue(layoutXml.contains("theme_card_add"))
     }
 
     @Test
@@ -801,7 +830,7 @@ class ReadMenuLayoutTest {
         val layout = readMenuLayout()
         val layoutXml = repoFile("app/src/main/res/layout/view_read_menu.xml").readText()
         val row = layout.elementById("ll_theme_preset_row")
-        val nightCard = layout.elementById("theme_card_night")
+        val defaultCard = layout.elementById("theme_card_follow_system")
         val addCard = layout.elementById("theme_card_add")
 
         assertFalse(layoutXml.contains("ll_theme_tabs"))
@@ -811,11 +840,14 @@ class ReadMenuLayoutTest {
         assertFalse(layoutXml.contains("@string/read_menu_theme_mine"))
         assertFalse(layoutXml.contains("@string/read_menu_theme_save_current"))
         assertFalse(layoutXml.contains("@string/read_menu_theme_eye_mode"))
-        assertTrue(nightCard.isBefore(addCard))
+        assertTrue(defaultCard.hasAncestor(row))
         assertTrue(addCard.hasAncestor(row))
+        assertTrue(defaultCard.isBefore(addCard))
+        assertEquals("96dp", defaultCard.androidAttr("layout_width"))
         assertEquals("96dp", addCard.androidAttr("layout_width"))
-        assertEquals("8dp", nightCard.androidAttr("layout_marginEnd"))
+        assertEquals("8dp", defaultCard.androidAttr("layout_marginEnd"))
         assertEquals("", addCard.androidAttr("layout_marginEnd"))
+        assertEquals(2, row.childElements("include").size)
     }
 
     @Test
@@ -832,6 +864,10 @@ class ReadMenuLayoutTest {
         assertTrue(readMenu.contains("ReadBookConfig.textSize = preset.textSize"))
         assertTrue(readMenu.contains("ReadBookConfig.lineSpacingExtra = preset.lineSpacingExtra"))
         assertTrue(readMenu.contains("ReadBookConfig.paragraphSpacing = preset.paragraphSpacing"))
+        assertTrue(readMenu.contains("ReadBookConfig.paddingTop = preset.paddingTop"))
+        assertTrue(readMenu.contains("ReadBookConfig.titleSize = preset.titleSize"))
+        assertTrue(readMenu.contains("ReadTipConfig.headerMode = preset.headerMode"))
+        assertTrue(readMenu.contains("ReadTipConfig.footerMode = preset.footerMode"))
         assertTrue(readMenu.contains("ReadBookConfig.pageAnim = preset.pageAnim"))
         assertTrue(readMenu.contains("AppConfig.pageAnimationSpeed = preset.pageAnimationSpeed"))
         assertTrue(readMenu.contains("ReadBookConfig.bgBrightness = preset.bgBrightness"))
@@ -848,6 +884,7 @@ class ReadMenuLayoutTest {
     @Test
     fun themeSaveCurrentAndMyThemesHaveReaderSuiteEntryPoints() {
         val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val layoutXml = repoFile("app/src/main/res/layout/view_read_menu.xml").readText()
         val suiteStore = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenuThemeSuite.kt")
 
         assertTrue(suiteStore.exists())
@@ -855,10 +892,10 @@ class ReadMenuLayoutTest {
         assertTrue(suiteStoreText.contains("object ReadMenuThemeSuiteStore"))
         assertTrue(suiteStoreText.contains("fun captureCurrent"))
         assertTrue(suiteStoreText.contains("fun applyToReader"))
-        assertTrue(readMenu.contains("saveCurrentThemeSuite()"))
-        assertTrue(readMenu.contains("bindThemeAddCard("))
-        assertTrue(readMenu.contains("binding.themeCardAdd.root.setOnClickListener"))
-        assertTrue(readMenu.contains("DialogEditTextBinding.inflate"))
+        assertTrue(layoutXml.contains("theme_card_add"))
+        assertTrue(readMenu.contains("binding.themeCardAdd.root.setOnClickListener { addCurrentThemeSuite() }"))
+        assertTrue(readMenu.contains("bindThemeAddCard(binding.themeCardAdd)"))
+        assertFalse(readMenu.contains("private fun saveCurrentThemeSuite()"))
         assertFalse(readMenu.contains("ThemeTab"))
         assertFalse(readMenu.contains("showSavedThemeSuites"))
         assertFalse(readMenu.contains("llThemeTab"))
@@ -870,10 +907,11 @@ class ReadMenuLayoutTest {
         val suiteStore = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenuThemeSuite.kt").readText()
 
         assertTrue(suiteStore.contains("fun matchesCurrentTheme"))
-        assertTrue(readMenu.contains("val currentSuite = ReadMenuThemeSuiteStore.captureCurrent"))
-        assertTrue(readMenu.contains("val needsCurrentCard = selectedPresetIndex == -1 && selectedSavedIndex == -1"))
-        assertTrue(readMenu.contains("currentSuite.takeIf { needsCurrentCard }"))
-        assertTrue(readMenu.contains("ThemeSuiteCard(it, true, false)"))
+        assertTrue(readMenu.contains("val savedSuites = ReadMenuThemeSuiteStore.load(context)"))
+        assertTrue(readMenu.contains("syncThemeSuiteCards(savedThemeCards.size"))
+        assertTrue(readMenu.contains("val selectedPresetIndex = themePresets.indexOfFirst"))
+        assertTrue(readMenu.contains("presetIndex == selectedPresetIndex"))
+        assertFalse(readMenu.contains("val needsCurrentCard"))
         assertTrue(readMenu.contains("bindThemeAddCard(binding.themeCardAdd)"))
     }
 
@@ -881,11 +919,10 @@ class ReadMenuLayoutTest {
     fun themeRailChoosesOnlyOneSelectedThemeCard() {
         val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
 
-        assertTrue(readMenu.contains("val selectedPresetIndex = if (explicitSavedIndex == -1)"))
-        assertTrue(readMenu.contains("val selectedSavedIndex = when"))
+        assertTrue(readMenu.contains("val selectedPresetIndex = themePresets.indexOfFirst"))
         assertTrue(readMenu.contains("presetIndex == selectedPresetIndex"))
         assertTrue(readMenu.contains("savedIndex == selectedSavedIndex"))
-        assertFalse(readMenu.contains("savedSuites.any { it.matchesCurrentTheme() }"))
+        assertTrue(readMenu.contains("if (explicitSavedIndex == -1)"))
     }
 
     @Test
@@ -902,6 +939,20 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun selectedSavedThemeIsUpdatedWhenReaderThemeControlsChange() {
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val suiteStore = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenuThemeSuite.kt").readText()
+        val activity = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt").readText()
+
+        assertTrue(suiteStore.contains("fun updateActiveFromCurrent"))
+        assertTrue(suiteStore.contains("createdAt = active.createdAt"))
+        assertTrue(readMenu.contains("fun persistActiveThemeSuiteChange()"))
+        assertTrue(readMenu.contains("ReadMenuThemeSuiteStore.updateActiveFromCurrent(context)"))
+        assertTrue(readMenu.contains("persistActiveThemeSuiteChange()"))
+        assertTrue(activity.contains("binding.readMenu.persistActiveThemeSuiteChange()"))
+    }
+
+    @Test
     fun themeRailLetsExplicitSavedThemeWinOverMatchingPreset() {
         val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
 
@@ -911,15 +962,16 @@ class ReadMenuLayoutTest {
     }
 
     @Test
-    fun savingDuplicateThemeSelectsExistingThemeInsteadOfCreatingAnotherCard() {
+    fun savingThemeAlwaysCreatesNamedCard() {
         val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
         val suiteStore = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenuThemeSuite.kt").readText()
 
-        assertTrue(suiteStore.contains("fun matchingSuite"))
-        assertTrue(suiteStore.contains("fun saveOrSelectExisting"))
-        assertTrue(suiteStore.contains("load(context).firstOrNull { it.matches(suite) }"))
-        assertTrue(readMenu.contains("ReadMenuThemeSuiteStore.saveOrSelectExisting(context, suite)"))
-        assertFalse(readMenu.contains("ReadMenuThemeSuiteStore.save(context, suite)\n                ReadMenuThemeSuiteStore.select(context, suite)"))
+        assertTrue(suiteStore.contains("fun save(context: Context, suite: ReadMenuThemeSuite)"))
+        assertTrue(suiteStore.contains("suites + suite"))
+        assertTrue(suiteStore.contains("takeLast(MAX_SUITES)"))
+        assertTrue(readMenu.contains("ReadMenuThemeSuiteStore.save(context, suite)"))
+        assertTrue(readMenu.contains("ReadMenuThemeSuiteStore.select(context, suite)"))
+        assertFalse(readMenu.contains("ReadMenuThemeSuiteStore.saveOrSelectExisting(context, suite)"))
     }
 
     @Test
@@ -928,8 +980,9 @@ class ReadMenuLayoutTest {
 
         assertFalse(readMenu.contains("themePresets.any { preset ->"))
         assertFalse(readMenu.contains("ReadMenuThemeSuiteStore.clearSelection(context)\n                    updateThemePresetCards()\n                    return@okButton"))
-        assertTrue(readMenu.contains("val selectedSuite = ReadMenuThemeSuiteStore.saveOrSelectExisting(context, suite)"))
-        assertTrue(readMenu.contains("context.toastOnUi(context.getString(R.string.read_menu_theme_saved, selectedSuite.name))"))
+        assertTrue(readMenu.contains("ReadMenuThemeSuiteStore.save(context, suite)"))
+        assertTrue(readMenu.contains("context.toastOnUi(context.getString(R.string.read_menu_theme_saved, suite.name))"))
+        assertFalse(readMenu.contains("context.alert(R.string.read_menu_theme_save_current)"))
     }
 
     @Test
@@ -948,35 +1001,37 @@ class ReadMenuLayoutTest {
     }
 
     @Test
-    fun selectedSavedThemeShowsDeleteIconAfterCard() {
+    fun savedThemeLongPressShowsTextOnlyRenameAndDeleteActions() {
         val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
         val suiteStore = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenuThemeSuite.kt").readText()
 
-        assertTrue(readMenu.contains("selectedThemeDeleteButton"))
-        assertTrue(readMenu.contains("showSelectedThemeDeleteButton("))
-        assertTrue(readMenu.contains("R.drawable.ic_outline_delete"))
-        assertTrue(readMenu.contains("context.getCompatColor(R.color.error)"))
-        assertFalse(readMenu.contains("imageTintList = ColorStateList.valueOf(context.accentColor)"))
+        assertTrue(readMenu.contains("card.root.setOnLongClickListener"))
+        assertTrue(readMenu.contains("showThemeSuiteActions(suite)"))
+        assertTrue(readMenu.contains("private fun showThemeSuiteActions(suite: ReadMenuThemeSuite)"))
+        assertTrue(readMenu.contains("context.selector(suite.name, actions)"))
+        assertTrue(readMenu.contains("context.getString(R.string.read_menu_theme_rename)"))
+        assertTrue(readMenu.contains("context.getString(R.string.delete)"))
+        assertTrue(readMenu.contains("renameThemeSuite(suite)"))
         assertTrue(readMenu.contains("deleteThemeSuite(suite)"))
-        assertTrue(readMenu.contains("llThemePresetRow.indexOfChild(selectedCard.root) + 1"))
-        assertTrue(readMenu.contains("hsvThemePresets.post"))
-        assertTrue(readMenu.contains("button.right > visibleRight"))
+        assertFalse(readMenu.contains("selectedThemeActionPanel"))
+        assertFalse(readMenu.contains("showSelectedThemeActionPanel("))
+        assertFalse(readMenu.contains("themeActionButton("))
+        assertFalse(readMenu.contains("themeActionPanelBackground("))
+        assertFalse(readMenu.contains("R.drawable.ic_lucide_pencil"))
+        assertFalse(readMenu.contains("R.drawable.ic_lucide_trash_2"))
+        assertFalse(readMenu.contains("width = 96.dpToPx() + actionWidth"))
         assertTrue(suiteStore.contains("fun delete"))
         assertTrue(suiteStore.contains("filterNot { it.createdAt == suite.createdAt }"))
     }
 
     @Test
-    fun selectedSavedThemeDeleteIconRevealsAfterAnimatedSpaceOpens() {
+    fun savedThemeRevealKeepsStandardCardWidthWithoutActionExtension() {
         val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
 
-        assertTrue(readMenu.contains("selectedThemeDeleteButtonAnimator"))
-        assertTrue(readMenu.contains("button.alpha = 0f"))
-        assertTrue(readMenu.contains("button.isEnabled = false"))
-        assertTrue(readMenu.contains("LinearLayout.LayoutParams(0, 70.dpToPx())"))
-        assertTrue(readMenu.contains("ValueAnimator.ofInt(0, 42.dpToPx())"))
-        assertTrue(readMenu.contains("button.animate()"))
-        assertTrue(readMenu.contains(".alpha(1f)"))
-        assertFalse(readMenu.contains("LinearLayout.LayoutParams(42.dpToPx(), 70.dpToPx()).apply"))
+        assertTrue(readMenu.contains("val targetWidth = 96.dpToPx()"))
+        assertTrue(readMenu.contains("ValueAnimator.ofInt(0, targetWidth)"))
+        assertFalse(readMenu.contains("actionPanelWidth"))
+        assertFalse(readMenu.contains("ValueAnimator.ofInt(0, 42.dpToPx())"))
     }
 
     @Test
@@ -992,9 +1047,94 @@ class ReadMenuLayoutTest {
         assertTrue(readMenu.contains("val custom: Boolean"))
         assertTrue(readMenu.contains("savedSuites.mapIndexed { savedIndex, suite ->"))
         assertTrue(readMenu.contains("ThemeSuiteCard(suite, savedIndex == selectedSavedIndex, true)"))
-        assertTrue(readMenu.contains("ThemeSuiteCard(it, true, false)"))
+        assertFalse(readMenu.contains("ThemeSuiteCard(it, true, false)"))
         assertTrue(readMenu.contains("card.tvThemeCardBadge.isVisible = false"))
         assertTrue(readMenu.contains("card.tvThemeCardBadge.isVisible = custom"))
+    }
+
+    @Test
+    fun savingThemeRevealsCardBeforeAddCardAndScrollsRight() {
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val suiteStore = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenuThemeSuite.kt").readText()
+
+        assertTrue(readMenu.contains("llThemePresetRow.indexOfChild(themeCardAdd.root)"))
+        assertTrue(readMenu.contains("llThemePresetRow.addView(card.root, insertIndex)"))
+        assertTrue(readMenu.contains("ReadMenuThemeSuiteStore.captureDefaultPreset"))
+        assertTrue(readMenu.contains("finishThemeSuiteApplied(revealSuite = suite)"))
+        assertTrue(readMenu.contains("suite.applyToReader()"))
+        assertTrue(readMenu.contains("animateThemeSuiteCardReveal"))
+        assertTrue(readMenu.contains("val targetWidth = 96.dpToPx()"))
+        assertTrue(readMenu.contains("ValueAnimator.ofInt(0, targetWidth)"))
+        assertTrue(readMenu.contains("hsvThemePresets.smoothScrollTo(llThemePresetRow.width"))
+        assertTrue(suiteStore.contains("fun captureDefaultPreset(name: String, preset: ReadMenuThemePreset)"))
+        assertTrue(suiteStore.contains("ReadMenuThemeSuite.fromPreset(name, preset)"))
+        assertTrue(suiteStore.contains("fun fromPreset(name: String, preset: ReadMenuThemePreset): ReadMenuThemeSuite"))
+        assertFalse(readMenu.contains("ReadMenuThemeSuiteStore.captureCurrent(name)"))
+    }
+
+    @Test
+    fun savedThemeCardsCanBeRenamedByLongPress() {
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val suiteStore = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenuThemeSuite.kt").readText()
+        val defaultStrings = repoFile("app/src/main/res/values/strings.xml").readText()
+        val zhStrings = repoFile("app/src/main/res/values-zh/strings.xml").readText()
+
+        assertTrue(readMenu.contains("card.root.setOnLongClickListener"))
+        assertTrue(readMenu.contains("renameThemeSuite(suite)"))
+        assertTrue(readMenu.contains("ReadMenuThemeSuiteStore.rename(context, suite, name)"))
+        assertTrue(suiteStore.contains("fun rename(context: Context, suite: ReadMenuThemeSuite, name: String)"))
+        assertTrue(defaultStrings.contains("read_menu_theme_rename"))
+        assertTrue(zhStrings.contains("read_menu_theme_rename"))
+    }
+
+    @Test
+    fun savedThemeSuiteCapturesFullReaderLayoutFontAndTipSettings() {
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val suiteStore = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenuThemeSuite.kt").readText()
+
+        listOf(
+            "textBold",
+            "textFont",
+            "systemTypeface",
+            "paddingTop",
+            "paddingBottom",
+            "paddingLeft",
+            "paddingRight",
+            "titleTopSpacing",
+            "titleBottomSpacing",
+            "titleSize",
+            "titleMode",
+            "headerMode",
+            "headerPaddingTop",
+            "headerPaddingBottom",
+            "headerPaddingLeft",
+            "headerPaddingRight",
+            "showHeaderLine",
+            "footerMode",
+            "footerPaddingTop",
+            "footerPaddingBottom",
+            "footerPaddingLeft",
+            "footerPaddingRight",
+            "showFooterLine"
+        ).forEach { field ->
+            assertTrue("suite should contain $field", suiteStore.contains("val $field"))
+        }
+
+        assertTrue(suiteStore.contains("ReadBookConfig.textFont = textFont.orEmpty()"))
+        assertTrue(suiteStore.contains("AppConfig.systemTypefaces = systemTypeface"))
+        assertTrue(suiteStore.contains("ReadTipConfig.headerMode = headerMode"))
+        assertTrue(suiteStore.contains("ReadTipConfig.footerMode = footerMode"))
+        assertTrue(readMenu.contains("private fun setSystemFont(systemTypeface: Int)"))
+        assertTrue(readMenu.substringAfter("private fun setSystemFont").substringBefore("private fun setBuiltInFont")
+            .contains("persistActiveThemeSuiteChange()"))
+        assertTrue(readMenu.substringAfter("private fun setLayoutBodyPadding").substringBefore("private fun setLayoutTitleSize")
+            .contains("persistActiveThemeSuiteChange()"))
+        assertTrue(readMenu.substringAfter("private fun setLayoutTitleMode").substringBefore("private fun setLayoutTipPadding")
+            .contains("persistActiveThemeSuiteChange()"))
+        assertTrue(readMenu.substringAfter("private fun setHeaderDisplayMode").substringBefore("private fun setFooterDisplayMode")
+            .contains("persistActiveThemeSuiteChange()"))
+        assertTrue(readMenu.substringAfter("private fun setFooterDividerVisible").substringBefore("private fun bindBackgroundSeek")
+            .contains("persistActiveThemeSuiteChange()"))
     }
 
     @Test
@@ -1016,12 +1156,51 @@ class ReadMenuLayoutTest {
     }
 
     @Test
-    fun builtInFontSamplesDoNotExposeSourceHanSerif() {
+    fun builtInFontSamplesAreHiddenAndLargeFontsAreNotPackagedAssets() {
         val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
         val builtInFonts = repoFile("app/src/main/java/io/legado/app/help/config/BuiltInReadFonts.kt").readText()
         val defaultStrings = repoFile("app/src/main/res/values/strings.xml").readText()
         val zhStrings = repoFile("app/src/main/res/values-zh/strings.xml").readText()
+        val movedFontNames = listOf(
+            "source_han_sans_cn_regular.otf",
+            "source_han_sans_sc_vf.otf",
+            "harmonyos_sans_sc_regular.ttf",
+            "harmonyos_sans_sc_thin.ttf",
+            "harmonyos_sans_sc_light.ttf",
+            "harmonyos_sans_sc_medium.ttf",
+            "harmonyos_sans_sc_bold.ttf",
+            "harmonyos_sans_sc_black.ttf",
+            "wenyuan_sans_sc_vf.otf",
+            "mi_sans_vf.ttf",
+            "alimama_fang_yuan_ti_vf.ttf",
+            "lxgw_wenkai_screen.ttf",
+            "lxgw_neo_xihei.ttf",
+            "lxgw_fasmart_gothic.ttf",
+            "lxgw_zhenkai_gb_regular.ttf"
+        )
 
+        listOf(
+            "read_style_font_harmonyos_sans",
+            "read_style_font_sans",
+            "read_style_font_wenyuan_sans_vf",
+            "read_style_font_mi_sans_vf",
+            "read_style_font_alimama_fang_yuan_ti_vf",
+            "read_style_font_lxgw_wenkai_screen",
+            "read_style_font_lxgw_neo_xihei",
+            "read_style_font_lxgw_fasmart_gothic",
+            "read_style_font_lxgw_zhenkai"
+        ).forEach { fontString ->
+            assertFalse(readMenu.contains(fontString))
+        }
+        assertFalse(readMenu.contains("setBuiltInFont("))
+        assertFalse(readMenu.contains("isBuiltInFontSelected("))
+        assertFalse(readMenu.contains("builtInTypeface("))
+        assertFalse(readMenu.contains("BuiltInReadFonts."))
+        movedFontNames.forEach { fontName ->
+            assertFalse(repoFile("app/src/main/assets/font/$fontName").exists())
+            assertTrue(repoFile("app/src/main/nonPackagedAssets/font/$fontName").exists())
+        }
+        assertTrue(repoFile("app/src/main/assets/font/number.ttf").exists())
         assertFalse(readMenu.contains("read_style_font_source"))
         assertFalse(readMenu.contains("SOURCE_HAN_SERIF"))
         assertFalse(builtInFonts.contains("SOURCE_HAN_SERIF"))
@@ -1192,6 +1371,12 @@ class ReadMenuLayoutTest {
         assertTrue(layout.elementById("ll_layout_margin_title_mode").hasAncestor(previewHost))
         assertTrue(layout.elementById("layout_margin_title_size").hasAncestor(previewHost))
         assertTrue(layout.elementById("seek_layout_title_size").hasAncestor(previewHost))
+        assertEquals("76dp", layout.elementById("ll_layout_margin_title_mode").androidAttr("layout_height"))
+        assertEquals("vertical", layout.elementById("ll_layout_margin_title_mode").androidAttr("orientation"))
+        assertTrue(layout.elementById("tv_layout_margin_title_mode_left")
+            .hasAncestor(layout.elementById("layout_margin_title_mode_row_1")))
+        assertTrue(layout.elementById("tv_layout_margin_title_mode_advanced")
+            .hasAncestor(layout.elementById("layout_margin_title_mode_row_2")))
         assertTrue(layout.elementById("layout_text_style_controls").hasAncestor(previewHost))
         assertEquals("@id/layout_margin_adjust_preview_host", layout.elementById("layout_text_style_controls")
             .appAttr("layout_constraintTop_toTopOf"))
@@ -1204,6 +1389,13 @@ class ReadMenuLayoutTest {
         assertTrue(layout.elementById("layout_tip_header_controls").hasAncestor(previewHost))
         assertTrue(layout.elementById("layout_tip_footer_controls").hasAncestor(previewHost))
         assertTrue(layout.elementById("ll_layout_tip_divider_color").hasAncestor(previewHost))
+        assertEquals("72dp", layout.elementById("layout_margin_adjust_overlay").androidAttr("paddingTop"))
+        assertEquals("16dp", layout.elementById("layout_margin_adjust_overlay").androidAttr("paddingBottom"))
+        assertEquals("wrap_content", layout.elementById("layout_tip_divider_section").androidAttr("layout_height"))
+        assertEquals("40dp", layout.elementById("layout_tip_divider_toggle_row").androidAttr("layout_height"))
+        assertEquals("36dp", layout.elementById("tv_layout_header_line_toggle").androidAttr("layout_height"))
+        assertEquals("72dp", layout.elementById("tv_layout_header_line_toggle").androidAttr("layout_width"))
+        assertEquals("46dp", layout.elementById("ll_layout_tip_divider_color").androidAttr("layout_height"))
         assertEquals("LinearLayout", layout.elementById("layout_tip_controls").tagName)
         assertEquals("wrap_content", layout.elementById("layout_tip_controls").androidAttr("layout_height"))
         assertEquals("", layout.elementById("layout_tip_controls").androidAttr("scrollbars"))
@@ -1301,11 +1493,26 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun titleMarginAdjustPopupStacksControlsAwayFromPreview() {
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+
+        assertTrue(readMenu.contains("val useTitleStackLayout = showTitleMode"))
+        assertTrue(readMenu.contains("syncLayoutMarginSpinboxLayout(showHorizontal, useTitleStackLayout)"))
+        assertTrue(readMenu.contains("private fun syncLayoutMarginSpinboxLayout(\n        useBodyCrossLayout: Boolean,\n        useTitleStackLayout: Boolean\n    )"))
+        assertTrue(readMenu.contains("LayoutMarginAdjustMode.Title -> 352.dpToPx()"))
+        assertTrue(readMenu.contains("topToBottom = R.id.layout_margin_spinbox_top"))
+        assertTrue(readMenu.contains("layoutMarginTitleSize.updateLayoutParams<ConstraintLayout.LayoutParams>"))
+        assertTrue(readMenu.contains("topToBottom = R.id.layout_margin_adjust_preview"))
+        assertTrue(readMenu.contains("llLayoutMarginTitleMode.updateLayoutParams<ConstraintLayout.LayoutParams>"))
+    }
+
+    @Test
     fun bodyMarginAdjustPopupReflowsFourSpinboxesAroundPreview() {
         val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
 
-        assertTrue(readMenu.contains("syncLayoutMarginSpinboxLayout(showHorizontal)"))
-        assertTrue(readMenu.contains("private fun syncLayoutMarginSpinboxLayout(useBodyCrossLayout: Boolean)"))
+        assertTrue(readMenu.contains("syncLayoutMarginSpinboxLayout(showHorizontal, useTitleStackLayout)"))
+        assertTrue(readMenu.contains("useBodyCrossLayout: Boolean"))
+        assertTrue(readMenu.contains("useTitleStackLayout: Boolean"))
         assertTrue(readMenu.contains("LayoutMarginAdjustMode.Body -> 300.dpToPx()"))
         assertTrue(readMenu.contains("layoutMarginSpinboxTop.updateLayoutParams<ConstraintLayout.LayoutParams>"))
         assertTrue(readMenu.contains("bottomToTop = R.id.layout_margin_adjust_preview"))
@@ -1354,6 +1561,36 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun fontWeightChangesApplyOnceOnSeekStopAndBuiltInFontsAreCached() {
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val chapterProvider = repoFile("app/src/main/java/io/legado/app/ui/book/read/page/provider/ChapterProvider.kt").readText()
+        val weightListener = readMenu.substringAfter("seekThemeFontWeight.setOnSeekBarChangeListener")
+            .substringBefore("seekThemeTextSize.setOnSeekBarChangeListener")
+
+        assertFalse(weightListener.contains("if (fromUser) setFontWeight(progress)"))
+        assertTrue(weightListener.contains("override fun onStopTrackingTouch(seekBar: SeekBar)"))
+        assertTrue(weightListener.contains("setFontWeight(seekBar.progress)"))
+        assertTrue(chapterProvider.contains("builtInTypefaceCache"))
+        assertTrue(chapterProvider.contains("private fun builtInTypeface(assetPath: String): Typeface"))
+        assertTrue(chapterProvider.contains("BuiltInReadFonts.targetWeight"))
+    }
+
+    @Test
+    fun advancedTitleDialogUsesRoomierSectionsAndActionSpacing() {
+        val dialog = repoFile(
+            "app/src/main/java/io/legado/app/ui/book/read/config/AdvancedTitleConfigDialog.kt"
+        ).readText()
+
+        assertTrue(dialog.contains("(resources.displayMetrics.widthPixels * 0.94f).toInt()"))
+        assertTrue(dialog.contains("(resources.displayMetrics.heightPixels * 0.84f).toInt()"))
+        assertTrue(dialog.contains("setPadding(20.dpToPx(), 16.dpToPx(), 20.dpToPx(), 10.dpToPx())"))
+        assertTrue(dialog.contains("fun sectionGap(heightDp: Int = 8)"))
+        assertTrue(dialog.contains("val actionRow = LinearLayout(context).apply"))
+        assertTrue(dialog.contains("setMargins(0, 0, 8.dpToPx(), 0)"))
+        assertTrue(dialog.contains("setMargins(8.dpToPx(), 0, 0, 0)"))
+    }
+
+    @Test
     fun fontAndLayoutPanelsDoNotExposeTertiaryLayoutTabs() {
         val layoutXml = repoFile("app/src/main/res/layout/view_read_menu.xml").readText()
         val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
@@ -1398,15 +1635,9 @@ class ReadMenuLayoutTest {
     @Test
     fun themePresetCardsFitThreeFullItemsOnPhoneWidth() {
         val layout = readMenuLayout()
-        val cards = listOf(
-            "theme_card_follow_system",
-            "theme_card_dark",
-            "theme_card_paper"
-        ).map { id -> layout.elementById(id) }
+        val card = layout.elementById("theme_card_follow_system")
 
-        cards.forEach { card ->
-            assertEquals("96dp", card.androidAttr("layout_width"))
-        }
+        assertEquals("96dp", card.androidAttr("layout_width"))
     }
 
     @Test

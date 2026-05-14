@@ -21,6 +21,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 import androidx.fragment.app.DialogFragment
 import io.legado.app.R
+import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.ui.widget.dialog.TextDialog
 
 inline fun <reified T : DialogFragment> AppCompatActivity.showDialogFragment(
@@ -118,7 +119,12 @@ fun Activity.setStatusBarColorAuto(
     isTransparent: Boolean,
     fullScreen: Boolean
 ) {
-    val isLightBar = ColorUtils.isColorLight(color)
+    val iconReferenceColor = if (isTransparent && fullScreen) {
+        ThemeStore.backgroundColor(this)
+    } else {
+        color
+    }
+    val isLightBar = ColorUtils.isColorLight(iconReferenceColor)
     if (fullScreen) {
         if (isTransparent) {
             window.statusBarColor = Color.TRANSPARENT

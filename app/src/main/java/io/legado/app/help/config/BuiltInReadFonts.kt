@@ -3,7 +3,6 @@ package io.legado.app.help.config
 object BuiltInReadFonts {
 
     private const val ASSET_PREFIX = "asset://"
-    private const val MAX_SYNTHETIC_STROKE_EM = 0.045f
 
     const val HARMONYOS_SANS_SC = "font/harmonyos_sans_sc_regular.ttf"
     const val HARMONYOS_SANS_SC_THIN = "font/harmonyos_sans_sc_thin.ttf"
@@ -28,91 +27,24 @@ object BuiltInReadFonts {
         val syntheticStrokeEm: Float,
     )
 
-    private data class StaticAsset(
-        val assetPath: String,
-        val weight: Int,
-    )
-
-    private val harmonyWeights = listOf(
-        StaticAsset(HARMONYOS_SANS_SC_THIN, 100),
-        StaticAsset(HARMONYOS_SANS_SC_LIGHT, 300),
-        StaticAsset(HARMONYOS_SANS_SC, 400),
-        StaticAsset(HARMONYOS_SANS_SC_MEDIUM, 500),
-        StaticAsset(HARMONYOS_SANS_SC_BOLD, 700),
-        StaticAsset(HARMONYOS_SANS_SC_BLACK, 900),
-    )
-
-    private val harmonyAliases = harmonyWeights
-        .map { it.assetPath }
-        .toSet()
-
-    private val singleWeightAssets = setOf(
-        LXGW_WENKAI_SCREEN,
-        LXGW_NEO_XIHEI,
-        LXGW_FASMART_GOTHIC,
-        LXGW_ZHENKAI_GB,
-    )
-
     fun uri(assetPath: String): String {
         return "$ASSET_PREFIX$assetPath"
     }
 
     fun assetPath(fontPath: String): String? {
-        return fontPath
-            .takeIf { it.startsWith(ASSET_PREFIX, ignoreCase = true) }
-            ?.substring(ASSET_PREFIX.length)
-            ?.takeIf { it.isNotBlank() }
+        return null
+    }
+
+    fun targetWeight(progress: Int): Int {
+        val value = progress.coerceIn(0, 100)
+        return if (value <= 50) {
+            300 + (value / 50f * 100f).toInt()
+        } else {
+            400 + ((value - 50) / 50f * 500f).toInt()
+        }.coerceIn(300, 900)
     }
 
     fun weightPlan(fontPath: String, targetWeight: Int): WeightPlan? {
-        val assetPath = assetPath(fontPath) ?: fontPath.takeIf { it.startsWith("font/") } ?: return null
-        val weight = targetWeight.coerceIn(100, 900)
-        return when (assetPath) {
-            SOURCE_HAN_SANS_CN,
-            SOURCE_HAN_SANS_SC_VF -> WeightPlan(
-                assetPath = SOURCE_HAN_SANS_SC_VF,
-                variable = true,
-                baseWeight = weight,
-                syntheticStrokeEm = 0f,
-            )
-
-            WEN_YUAN_SANS_SC_VF,
-            MI_SANS_VF,
-            ALIMAMA_FANG_YUAN_TI_VF -> WeightPlan(
-                assetPath = assetPath,
-                variable = true,
-                baseWeight = weight,
-                syntheticStrokeEm = 0f,
-            )
-
-            in harmonyAliases -> {
-                val staticAsset = harmonyWeights
-                    .lastOrNull { it.weight <= weight }
-                    ?: harmonyWeights.first()
-                WeightPlan(
-                    assetPath = staticAsset.assetPath,
-                    variable = false,
-                    baseWeight = staticAsset.weight,
-                    syntheticStrokeEm = syntheticStroke(staticAsset.weight, weight),
-                )
-            }
-
-            in singleWeightAssets -> WeightPlan(
-                assetPath = assetPath,
-                variable = false,
-                baseWeight = 400,
-                syntheticStrokeEm = syntheticStroke(400, weight),
-            )
-
-            else -> null
-        }
-    }
-
-    private fun syntheticStroke(baseWeight: Int, targetWeight: Int): Float {
-        if (targetWeight <= baseWeight) {
-            return 0f
-        }
-        val progress = (targetWeight - baseWeight) / 500f
-        return (progress * MAX_SYNTHETIC_STROKE_EM).coerceIn(0f, MAX_SYNTHETIC_STROKE_EM)
+        return null
     }
 }

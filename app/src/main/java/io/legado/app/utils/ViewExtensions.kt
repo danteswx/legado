@@ -443,11 +443,14 @@ fun View.applyStatusBarPadding(withInitialPadding: Boolean = false) {
     }
 }
 
-fun View.applyNavigationBarPadding(withInitialPadding: Boolean = false) {
+fun View.applyNavigationBarPadding(
+    withInitialPadding: Boolean = false,
+    extraPaddingDp: Int = 12
+) {
     val initialPadding = if (withInitialPadding) bottomPadding else 0
     setOnApplyWindowInsetsListenerCompat { _, windowInsets ->
         val navigationBarHeight = windowInsets.navigationBarHeight
-        val extraPadding = if (navigationBarHeight > 0) 12.dpToPx() else 0
+        val extraPadding = if (navigationBarHeight > 0) extraPaddingDp.coerceAtLeast(0).dpToPx() else 0
         bottomPadding = initialPadding + navigationBarHeight + extraPadding
         windowInsets
     }

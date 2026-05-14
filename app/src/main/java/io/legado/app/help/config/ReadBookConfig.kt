@@ -51,7 +51,8 @@ object ReadBookConfig {
     var durConfig
         get() = getConfig(styleSelect)
         set(value) {
-            configList[styleSelect] = value
+            val index = validStyleIndex()
+            configList[index] = value
             if (shareLayout) {
                 shareConfig = value
             }
@@ -71,7 +72,7 @@ object ReadBookConfig {
 
     @Synchronized
     fun getConfig(index: Int): Config {
-        if (configList.size < 5) {
+        if (configList.isEmpty()) {
             resetAll()
         }
         return configList.getOrNull(index) ?: configList[0]
@@ -88,9 +89,18 @@ object ReadBookConfig {
                 AppLog.put("读取排版配置文件出错", e)
             }
         }
-        (configs ?: DefaultData.readConfigs).let {
+        val defaultConfigs = DefaultData.readConfigs
+        val useBundledDefault = configs?.size != 1
+        (configs?.takeIf { it.size == 1 } ?: defaultConfigs).let {
             configList.clear()
             configList.addAll(it)
+        }
+        if (configList.size == 1) {
+            appCtx.putPrefInt(PreferKey.readStyleSelect, 0)
+            appCtx.putPrefInt(PreferKey.comicStyleSelect, 0)
+            if (useBundledDefault) {
+                appCtx.putPrefBoolean(PreferKey.shareLayout, false)
+            }
         }
     }
 
@@ -105,7 +115,7 @@ object ReadBookConfig {
                 e.printOnDebug()
             }
         }
-        shareConfig = c ?: configList.getOrNull(5) ?: Config()
+        shareConfig = c ?: configList.firstOrNull() ?: Config()
     }
 
     fun upBg(width: Int, height: Int) {
@@ -156,7 +166,7 @@ object ReadBookConfig {
     }
 
     fun deleteDur(): Boolean {
-        if (configList.size > 5) {
+        if (configList.size > 1) {
             val removeIndex = styleSelect
             configList.removeAt(removeIndex)
             if (removeIndex <= readStyleSelect) {
@@ -195,6 +205,10 @@ object ReadBookConfig {
             configList.addAll(it)
             save()
         }
+    }
+
+    private fun validStyleIndex(): Int {
+        return styleSelect.coerceIn(0, (configList.size - 1).coerceAtLeast(0))
     }
 
     //配置写入读取

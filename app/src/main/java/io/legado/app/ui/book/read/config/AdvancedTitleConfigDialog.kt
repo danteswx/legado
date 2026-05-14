@@ -106,8 +106,8 @@ class AdvancedTitleConfigDialog : DialogFragment() {
             setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
             setBackgroundDrawableResource(android.R.color.transparent)
             setLayout(
-                (resources.displayMetrics.widthPixels * 0.92f).toInt(),
-                (resources.displayMetrics.heightPixels * 0.78f).toInt()
+                (resources.displayMetrics.widthPixels * 0.94f).toInt(),
+                (resources.displayMetrics.heightPixels * 0.84f).toInt()
             )
         }
     }
@@ -122,7 +122,7 @@ class AdvancedTitleConfigDialog : DialogFragment() {
 
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(18.dpToPx(), 12.dpToPx(), 18.dpToPx(), 4.dpToPx())
+            setPadding(20.dpToPx(), 16.dpToPx(), 20.dpToPx(), 10.dpToPx())
         }
 
         fun label(text: String) = TextView(context).apply {
@@ -145,6 +145,13 @@ class AdvancedTitleConfigDialog : DialogFragment() {
             setPadding(12.dpToPx(), 8.dpToPx(), 12.dpToPx(), 8.dpToPx())
             textSize = 14f
             setTextColor(ContextCompat.getColor(context, R.color.primaryText))
+        }
+
+        fun sectionGap(heightDp: Int = 8) = View(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                heightDp.dpToPx()
+            )
         }
 
         val scopeGroup = RadioGroup(context).apply {
@@ -251,16 +258,21 @@ class AdvancedTitleConfigDialog : DialogFragment() {
             addView(titleSizeSeekBar, LinearLayout.LayoutParams(0, 40.dpToPx(), 1f))
             addView(titleSizeValue, LinearLayout.LayoutParams(42.dpToPx(), ViewGroup.LayoutParams.WRAP_CONTENT))
         })
+        root.addView(sectionGap(4))
         root.addView(label(getString(R.string.advanced_title_scope_label)))
         root.addView(scopeGroup)
+        root.addView(sectionGap())
         root.addView(label(getString(R.string.advanced_title_rule_label)))
         root.addView(useRegexCheck)
         root.addView(ruleEdit)
+        root.addView(sectionGap())
         root.addView(label(getString(R.string.preview)))
         root.addView(sampleEdit)
         root.addView(preview)
+        root.addView(sectionGap())
         root.addView(label(getString(R.string.advanced_title_height_factor_label)))
         root.addView(heightFactorEdit)
+        root.addView(sectionGap())
         root.addView(LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -316,13 +328,13 @@ class AdvancedTitleConfigDialog : DialogFragment() {
             }
             setBackgroundColor(ContextCompat.getColor(context, R.color.divider))
         })
-        root.addView(LinearLayout(context).apply {
+        val actionRow = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, 10.dpToPx(), 0, 6.dpToPx())
             addView(button(getString(R.string.restore_default)).apply {
                 layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-                (layoutParams as LinearLayout.LayoutParams).marginEnd = 6.dpToPx()
+                (layoutParams as LinearLayout.LayoutParams).setMargins(0, 0, 8.dpToPx(), 0)
                 setOnClickListener {
                     AdvancedTitleConfig.globalRule = AdvancedTitleConfig.SplitRule()
                     AdvancedTitleConfig.lottieJson = null
@@ -344,7 +356,7 @@ class AdvancedTitleConfigDialog : DialogFragment() {
             })
             addView(button(getString(R.string.confirm)).apply {
                 layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-                (layoutParams as LinearLayout.LayoutParams).marginStart = 6.dpToPx()
+                (layoutParams as LinearLayout.LayoutParams).setMargins(8.dpToPx(), 0, 0, 0)
                 setOnClickListener {
                     val rule = buildRule()
                     val json = currentJson.trim()
@@ -371,7 +383,8 @@ class AdvancedTitleConfigDialog : DialogFragment() {
                     dismissAllowingStateLoss()
                 }
             })
-        })
+        }
+        root.addView(actionRow)
 
         updatePreview()
 

@@ -100,7 +100,7 @@ class PageView(context: Context) : FrameLayout(context) {
         if (!isInEditMode) {
             upStyle()
             binding.vwStatusBar.applyStatusBarPadding()
-            binding.vwNavigationBar.applyNavigationBarPadding()
+            binding.vwNavigationBar.applyNavigationBarPadding(extraPaddingDp = 0)
         }
     }
 

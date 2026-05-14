@@ -1846,6 +1846,17 @@
     <string name="image_crop_hint">Move or pinch the image, then confirm</string>
     <string name="theme_image_selected">Selected</string>
     <string name="navigation_bar_sidebar_background">Sidebar wallpaper</string>
+    <string name="cover_collection_manage">Cover collections</string>
+    <string name="cover_collection_select">Use collection</string>
+    <string name="cover_collection_none">None</string>
+    <string name="cover_collection_add">Create collection</string>
+    <string name="cover_collection_import_zip">Import ZIP</string>
+    <string name="cover_collection_import_images">Import images</string>
+    <string name="cover_collection_images_count">%d images</string>
+    <string name="cover_collection_mode">Cover mode</string>
+    <string name="cover_collection_mode_random">Random</string>
+    <string name="cover_collection_mode_sequence">Sequential</string>
+    <string name="cover_collection_name">Collection name</string>
     <string name="color_format_error">Invalid color format</string>
     <string name="unknown">Unknown</string>
     <string name="ai_read_prompt_template">You are the Ask AI assistant inside the reading page. Answer around the current book and selected text. Prioritize explaining the original text, context, character relationships, foreshadowing, or the user question. Do not invent plot details not provided.
@@ -1869,7 +1880,7 @@ Selected text or question:
     <string name="read_style_font_harmonyos_sans">HarmonyOS Sans</string>
     <string name="read_style_font_custom">Custom Font</string>
     <string name="read_style_font_weight">Font weight</string>
-    <string name="read_style_weight_standard">Standard / %d</string>
+    <string name="read_style_weight_standard">Regular / %d</string>
     <string name="read_style_weight_bold">Bold / %d</string>
     <string name="read_style_weight_light">Light / %d</string>
     <string name="read_style_page">Page</string>
@@ -1886,6 +1897,7 @@ Selected text or question:
     <string name="read_menu_theme_save_name">Theme name</string>
     <string name="read_menu_theme_default_name">Reader theme %1$d</string>
     <string name="read_menu_theme_empty_name">Theme name cannot be empty</string>
+    <string name="read_menu_theme_rename">Rename theme</string>
     <string name="read_menu_theme_saved">Saved %1$s</string>
     <string name="read_menu_theme_none_saved">No saved reader themes</string>
     <string name="read_menu_theme_suite_summary">%1$s / %2$s\n%3$s</string>

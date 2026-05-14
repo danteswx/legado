@@ -1740,6 +1740,17 @@
     <string name="image_crop_hint">拖动或双指缩放图片后确认裁剪</string>
     <string name="theme_image_selected">已选择</string>
     <string name="navigation_bar_sidebar_background">侧边栏壁纸</string>
+    <string name="cover_collection_manage">封面图集</string>
+    <string name="cover_collection_select">选用图集</string>
+    <string name="cover_collection_none">无</string>
+    <string name="cover_collection_add">创建图集</string>
+    <string name="cover_collection_import_zip">导入 ZIP</string>
+    <string name="cover_collection_import_images">导入图片</string>
+    <string name="cover_collection_images_count">%d 张图片</string>
+    <string name="cover_collection_mode">封面模式</string>
+    <string name="cover_collection_mode_random">随机</string>
+    <string name="cover_collection_mode_sequence">顺序</string>
+    <string name="cover_collection_name">图集名称</string>
     <string name="color_format_error">颜色格式不正确</string>
     <string name="unknown">未知</string>
     <string name="ai_read_prompt_template">你是阅读页里的问 AI 助手。请围绕当前书籍和选中文本回答，优先解释原文含义、上下文、人物关系、伏笔或用户提问，不要编造未给出的剧情。
@@ -1763,7 +1774,7 @@
     <string name="read_style_font_harmonyos_sans">鸿蒙字体</string>
     <string name="read_style_font_custom">自定义字体</string>
     <string name="read_style_font_weight">字重</string>
-    <string name="read_style_weight_standard">标准 / %d</string>
+    <string name="read_style_weight_standard">常规 / %d</string>
     <string name="read_style_weight_bold">加粗 / %d</string>
     <string name="read_style_weight_light">细体 / %d</string>
     <string name="read_style_page">翻页</string>
@@ -1780,6 +1791,7 @@
     <string name="read_menu_theme_save_name">主题名称</string>
     <string name="read_menu_theme_default_name">阅读主题 %1$d</string>
     <string name="read_menu_theme_empty_name">主题名称不能为空</string>
+    <string name="read_menu_theme_rename">重命名主题</string>
     <string name="read_menu_theme_saved">已保存 %1$s</string>
     <string name="read_menu_theme_none_saved">还没有保存的阅读主题</string>
     <string name="read_menu_theme_suite_summary">%1$s / %2$s\n%3$s</string>
