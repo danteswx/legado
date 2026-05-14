@@ -619,6 +619,12 @@ class ReadView(context: Context, attrs: AttributeSet) :
         callBack.screenOffTimerStart()
     }
 
+    fun previewChapterProgress(pageIndex: Int, pageOffset: Int) {
+        val page = ReadBook.curTextChapter?.getPage(pageIndex) ?: return
+        curPage.previewChapterProgress(page, pageOffset)
+        curPage.setContentDescription(page.text)
+    }
+
     private fun upProgress() {
         curPage.setProgress(pageFactory.curPage)
     }

@@ -81,6 +81,7 @@ object ReadBook : CoroutineScope by MainScope() {
     private val readRecord = ReadRecord()
     private val chapterLoadingJobs = ConcurrentHashMap<Int, Coroutine<*>>()
     private val chapterLayoutKeys = ConcurrentHashMap<Int, String>()
+    private var chapterProgressPageBreak: ChapterProgressPageBreak? = null
     private val prevChapterLoadingLock = Mutex()
     private val curChapterLoadingLock = Mutex()
     private val nextChapterLoadingLock = Mutex()
@@ -93,6 +94,11 @@ object ReadBook : CoroutineScope by MainScope() {
     var webBookProgress: BookProgress? = null
 
     var preDownloadTask: Job? = null
+
+    private data class ChapterProgressPageBreak(
+        val chapterIndex: Int,
+        val position: Int
+    )
     val downloadedChapters = hashSetOf<Int>()
     val downloadFailChapters = hashMapOf<Int, Int>()
     var contentProcessor: ContentProcessor? = null
@@ -243,6 +249,7 @@ object ReadBook : CoroutineScope by MainScope() {
 
     fun clearTextChapter() {
         clearExpiredChapterLoadingJob(true)
+        chapterProgressPageBreak = null
         prevTextChapter = null
         curTextChapter = null
         nextTextChapter = null
@@ -357,6 +364,7 @@ object ReadBook : CoroutineScope by MainScope() {
 
     fun moveToNextChapter(upContent: Boolean, upContentInPlace: Boolean = true): Boolean {
         if (durChapterIndex < simulatedChapterSize - 1) {
+            chapterProgressPageBreak = null
             durChapterPos = 0
             durChapterIndex++
             clearExpiredChapterLoadingJob()
@@ -388,6 +396,7 @@ object ReadBook : CoroutineScope by MainScope() {
         upContentInPlace: Boolean = true
     ): Boolean {
         if (durChapterIndex < simulatedChapterSize - 1) {
+            chapterProgressPageBreak = null
             durChapterPos = 0
             durChapterIndex++
             clearExpiredChapterLoadingJob()
@@ -420,6 +429,7 @@ object ReadBook : CoroutineScope by MainScope() {
         upContentInPlace: Boolean = true
     ): Boolean {
         if (durChapterIndex > 0) {
+            chapterProgressPageBreak = null
             durChapterPos = if (toLast) prevTextChapter?.lastReadLength ?: Int.MAX_VALUE else 0
             durChapterIndex--
             clearExpiredChapterLoadingJob()
@@ -449,6 +459,29 @@ object ReadBook : CoroutineScope by MainScope() {
         }
         curPageChanged()
         saveRead(true)
+    }
+
+    fun commitChapterProgressPosition(position: Int, success: (() -> Unit)? = null) {
+        val textChapter = curTextChapter ?: return
+        val chapterEndPosition = textChapter.lastPage?.let { page ->
+            page.chapterPosition + page.charSize
+        } ?: textChapter.lastReadLength
+        val targetPosition = position.coerceIn(0, chapterEndPosition.coerceAtLeast(0))
+        chapterProgressPageBreak = ChapterProgressPageBreak(durChapterIndex, targetPosition)
+        durChapterPos = targetPosition
+        chapterLoadingJobs[durChapterIndex]?.cancel()
+        removeLoading(durChapterIndex)
+        textChapter.cancelLayout()
+        loadContent(durChapterIndex, upContent = true, resetPageOffset = true) {
+            saveRead(true)
+            success?.invoke()
+        }
+    }
+
+    fun chapterProgressPageBreakPosition(chapterIndex: Int): Int? {
+        return chapterProgressPageBreak
+            ?.takeIf { it.chapterIndex == chapterIndex }
+            ?.position
     }
 
     fun setPageIndex(index: Int) {
@@ -589,7 +622,7 @@ object ReadBook : CoroutineScope by MainScope() {
         }
     }
 
-    private fun currentChapterLayoutKey(): String {
+    private fun currentChapterLayoutKey(chapterIndex: Int? = null): String {
         val paint = ChapterProvider.contentPaint
         val titlePaint = ChapterProvider.titlePaint
         return buildString {
@@ -610,6 +643,9 @@ object ReadBook : CoroutineScope by MainScope() {
             append('|').append(ChapterProvider.titlePaintTextHeight)
             append('|').append(ChapterProvider.lineSpacingExtra)
             append('|').append(ChapterProvider.paragraphSpacing)
+            chapterIndex?.let { index ->
+                append('|').append(chapterProgressPageBreakPosition(index) ?: -1)
+            }
         }
     }
 
@@ -626,7 +662,7 @@ object ReadBook : CoroutineScope by MainScope() {
         resetPageOffset: Boolean = false,
         success: (() -> Unit)? = null
     ) {
-        val layoutKey = currentChapterLayoutKey()
+        val layoutKey = currentChapterLayoutKey(index)
         val cached = textChapter(index - durChapterIndex)
         if (book?.isEpub == true && cached?.isCompleted == true && chapterLayoutKeys[index] == layoutKey) {
             if (upContent) {
@@ -788,7 +824,7 @@ object ReadBook : CoroutineScope by MainScope() {
             val textChapter = ChapterProvider.getTextChapterAsync(
                 this, book, chapter, displayTitle, contents, simulatedChapterSize
             )
-            val layoutKey = currentChapterLayoutKey()
+            val layoutKey = currentChapterLayoutKey(chapter.index)
             when (val offset = chapter.index - durChapterIndex) {
                 0 -> curChapterLoadingLock.withLock {
                     withContext(Main) {
@@ -880,7 +916,7 @@ object ReadBook : CoroutineScope by MainScope() {
             val textChapter = ChapterProvider.getTextChapterAsync(
                 this@ReadBook, book, chapter, displayTitle, contents, simulatedChapterSize
             )
-            val layoutKey = currentChapterLayoutKey()
+            val layoutKey = currentChapterLayoutKey(chapter.index)
             when (val offset = chapter.index - durChapterIndex) {
                 0 -> {
                     curTextChapter?.cancelLayout()

@@ -171,7 +171,8 @@ object ChapterProvider {
             bookContent.sameTitleRemoved,
             bookChapter.isVip,
             bookChapter.isPay,
-            bookContent.effectiveReplaceRules
+            bookContent.effectiveReplaceRules,
+            ReadBook.chapterProgressPageBreakPosition(bookChapter.index)
         ).apply {
             createLayout(scope, book, bookContent)
         }

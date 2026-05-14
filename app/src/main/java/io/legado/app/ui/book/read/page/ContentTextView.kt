@@ -258,6 +258,19 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         invalidateBackgroundHost()
     }
 
+    fun setPageOffset(offset: Int) {
+        val oldOffset = pageOffset
+        val minOffset = if (hasRelativeNextPage()) {
+            -textPage.height.toInt().coerceAtLeast(0)
+        } else {
+            min(0, (ChapterProvider.visibleHeight - textPage.height).toInt())
+        }
+        pageOffset = offset.coerceIn(minOffset, 0)
+        backgroundScrollOffset += pageOffset - oldOffset
+        invalidateBackgroundHost()
+        postInvalidate()
+    }
+
     fun getBackgroundOffset(): Int {
         return backgroundScrollOffset
     }
@@ -936,19 +949,40 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
     }
 
     private fun relativeOffset(relativePos: Int): Float {
-        return when (relativePos) {
-            0 -> pageOffset.toFloat()
-            1 -> pageOffset + textPage.height
-            else -> pageOffset + textPage.height + pageFactory.nextPage.height
+        var offset = pageOffset.toFloat()
+        for (index in 0 until relativePos) {
+            offset += relativePage(index).height
         }
+        return offset
     }
 
     fun relativePage(relativePos: Int): TextPage {
+        if (relativePos > 0 && isDetachedChapterPage()) {
+            return textPage.textChapter.getPage(textPage.index + relativePos)?.removePageAloudSpan()
+                ?: TextPage(title = textPage.title).apply {
+                    textChapter = this@ContentTextView.textPage.textChapter
+                }.format()
+        }
         return when (relativePos) {
             0 -> textPage
             1 -> pageFactory.nextPage
             else -> pageFactory.nextPlusPage
         }
+    }
+
+    private fun hasRelativeNextPage(): Boolean {
+        return if (isDetachedChapterPage()) {
+            textPage.index < textPage.textChapter.lastIndex
+        } else {
+            pageFactory.hasNext()
+        }
+    }
+
+    private fun isDetachedChapterPage(): Boolean {
+        val chapter = textPage.textChapter
+        return chapter.pages.isNotEmpty() &&
+                chapter.getPage(textPage.index) === textPage &&
+                textPage !== pageFactory.curPage
     }
 
     fun setAutoPager(autoPager: AutoPager?) {

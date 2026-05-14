@@ -131,6 +131,8 @@ class TextChapterLayout(
     private val pageAnim = book.getPageAnim()
 
     private var pendingTextPage = TextPage()
+    private val forcedPageBreakPosition = textChapter.forcedPageBreakPosition
+    private var forcedPageBreakApplied = forcedPageBreakPosition == null
 
     private val bookChapter inline get() = textChapter.chapter
     private val displayTitle inline get() = textChapter.title
@@ -2019,6 +2021,11 @@ class TextChapterLayout(
                 textLine.isLeftLine = absStartX < viewWidth / 2
             }
             calcTextLinePosition(textPages, textLine, stringBuilder.length)
+            if (shouldApplyForcedPageBreak(textLine)) {
+                prepareNextPageIfNeed()
+                calcTextLinePosition(textPages, textLine, stringBuilder.length)
+                forcedPageBreakApplied = true
+            }
             stringBuilder.append(lineText)
             textLine.upTopBottom(durY, textHeight, fontMetrics)
             val textPage = pendingTextPage
@@ -2029,6 +2036,18 @@ class TextChapterLayout(
             }
         }
         durY += textHeight * paragraphSpacing / 10f
+    }
+
+    private fun shouldApplyForcedPageBreak(textLine: TextLine): Boolean {
+        val breakPosition = forcedPageBreakPosition ?: return false
+        if (forcedPageBreakApplied || textLine.chapterPosition < breakPosition) {
+            return false
+        }
+        if (pendingTextPage.lines.isEmpty() && stringBuilder.isEmpty()) {
+            forcedPageBreakApplied = true
+            return false
+        }
+        return true
     }
 
     private fun calcTextLinePosition(

@@ -416,6 +416,15 @@ class PageView(context: Context) : FrameLayout(context) {
         binding.contentTextView.setContent(textPage, resetPageOffset)
     }
 
+    fun previewChapterProgress(textPage: TextPage, pageOffset: Int) {
+        currentTextPage = textPage
+        upTipStyle(textPage)
+        upAdvancedTitleLottie(textPage)
+        setProgress(textPage)
+        binding.contentTextView.setContent(textPage, resetBackgroundOffset = false)
+        binding.contentTextView.setPageOffset(pageOffset)
+    }
+
     fun invalidateContentView() {
         binding.contentTextView.invalidate()
     }

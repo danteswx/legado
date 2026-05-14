@@ -215,7 +215,6 @@ class ReadMenu @JvmOverloads constructor(
     }
     private val searchPanelResults = arrayListOf<SearchResult>()
     private var searchPanelJob: Coroutine<List<SearchResult>>? = null
-    private var tocProgressWholeBook: Boolean = false
     private data class FontSample(
         val binding: ViewReadThemeCardBinding,
         val titleRes: Int,
@@ -478,9 +477,6 @@ class ReadMenu @JvmOverloads constructor(
         flExpandedPanel.elevation = 0f
         tvPanelTocCount.setTextColor(textColor)
         taggedText("tv_panel_bookmarks_empty").setTextColor(ColorUtils.adjustAlpha(textColor, 0.62f))
-        tocProgressModeToggle.setTextColor(textColor)
-        tvTocPrevChapter.setTextColor(textColor)
-        tvTocNextChapter.setTextColor(textColor)
         tvPanelSearchTitle.setTextColor(textColor)
         taggedText("tv_panel_aloud_title").setTextColor(textColor)
         taggedText("tv_aloud_prev_chapter").setTextColor(textColor)
@@ -818,26 +814,6 @@ class ReadMenu @JvmOverloads constructor(
                 animateTocPanelTo(if (tocPanelFullscreen) tocDefaultPanelHeight() else tocFullPanelHeight())
             }
         }
-        tocProgressModeToggle.setOnClickListener {
-            tocProgressWholeBook = !tocProgressWholeBook
-            upSeekBar()
-        }
-        tvTocPrevChapter.setOnClickListener { ReadBook.moveToPrevChapter(upContent = true, toLast = false) }
-        tvTocNextChapter.setOnClickListener { ReadBook.moveToNextChapter(true) }
-        seekTocProgress.setOnSeekBarChangeListener(object : SeekBarChangeListener {
-            override fun onStopTrackingTouch(seekBar: SeekBar) {
-                if (tocProgressWholeBook) {
-                    if (seekBar.progress == ReadBook.durChapterIndex) {
-                        return
-                    }
-                    callBack.skipToChapter(seekBar.progress)
-                } else {
-                    ReadBook.skipToPage(seekBar.progress)
-                    setSeekPage(seekBar.progress)
-                    upSeekBar()
-                }
-            }
-        })
         tocDragHandle.setOnTouchListener { _, event ->
             if (activeBottomTab != BottomTab.Toc || !flExpandedPanel.isVisible) {
                 return@setOnTouchListener false
@@ -898,7 +874,6 @@ class ReadMenu @JvmOverloads constructor(
         val showingChapters = tocPanelPage == TocPanelPage.Chapters
         configureTocHeaderTab(taggedText("tv_toc_tab_chapters"), showingChapters)
         configureTocHeaderTab(taggedText("tv_toc_tab_bookmarks"), !showingChapters)
-        tocProgressPanel.gone(!showingChapters)
         rvPanelToc.gone(!showingChapters)
         taggedRecycler("rv_panel_bookmarks").gone(showingChapters)
         taggedText("tv_panel_bookmarks_empty").gone(showingChapters || bookmarkAdapter.itemCount > 0)
@@ -1472,7 +1447,6 @@ class ReadMenu @JvmOverloads constructor(
 
             PreferKey.progressBarBehavior -> {
                 postEvent(EventBus.UP_SEEK_BAR, true)
-                upSeekBar()
             }
 
             PreferKey.noAnimScrollPage -> {
@@ -1722,7 +1696,7 @@ class ReadMenu @JvmOverloads constructor(
 
     private fun tocDefaultMinHeight(): Int = 220.dpToPx()
 
-    private fun bottomTabCollapsedHeight(): Int = 64.dpToPx()
+    private fun bottomTabCollapsedHeight(): Int = 56.dpToPx()
 
     private fun expandedPanelTargetHeight(tab: BottomTab): Int {
         if (tab == BottomTab.Search) {
@@ -2052,8 +2026,8 @@ class ReadMenu @JvmOverloads constructor(
         bottomTabIndicatorContainer.post {
             val itemView = findBottomNavigationItemView(nav, itemId) ?: return@post
             val menuView = nav.getChildAt(0) as? ViewGroup ?: return@post
-            val maxWidth = 68.dpToPx()
-            val minWidth = 52.dpToPx()
+            val maxWidth = 60.dpToPx()
+            val minWidth = 48.dpToPx()
             val targetWidth = minOf(
                 maxWidth,
                 (itemView.width - 12.dpToPx()).coerceAtLeast(minWidth)
@@ -4890,41 +4864,10 @@ class ReadMenu @JvmOverloads constructor(
                 binding.tvChapterUrl.tag = null
             }
             binding.tvChapterUrl.visible()
-            upSeekBar()
-            binding.tvTocPrevChapter.isEnabled = ReadBook.durChapterIndex != 0
-            binding.tvTocNextChapter.isEnabled = ReadBook.durChapterIndex != ReadBook.simulatedChapterSize - 1
         } ?: let {
             binding.tvChapterUrl.tag = null
             binding.tvChapterUrl.gone()
         }
-    }
-
-    fun upSeekBar() {
-        binding.seekTocProgress.apply {
-            val behavior = if (tocProgressWholeBook) "chapter" else AppConfig.progressBarBehavior
-            binding.tocProgressModeToggle.text = if (behavior == "chapter") {
-                context.getString(R.string.read_menu_whole_book)
-            } else {
-                context.getString(R.string.chapter)
-            }
-            when (behavior) {
-                "page" -> {
-                    ReadBook.curTextChapter?.let {
-                        max = it.pageSize.minus(1)
-                        progress = ReadBook.durPageIndex
-                    }
-                }
-
-                "chapter" -> {
-                    max = ReadBook.simulatedChapterSize - 1
-                    progress = ReadBook.durChapterIndex
-                }
-            }
-        }
-    }
-
-    fun setSeekPage(seek: Int) {
-        binding.seekTocProgress.progress = seek
     }
 
     fun setAutoPage(autoPage: Boolean) = binding.run {

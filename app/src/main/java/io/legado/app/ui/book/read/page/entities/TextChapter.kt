@@ -27,7 +27,8 @@ data class TextChapter(
     val isVip: Boolean,
     val isPay: Boolean,
     //起效的替换规则
-    val effectiveReplaceRules: List<ReplaceRule>?
+    val effectiveReplaceRules: List<ReplaceRule>?,
+    val forcedPageBreakPosition: Int? = null
 ) : LayoutProgressListener {
 
     private val textPages = arrayListOf<TextPage>()

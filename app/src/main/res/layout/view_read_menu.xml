@@ -25,7 +25,8 @@
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/title_bar_addition"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="wrap_content"
+            android:layout_marginTop="-6dp">
 
             <TextView
                 android:id="@+id/tv_chapter_name"
@@ -35,7 +36,7 @@
                 android:paddingLeft="10dp"
                 android:paddingRight="10dp"
                 android:singleLine="true"
-                android:textSize="16sp"
+                android:textSize="18sp"
                 android:textStyle="bold"
                 android:visibility="gone"
                 app:layout_constraintLeft_toLeftOf="parent"
@@ -1639,7 +1640,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom"
-            android:layout_marginBottom="64dp"
+            android:layout_marginBottom="56dp"
             android:background="@drawable/bg_read_menu_panel"
             android:clipToPadding="false"
             android:visibility="gone">
@@ -1799,69 +1800,6 @@
                         android:textSize="13sp" />
                 </LinearLayout>
 
-                <LinearLayout
-                    android:id="@+id/toc_progress_panel"
-                    android:layout_width="match_parent"
-                    android:layout_height="52dp"
-                    android:layout_marginTop="6dp"
-                    android:background="@drawable/bg_read_menu_panel_button"
-                    android:clipChildren="false"
-                    android:clipToPadding="false"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingStart="10dp"
-                    android:paddingTop="7dp"
-                    android:paddingEnd="10dp"
-                    android:paddingBottom="7dp">
-
-                    <TextView
-                        android:id="@+id/toc_progress_mode_toggle"
-                        android:layout_width="64dp"
-                        android:layout_height="38dp"
-                        android:background="@drawable/bg_read_menu_panel_button"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:gravity="center"
-                        android:singleLine="true"
-                        android:text="@string/chapter"
-                        android:textSize="12sp" />
-
-                    <TextView
-                        android:id="@+id/tv_toc_prev_chapter"
-                        android:layout_width="60dp"
-                        android:layout_height="36dp"
-                        android:layout_marginStart="6dp"
-                        android:background="@drawable/bg_read_menu_panel_button"
-                        android:clickable="true"
-                        android:enabled="false"
-                        android:focusable="true"
-                        android:gravity="center"
-                        android:singleLine="true"
-                        android:text="@string/previous_chapter"
-                        android:textSize="12sp" />
-
-                    <io.legado.app.lib.theme.view.ThemeSeekBar
-                        android:id="@+id/seek_toc_progress"
-                        android:layout_width="0dp"
-                        android:layout_height="38dp"
-                        android:layout_marginStart="6dp"
-                        android:layout_marginEnd="6dp"
-                        android:layout_weight="1" />
-
-                    <TextView
-                        android:id="@+id/tv_toc_next_chapter"
-                        android:layout_width="60dp"
-                        android:layout_height="36dp"
-                        android:background="@drawable/bg_read_menu_panel_button"
-                        android:clickable="true"
-                        android:enabled="false"
-                        android:focusable="true"
-                        android:gravity="center"
-                        android:singleLine="true"
-                        android:text="@string/next_chapter"
-                        android:textSize="12sp" />
-                </LinearLayout>
-
                 <FrameLayout
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
@@ -1906,6 +1844,7 @@
                         android:textSize="14sp"
                         android:visibility="gone" />
                 </FrameLayout>
+
             </LinearLayout>
 
             <LinearLayout
@@ -3298,7 +3237,7 @@
         <FrameLayout
             android:id="@+id/bottom_tab_bar"
             android:layout_width="match_parent"
-            android:layout_height="64dp"
+            android:layout_height="56dp"
             android:layout_gravity="bottom"
             android:background="@color/transparent"
             android:clipChildren="true"
@@ -3322,10 +3261,10 @@
 
             <FrameLayout
                 android:id="@+id/bottom_tab_indicator_container"
-                android:layout_width="68dp"
-                android:layout_height="52dp"
+                android:layout_width="60dp"
+                android:layout_height="48dp"
                 android:layout_gravity="start|bottom"
-                android:layout_marginBottom="6dp"
+                android:layout_marginBottom="4dp"
                 android:alpha="0"
                 android:background="@drawable/bg_read_menu_tab_selected"
                 android:clickable="false"
@@ -3335,7 +3274,7 @@
             <FrameLayout
                 android:id="@+id/bottom_tab_nav_viewport"
                 android:layout_width="match_parent"
-                android:layout_height="64dp"
+                android:layout_height="56dp"
                 android:layout_gravity="bottom"
                 android:clipChildren="true"
                 android:clipToPadding="true">
@@ -3345,12 +3284,11 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:background="@color/transparent"
-                    android:minHeight="64dp"
+                    android:minHeight="56dp"
                     android:paddingStart="@dimen/read_bottom_nav_horizontal_padding"
                     android:paddingEnd="@dimen/read_bottom_nav_horizontal_padding"
-                    android:translationY="8dp"
                     app:itemIconSize="22dp"
-                    app:labelVisibilityMode="labeled"
+                    app:labelVisibilityMode="selected"
                     app:menu="@menu/read_bottom_primary" />
 
                 <io.legado.app.lib.theme.view.ThemeBottomNavigationVIew
@@ -3358,17 +3296,17 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:background="@color/transparent"
-                    android:minHeight="64dp"
+                    android:minHeight="56dp"
                     android:paddingStart="@dimen/read_bottom_nav_horizontal_padding"
                     android:paddingEnd="@dimen/read_bottom_nav_horizontal_padding"
-                    android:translationY="8dp"
                     android:visibility="invisible"
                     app:itemIconSize="22dp"
-                    app:labelVisibilityMode="labeled"
+                    app:labelVisibilityMode="selected"
                     app:menu="@menu/read_bottom_interface" />
 
             </FrameLayout>
         </FrameLayout>
+
     </FrameLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -115,6 +115,7 @@ import io.legado.app.utils.buildMainHandler
 import io.legado.app.utils.dismissDialogFragment
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getPrefString
+import io.legado.app.utils.gone
 import io.legado.app.utils.hexString
 import io.legado.app.utils.iconItemOnLongClick
 import io.legado.app.utils.invisible
@@ -145,6 +146,7 @@ import androidx.lifecycle.Lifecycle
 import com.script.rhino.runScriptWithContext
 import io.legado.app.model.analyzeRule.AnalyzeUrl.Companion.paramPattern
 import io.legado.app.ui.login.SourceLoginJsExtensions
+import kotlin.math.roundToInt
 
 /**
  * 闃呰鐣岄潰
@@ -255,10 +257,9 @@ class ReadBookActivity : BaseReadBookActivity(),
     private val handler by lazy { buildMainHandler() }
     private val screenOffRunnable by lazy { Runnable { keepScreenOn(false) } }
     private val executor = ReadBook.executor
-    private val upSeekBarThrottle = throttle(200) {
+    private val updateChapterProgressMinimapThrottle = throttle(200) {
         runOnUiThread {
-            upSeekBarProgress()
-            binding.readMenu.upSeekBar()
+            updateChapterProgressMinimap()
         }
     }
 
@@ -278,6 +279,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         binding.cursorLeft.setOnTouchListener(this)
         binding.cursorRight.setOnTouchListener(this)
         binding.readAiPanel.attach(this)
+        bindChapterProgressMinimap()
         window.setBackgroundDrawable(null)
         upScreenTimeOut()
         ReadBook.register(this)
@@ -1083,7 +1085,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         lifecycleScope.launch {
             binding.readView.upContent(relativePosition, resetPageOffset)
             if (relativePosition == 0) {
-                upSeekBarProgress()
+                updateChapterProgressMinimap()
             }
             loadStates = false
             success?.invoke()
@@ -1097,7 +1099,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     ) = withContext(Main.immediate) {
         binding.readView.upContent(relativePosition, resetPageOffset)
         if (relativePosition == 0) {
-            upSeekBarProgress()
+            updateChapterProgressMinimap()
         }
         loadStates = false
     }
@@ -1128,23 +1130,98 @@ class ReadBookActivity : BaseReadBookActivity(),
         pageChanged = true
         binding.readView.onPageChange()
         handler.post {
-            upSeekBarProgress()
+            updateChapterProgressMinimap()
         }
         executor.execute {
             startBackupJob()
         }
     }
 
-    /**
-     * 鏇存柊杩涘害鏉′綅缃?
-     */
-    private fun upSeekBarProgress() {
-        val progress = when (AppConfig.progressBarBehavior) {
-            "page" -> ReadBook.durPageIndex
-            else /* chapter */ -> ReadBook.durChapterIndex
-        }
-        binding.readMenu.setSeekPage(progress)
+    private fun bindChapterProgressMinimap() {
+        binding.chapterProgressMinimap.onProgressChanging = ::previewChapterProgressMinimap
+        binding.chapterProgressMinimap.onProgressChanged = ::commitChapterProgressMinimap
     }
+
+    private fun updateChapterProgressMinimap(show: Boolean = binding.readMenu.isVisible) {
+        val textChapter = ReadBook.curTextChapter
+        val pageCount = textChapter?.pageSize ?: 0
+        if (show && textChapter != null) {
+            binding.chapterProgressMinimap.updateChapter(
+                textChapter.getContent(),
+                pageCount,
+                ReadBook.durPageIndex
+            )
+        } else {
+            binding.chapterProgressMinimap.updateProgress(pageCount, ReadBook.durPageIndex)
+        }
+        binding.chapterProgressMinimap.gone(!show || pageCount <= 1)
+    }
+
+    private fun previewChapterProgressMinimap(ratio: Float) {
+        val target = chapterProgressTarget(ratio) ?: return
+        binding.readView.previewChapterProgress(target.pageIndex, target.pageOffset)
+    }
+
+    private fun commitChapterProgressMinimap(ratio: Float) {
+        val target = chapterProgressTarget(ratio) ?: return
+        ReadBook.commitChapterProgressPosition(target.chapterPosition) {
+            updateChapterProgressMinimap(show = true)
+        }
+    }
+
+    private fun chapterProgressTarget(ratio: Float): ChapterProgressTarget? {
+        val pages = ReadBook.curTextChapter?.pages?.takeIf { it.isNotEmpty() } ?: return null
+        val visibleHeight = ChapterProvider.visibleHeight.toFloat().coerceAtLeast(1f)
+        val totalHeight = pages.sumOf { page ->
+            page.height.toDouble().coerceAtLeast(1.0)
+        }.toFloat()
+        val maxScroll = (totalHeight - visibleHeight).coerceAtLeast(0f)
+        if (maxScroll <= 0f) {
+            val firstPage = pages.first()
+            return ChapterProgressTarget(0, 0, firstPage.chapterPosition)
+        }
+        val scrollTop = maxScroll * ratio.coerceIn(0f, 1f)
+        var beforePage = 0f
+        pages.forEachIndexed { index, page ->
+            val pageHeight = page.height.coerceAtLeast(1f)
+            val afterPage = beforePage + pageHeight
+            if (scrollTop < afterPage || index == pages.lastIndex) {
+                val offsetInPage = (scrollTop - beforePage).coerceIn(0f, pageHeight)
+                val pageOffset = -(scrollTop - beforePage)
+                    .coerceIn(0f, pageHeight)
+                    .roundToInt()
+                return ChapterProgressTarget(
+                    index,
+                    pageOffset,
+                    chapterPositionForMinimapOffset(page, offsetInPage)
+                )
+            }
+            beforePage = afterPage
+        }
+        val lastPage = pages.last()
+        return ChapterProgressTarget(
+            pages.lastIndex,
+            0,
+            lastPage.chapterPosition
+        )
+    }
+
+    private fun chapterPositionForMinimapOffset(page: TextPage, offsetInPage: Float): Int {
+        val targetY = offsetInPage + ChapterProvider.paddingTop
+        return page.lines.firstOrNull { line ->
+            line.lineBottom >= targetY
+        }?.chapterPosition
+            ?: page.lines.lastOrNull()?.let { line ->
+                line.chapterPosition + line.charSize
+            }
+            ?: page.chapterPosition
+    }
+
+    private data class ChapterProgressTarget(
+        val pageIndex: Int,
+        val pageOffset: Int,
+        val chapterPosition: Int
+    )
 
     /**
      * 鏄剧ず鑿滃崟
@@ -1679,15 +1756,17 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     override fun onMenuShow() {
+        updateChapterProgressMinimap(show = true)
         binding.readView.autoPager.pause()
     }
 
     override fun onMenuHide() {
         binding.readView.autoPager.resume()
+        binding.chapterProgressMinimap.gone()
     }
 
     override fun onLayoutPageCompleted(index: Int, page: TextPage) {
-        upSeekBarThrottle.invoke()
+        updateChapterProgressMinimapThrottle.invoke()
         binding.readView.onLayoutPageCompleted(index, page)
     }
 
@@ -1892,7 +1971,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             readMenu.reset()
         }
         observeEvent<Boolean>(EventBus.UP_SEEK_BAR) {
-            readMenu.upSeekBar()
+            updateChapterProgressMinimap()
         }
         observeEvent<Boolean>(EventBus.REFRESH_BOOK_CONTENT) { //涔︽簮js鍑芥暟瑙﹀彂鍒锋柊
             if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
