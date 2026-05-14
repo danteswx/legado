@@ -49,7 +49,6 @@ jobs:
 
   build:
     name: Build
-    needs: book-source-test
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     outputs:
@@ -194,7 +193,9 @@ jobs:
 
   publish:
     name: Publish
-    needs: build
+    needs:
+      - book-source-test
+      - build
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
