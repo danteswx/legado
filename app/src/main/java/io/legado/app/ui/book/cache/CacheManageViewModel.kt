@@ -295,8 +295,7 @@ class CacheManageViewModel(application: Application) : BaseViewModel(application
             }
             val chapters = CacheManifestHelper.toChapters(manifest, cacheBook.bookUrl)
             if (chapters.isNotEmpty()) {
-                appDb.bookChapterDao.delByBook(cacheBook.bookUrl)
-                appDb.bookChapterDao.insert(*chapters.toTypedArray())
+                replaceBookChapters(cacheBook.bookUrl, chapters)
             }
             true
         }
@@ -418,6 +417,13 @@ class CacheManageViewModel(application: Application) : BaseViewModel(application
                     .thenBy { it.book.name }
                     .thenBy { it.sourceName }
             )
+    }
+
+    private fun replaceBookChapters(bookUrl: String, chapters: List<BookChapter>) {
+        appDb.runInTransaction {
+            appDb.bookChapterDao.delByBook(bookUrl)
+            appDb.bookChapterDao.insert(*chapters.toTypedArray())
+        }
     }
 
     private fun buildCacheBookItem(
