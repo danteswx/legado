@@ -134,6 +134,12 @@
                     android:layout_height="wrap_content"
                     android:text="@string/layout_grid6"
                     tools:ignore="TouchTargetSizeCheck" />
+
+                <RadioButton
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/layout_grid7"
+                    tools:ignore="TouchTargetSizeCheck" />
             </RadioGroup>
 
         </LinearLayout>

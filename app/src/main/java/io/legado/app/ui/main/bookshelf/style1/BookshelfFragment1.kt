@@ -23,6 +23,7 @@ import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.ui.main.bookshelf.BaseBookshelfFragment
 import io.legado.app.ui.main.bookshelf.style1.books.BooksFragment
+import io.legado.app.ui.widget.GridColumnsPopup
 import io.legado.app.ui.widget.ModernActionPopup
 import io.legado.app.ui.widget.RoundedTagBarView
 import io.legado.app.utils.applyStatusBarPadding
@@ -55,7 +56,13 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
     private var selectedBookTag = ""
     private val groupBooksCache = hashMapOf<Long, List<Book>>()
     private var currentGroupIndex = 0
+    private var gridColumnsPopup: PopupWindow? = null
     override val groupId: Long get() = selectedGroup?.groupId ?: 0
+
+    private companion object {
+        private const val BOOKSHELF_GRID_COLUMNS_MIN = 2
+        private const val BOOKSHELF_GRID_COLUMNS_MAX = 7
+    }
 
     override val books: List<Book>
         get() {
@@ -81,6 +88,10 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
         }
         binding.btnBookshelfLayoutToggle.setOnClickListener {
             switchBookshelfLayout()
+        }
+        binding.btnBookshelfLayoutToggle.setOnLongClickListener {
+            showBookshelfGridColumnsPopup(it)
+            true
         }
         updateBookshelfLayoutToggleIcon()
         binding.llTitleSelect.setOnClickListener {
@@ -139,6 +150,14 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
         binding.viewPagerBookshelf.swipeEnabled = AppConfig.bottomBarLayoutMode != "sidebar"
     }
 
+    override fun onDestroyView() {
+        gridColumnsPopup?.dismiss()
+        gridColumnsPopup = null
+        groupMenuPopup?.dismiss()
+        groupMenuPopup = null
+        super.onDestroyView()
+    }
+
     @Synchronized
     override fun upGroup(data: List<BookGroup>) {
         if (data.isEmpty()) {
@@ -160,6 +179,26 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
 
     private fun switchBookshelfLayout() {
         AppConfig.bookshelfLayout = if (AppConfig.bookshelfLayout >= 2) 0 else 2
+        updateBookshelfLayoutToggleIcon()
+        activity?.recreate()
+    }
+
+    private fun showBookshelfGridColumnsPopup(anchor: View) {
+        gridColumnsPopup = GridColumnsPopup.show(
+            anchor = anchor,
+            titleRes = R.string.discover_grid_columns,
+            minColumns = BOOKSHELF_GRID_COLUMNS_MIN,
+            maxColumns = BOOKSHELF_GRID_COLUMNS_MAX,
+            initialColumns = AppConfig.bookshelfLayout.coerceAtLeast(BOOKSHELF_GRID_COLUMNS_MIN),
+            previousPopup = gridColumnsPopup,
+            onColumnsChanged = ::setBookshelfGridColumns
+        )
+    }
+
+    private fun setBookshelfGridColumns(columns: Int) {
+        val gridColumns = columns.coerceIn(BOOKSHELF_GRID_COLUMNS_MIN, BOOKSHELF_GRID_COLUMNS_MAX)
+        if (AppConfig.bookshelfLayout == gridColumns) return
+        AppConfig.bookshelfLayout = gridColumns
         updateBookshelfLayoutToggleIcon()
         activity?.recreate()
     }

@@ -53,6 +53,7 @@ import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.login.SourceLoginJsExtensions
 import io.legado.app.ui.main.MainFragmentInterface
 import io.legado.app.ui.widget.DetailSeekBar
+import io.legado.app.ui.widget.GridColumnsPopup
 import io.legado.app.ui.widget.RoundedTagBarView
 import io.legado.app.ui.widget.RowUiDialog
 import io.legado.app.ui.widget.SourceSelectDialog
@@ -116,6 +117,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private var usingModernDiscovery = false
     private var sourceMenuPopup: PopupWindow? = null
     private var tagFilterPopup: PopupWindow? = null
+    private var discoverGridColumnsPopup: PopupWindow? = null
     private var discoverSourceFlowJob: Job? = null
     private var discoverBookshelfFlowJob: Job? = null
     private var discoverLoadJob: Job? = null
@@ -375,6 +377,8 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         sourceMenuPopup = null
         tagFilterPopup?.dismiss()
         tagFilterPopup = null
+        discoverGridColumnsPopup?.dismiss()
+        discoverGridColumnsPopup = null
         discoverSourceFlowJob?.cancel()
         discoverSourceFlowJob = null
         discoverBookshelfFlowJob?.cancel()
@@ -460,6 +464,10 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         binding.btnDiscoverLayoutToggle.setOnClickListener {
             switchDiscoverBookLayout()
         }
+        binding.btnDiscoverLayoutToggle.setOnLongClickListener {
+            showDiscoverGridColumnsPopup(it)
+            true
+        }
         binding.btnDiscoverTagFilter.setOnClickListener {
             showDiscoverSettingsDialog()
         }
@@ -517,6 +525,32 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             DISCOVER_LAYOUT_LIST
         }
         AppConfig.modernDiscoveryLayout = nextStyle
+        applyDiscoverBookLayout()
+    }
+
+    private fun showDiscoverGridColumnsPopup(anchor: View) {
+        discoverGridColumnsPopup = GridColumnsPopup.show(
+            anchor = anchor,
+            titleRes = R.string.discover_grid_columns,
+            minColumns = DISCOVER_GRID_COLUMNS_MIN,
+            maxColumns = DISCOVER_GRID_COLUMNS_MAX,
+            initialColumns = AppConfig.modernDiscoveryGridColumns,
+            previousPopup = discoverGridColumnsPopup,
+            onColumnsChanging = ::updateDiscoverGridColumns,
+            onColumnsChanged = ::updateDiscoverGridColumns
+        )
+    }
+
+    private fun updateDiscoverGridColumns(columns: Int) {
+        val gridColumns = columns.coerceIn(DISCOVER_GRID_COLUMNS_MIN, DISCOVER_GRID_COLUMNS_MAX)
+        val currentStyle = normalizeDiscoverBookLayout(AppConfig.modernDiscoveryLayout)
+        if (AppConfig.modernDiscoveryGridColumns == gridColumns && currentStyle == DISCOVER_LAYOUT_GRID) {
+            return
+        }
+        AppConfig.modernDiscoveryGridColumns = gridColumns
+        if (currentStyle != DISCOVER_LAYOUT_GRID) {
+            AppConfig.modernDiscoveryLayout = DISCOVER_LAYOUT_GRID
+        }
         applyDiscoverBookLayout()
     }
 
@@ -1446,6 +1480,8 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         sourceMenuPopup = null
         tagFilterPopup?.dismiss()
         tagFilterPopup = null
+        discoverGridColumnsPopup?.dismiss()
+        discoverGridColumnsPopup = null
         discoverSourceFlowJob?.cancel()
         discoverSourceFlowJob = null
         discoverBookshelfFlowJob?.cancel()

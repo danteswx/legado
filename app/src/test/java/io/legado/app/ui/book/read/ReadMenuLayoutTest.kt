@@ -177,6 +177,39 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun bookshelfAndDiscoverLayoutTogglesOpenColumnSliderOnLongPress() {
+        val bookshelfFragment = repoFile("app/src/main/java/io/legado/app/ui/main/bookshelf/style1/BookshelfFragment1.kt").readText()
+        val exploreFragment = repoFile("app/src/main/java/io/legado/app/ui/main/explore/ExploreFragment.kt").readText()
+        val sliderPopup = repoFile("app/src/main/java/io/legado/app/ui/widget/GridColumnsPopup.kt").readText()
+        val bookshelfConfig = repoFile("app/src/main/res/layout/dialog_bookshelf_config.xml").readText()
+        val defaultStrings = repoFile("app/src/main/res/values/strings.xml").readText()
+        val zhStrings = repoFile("app/src/main/res/values-zh/strings.xml").readText()
+
+        assertTrue(bookshelfFragment.contains("binding.btnBookshelfLayoutToggle.setOnLongClickListener"))
+        assertTrue(bookshelfFragment.contains("showBookshelfGridColumnsPopup(it)"))
+        assertTrue(bookshelfFragment.contains("GridColumnsPopup.show("))
+        assertTrue(bookshelfFragment.contains("minColumns = BOOKSHELF_GRID_COLUMNS_MIN"))
+        assertTrue(bookshelfFragment.contains("maxColumns = BOOKSHELF_GRID_COLUMNS_MAX"))
+        assertTrue(bookshelfFragment.contains("private const val BOOKSHELF_GRID_COLUMNS_MIN = 2"))
+        assertTrue(bookshelfFragment.contains("private const val BOOKSHELF_GRID_COLUMNS_MAX = 7"))
+
+        assertTrue(exploreFragment.contains("binding.btnDiscoverLayoutToggle.setOnLongClickListener"))
+        assertTrue(exploreFragment.contains("showDiscoverGridColumnsPopup(it)"))
+        assertTrue(exploreFragment.contains("GridColumnsPopup.show("))
+        assertTrue(exploreFragment.contains("minColumns = DISCOVER_GRID_COLUMNS_MIN"))
+        assertTrue(exploreFragment.contains("maxColumns = DISCOVER_GRID_COLUMNS_MAX"))
+
+        assertTrue(sliderPopup.contains("object GridColumnsPopup"))
+        assertTrue(sliderPopup.contains("max = maxColumns - minColumns"))
+        assertTrue(sliderPopup.contains("progress = (initialColumns - minColumns).coerceIn(0, max)"))
+        assertTrue(sliderPopup.contains("valueFormat = { (it + minColumns).toString() }"))
+
+        assertTrue(bookshelfConfig.contains("@string/layout_grid7"))
+        assertTrue(defaultStrings.contains("<string name=\"layout_grid7\">Grid-7</string>"))
+        assertTrue(zhStrings.contains("<string name=\"layout_grid7\">网格七列</string>"))
+    }
+
+    @Test
     fun mangaReaderToolbarUsesCompactLucideActionsMatchingDiscoverIconScale() {
         val mangaMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/MangaMenu.kt").readText()
         val mangaActivity = repoFile("app/src/main/java/io/legado/app/ui/book/manga/ReadMangaActivity.kt").readText()
@@ -238,25 +271,21 @@ class ReadMenuLayoutTest {
         val exploreShowAdapter = repoFile("app/src/main/java/io/legado/app/ui/book/explore/ExploreShowAdapter.kt").readText()
         val appConfig = repoFile("app/src/main/java/io/legado/app/help/config/AppConfig.kt").readText()
         val preferKey = repoFile("app/src/main/java/io/legado/app/constant/PreferKey.kt").readText()
-        val rowUiViewFactory = repoFile("app/src/main/java/io/legado/app/ui/widget/RowUiViewFactory.kt").readText()
         val defaultStrings = repoFile("app/src/main/res/values/strings.xml").readText()
         val zhStrings = repoFile("app/src/main/res/values-zh/strings.xml").readText()
 
         assertTrue(preferKey.contains("const val modernDiscoveryGridColumns = \"modernDiscoveryGridColumns\""))
         assertTrue(appConfig.contains("var modernDiscoveryGridColumns: Int"))
-        assertTrue(appConfig.contains("get() = appCtx.getPrefInt(PreferKey.modernDiscoveryGridColumns, 2).coerceIn(2, 4)"))
-        assertTrue(exploreFragment.contains("private const val DISCOVER_GRID_COLUMNS_SETTING_NAME = \"discover_grid_columns\""))
-        assertTrue(exploreFragment.contains("private val DISCOVER_GRID_COLUMN_VALUES = arrayOf<String?>(\"2\", \"3\", \"4\")"))
-        assertTrue(exploreFragment.contains("name = DISCOVER_GRID_COLUMNS_SETTING_NAME"))
-        assertTrue(exploreFragment.contains("viewName = getString(R.string.discover_grid_columns)"))
-        assertTrue(exploreFragment.contains("AppConfig.modernDiscoveryGridColumns = value.toIntOrNull() ?: return"))
-        assertTrue(exploreFragment.contains("put(DISCOVER_GRID_COLUMNS_SETTING_NAME, AppConfig.modernDiscoveryGridColumns.toString())"))
+        assertTrue(appConfig.contains("get() = appCtx.getPrefInt(PreferKey.modernDiscoveryGridColumns, 2).coerceIn(2, 7)"))
+        assertTrue(appConfig.contains("set(value) = appCtx.putPrefInt(PreferKey.modernDiscoveryGridColumns, value.coerceIn(2, 7))"))
+        assertTrue(exploreFragment.contains("private const val DISCOVER_GRID_COLUMNS_MIN = 2"))
+        assertTrue(exploreFragment.contains("private const val DISCOVER_GRID_COLUMNS_MAX = 7"))
+        assertTrue(exploreFragment.contains("addDiscoverGridColumnsSeekBar"))
         assertTrue(exploreFragment.contains("discoverBookAdapter.gridColumns = AppConfig.modernDiscoveryGridColumns"))
         assertTrue(exploreShowAdapter.contains("var gridColumns: Int = 2"))
         assertTrue(exploreShowAdapter.contains("val isCompact = gridColumns >= 3"))
-        assertTrue(rowUiViewFactory.contains("rowUi.viewName ?: rowUi.name"))
         assertTrue(defaultStrings.contains("<string name=\"discover_grid_columns\">Items per row</string>"))
-        assertTrue(zhStrings.contains("<string name=\"discover_grid_columns\">姣忚鏁伴噺</string>"))
+        assertTrue(zhStrings.contains("<string name=\"discover_grid_columns\">每行数量</string>"))
     }
 
     @Test
