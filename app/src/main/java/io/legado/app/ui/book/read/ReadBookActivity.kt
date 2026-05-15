@@ -105,7 +105,6 @@ import io.legado.app.ui.book.toc.rule.TxtTocRuleDialog
 import io.legado.app.ui.browser.WebViewActivity
 import io.legado.app.ui.dict.DictDialog
 import io.legado.app.ui.file.HandleFileContract
-import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.replace.ReplaceRuleActivity
 import io.legado.app.ui.replace.edit.ReplaceEditActivity
 import io.legado.app.ui.widget.ModernActionPopup
@@ -269,6 +268,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
     }
     private val boundChapterMinimapGlassViewIds = hashSetOf<Int>()
+    private var pendingChapterProgressMinimapLayoutSync = false
 
     //鎭㈠璺宠浆鍓嶈繘搴﹀璇濇鐨勪氦浜掔粨鏋?
     private var confirmRestoreProcess: Boolean? = null
@@ -472,6 +472,8 @@ class ReadBookActivity : BaseReadBookActivity(),
                 }
             }
         }
+        menu.findItem(R.id.menu_login)?.isVisible =
+            onLine && ReadBook.bookSource != null
         lifecycleScope.launch {
             val show = ReadBook.inBookshelf && withContext(IO) {
                 AppWebDav.isOk
@@ -541,6 +543,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             }
 
             R.id.menu_download -> showDownloadDialog()
+            R.id.menu_login -> showLogin()
             R.id.menu_add_bookmark -> addBookmark()
             R.id.menu_simulated_reading -> showSimulatedReading()
             R.id.menu_edit_content -> showDialogFragment(ContentEditDialog())
@@ -1224,10 +1227,47 @@ class ReadBookActivity : BaseReadBookActivity(),
         if (!show || pageCount <= 1) {
             return
         }
+        if (!chapterProgressMinimapMenuChromeReady()) {
+            binding.chapterProgressMinimapPanel.gone()
+            binding.chapterProgressMinimapPanel.post {
+                if (binding.readMenu.isVisible) {
+                    updateChapterProgressMinimap(show = true)
+                }
+            }
+            return
+        }
+        val preservePanelPosition = binding.chapterProgressMinimap.shouldPreservePanelPosition()
         setupChapterMinimapControlGlass()
-        if (!constrainChapterProgressMinimapPanel()) {
+        if (!preservePanelPosition && !constrainChapterProgressMinimapPanel()) {
             binding.chapterProgressMinimapPanel.gone()
         }
+    }
+
+    private fun scheduleChapterProgressMinimapStableSync() {
+        if (pendingChapterProgressMinimapLayoutSync) {
+            return
+        }
+        pendingChapterProgressMinimapLayoutSync = true
+        binding.chapterProgressMinimapPanel.post {
+            binding.chapterProgressMinimapPanel.post {
+                pendingChapterProgressMinimapLayoutSync = false
+                if (binding.readMenu.isVisible &&
+                    binding.chapterProgressMinimapPanel.isVisible &&
+                    !binding.chapterProgressMinimap.shouldPreservePanelPosition()
+                ) {
+                    constrainChapterProgressMinimapPanel()
+                }
+            }
+        }
+    }
+
+    private fun chapterProgressMinimapMenuChromeReady(): Boolean {
+        val topBar = binding.readMenu.findViewById<View>(R.id.title_bar_shell)
+        val bottomBar = binding.readMenu.findViewById<View>(R.id.bottom_menu)
+        return topBar?.isVisible == true &&
+                topBar.height > 0 &&
+                bottomBar?.isVisible == true &&
+                bottomBar.height > 0
     }
 
     private fun constrainChapterProgressMinimapPanel(): Boolean {
@@ -1312,6 +1352,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         val target = chapterProgressTarget(ratio) ?: return
         ReadBook.commitChapterProgressPosition(target.chapterPosition) {
             updateChapterProgressMinimap(show = true)
+            binding.chapterProgressMinimap.pinProgressRatio(ratio)
         }
     }
 
@@ -1587,10 +1628,16 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     override fun showLogin() {
-        ReadBook.bookSource?.let {
-            startActivity<SourceLoginActivity> {
-                putExtra("bookType", BookType.text)
-            }
+        val url = ReadBook.curTextChapter?.chapter?.getAbsoluteURL()
+            ?.takeIf { it.isNotBlank() }
+            ?: return
+        startActivity<WebViewActivity> {
+            val bookSource = ReadBook.bookSource
+            putExtra("title", ReadBook.curTextChapter?.title ?: ReadBook.book?.name)
+            putExtra("url", url)
+            putExtra("sourceOrigin", bookSource?.bookSourceUrl)
+            putExtra("sourceName", bookSource?.bookSourceName)
+            putExtra("sourceType", bookSource?.getSourceType())
         }
     }
 
@@ -1903,6 +1950,7 @@ class ReadBookActivity : BaseReadBookActivity(),
 
     override fun onMenuShow() {
         updateChapterProgressMinimap(show = true)
+        scheduleChapterProgressMinimapStableSync()
         binding.readView.autoPager.pause()
     }
 

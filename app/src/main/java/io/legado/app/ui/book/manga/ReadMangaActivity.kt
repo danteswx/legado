@@ -42,6 +42,7 @@ import io.legado.app.databinding.ViewLoadMoreBinding
 import io.legado.app.help.book.isImage
 import io.legado.app.help.book.removeType
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.source.getSourceType
 import io.legado.app.help.storage.Backup
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.model.ReadManga
@@ -62,6 +63,7 @@ import io.legado.app.ui.book.read.MangaMenu
 import io.legado.app.ui.book.read.ReaderBottomGlassStyle
 import io.legado.app.ui.book.read.ReadBookActivity.Companion.RESULT_DELETED
 import io.legado.app.ui.book.toc.TocActivityResult
+import io.legado.app.ui.browser.WebViewActivity
 import io.legado.app.ui.widget.number.NumberPickerDialog
 import io.legado.app.ui.widget.recycler.LoadMoreView
 import io.legado.app.utils.GSON
@@ -76,6 +78,7 @@ import io.legado.app.utils.getCompatColor
 import io.legado.app.utils.gone
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.showDialogFragment
+import io.legado.app.utils.startActivity
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.toggleSystemBar
 import io.legado.app.utils.viewbindingdelegate.viewBinding
@@ -105,6 +108,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         PagerSnapHelper()
     }
     private val boundMangaMinimapGlassViewIds = hashSetOf<Int>()
+    private var pendingMangaProgressMinimapLayoutSync = false
 
     private lateinit var mMangaFooterConfig: MangaFooterConfig
     private val mLabelBuilder by lazy { StringBuilder() }
@@ -476,10 +480,43 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         if (!show || pageCount <= 1) {
             return
         }
+        if (!mangaProgressMinimapMenuChromeReady()) {
+            binding.mangaProgressMinimapPanel.gone()
+            binding.mangaProgressMinimapPanel.post {
+                if (binding.mangaMenu.isVisible) {
+                    updateMangaProgressMinimap(show = true)
+                }
+            }
+            return
+        }
+        val preservePanelPosition = binding.mangaProgressMinimap.shouldPreservePanelPosition()
         setupMangaMinimapControlGlass()
-        if (!constrainMangaProgressMinimapPanel()) {
+        if (!preservePanelPosition && !constrainMangaProgressMinimapPanel()) {
             binding.mangaProgressMinimapPanel.gone()
         }
+    }
+
+    private fun scheduleMangaProgressMinimapStableSync() {
+        if (pendingMangaProgressMinimapLayoutSync) {
+            return
+        }
+        pendingMangaProgressMinimapLayoutSync = true
+        binding.mangaProgressMinimapPanel.post {
+            binding.mangaProgressMinimapPanel.post {
+                pendingMangaProgressMinimapLayoutSync = false
+                if (binding.mangaMenu.isVisible &&
+                    binding.mangaProgressMinimapPanel.isVisible &&
+                    !binding.mangaProgressMinimap.shouldPreservePanelPosition()
+                ) {
+                    constrainMangaProgressMinimapPanel()
+                }
+            }
+        }
+    }
+
+    private fun mangaProgressMinimapMenuChromeReady(): Boolean {
+        val topBar = binding.mangaMenu.findViewById<View>(R.id.title_bar_shell)
+        return topBar?.isVisible == true && topBar.height > 0
     }
 
     private fun constrainMangaProgressMinimapPanel(): Boolean {
@@ -560,6 +597,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     private fun commitMangaProgressMinimap(ratio: Float) {
         scrollToMangaProgress(ratio, commit = true)
         updateMangaProgressMinimap(show = true)
+        binding.mangaProgressMinimap.pinProgressRatio(ratio)
     }
 
     private fun scrollToMangaProgress(ratio: Float, commit: Boolean) {
@@ -767,6 +805,10 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                 }
             }
 
+            R.id.menu_login -> {
+                showLogin()
+            }
+
             R.id.menu_pre_manga_number -> {
                 showNumberPickerDialog(
                     0,
@@ -925,9 +967,26 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         }
     }
 
+    override fun showLogin() {
+        val url = ReadManga.curMangaChapter?.chapter?.getAbsoluteURL()
+            ?.takeIf { it.isNotBlank() }
+            ?: return
+        startActivity<WebViewActivity> {
+            val bookSource = ReadManga.bookSource
+            putExtra("title", ReadManga.curMangaChapter?.chapter?.title ?: ReadManga.book?.name)
+            putExtra("url", url)
+            putExtra("sourceOrigin", bookSource?.bookSourceUrl)
+            putExtra("sourceName", bookSource?.bookSourceName)
+            putExtra("sourceType", bookSource?.getSourceType())
+        }
+    }
+
     override fun upSystemUiVisibility(menuIsVisible: Boolean) {
         toggleSystemBar(menuIsVisible)
         updateMangaProgressMinimap(menuIsVisible)
+        if (menuIsVisible) {
+            scheduleMangaProgressMinimapStableSync()
+        }
         if (enableAutoScroll) {
             mScrollTimer.isEnabled = !menuIsVisible
         }
@@ -1024,6 +1083,8 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             isVisible = mangaHorizontalScroll && !mangaDisablePageAnim
             isChecked = mangaDisableHorizontalPageSnap || mangaDisablePageAnim
         }
+        menu.findItem(R.id.menu_login)?.isVisible =
+            ReadManga.bookSource != null
         menu.findItem(R.id.menu_gray_manga).isChecked = AppConfig.enableMangaGray
     }
 

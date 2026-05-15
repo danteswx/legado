@@ -6,6 +6,13 @@
 
     <group android:id="@+id/menu_group_on_line">
         <item
+            android:id="@+id/menu_login"
+            android:icon="@drawable/ic_lucide_link_2"
+            android:title="@string/login"
+            android:visible="false"
+            app:showAsAction="always" />
+
+        <item
             android:id="@+id/menu_change_source"
             android:icon="@drawable/ic_lucide_shuffle"
             android:title="@string/change_origin"

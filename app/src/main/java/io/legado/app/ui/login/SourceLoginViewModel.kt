@@ -13,6 +13,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.model.AudioPlay
 import io.legado.app.model.ReadBook
+import io.legado.app.model.ReadManga
 import io.legado.app.model.VideoPlay
 import io.legado.app.utils.toastOnUi
 
@@ -40,6 +41,13 @@ class SourceLoginViewModel(application: Application) : BaseViewModel(application
                     source = AudioPlay.bookSource
                     book = AudioPlay.book
                     chapter = AudioPlay.durChapter
+                }
+
+                BookType.image -> {
+                    source = ReadManga.bookSource
+                    book = ReadManga.book?.also {
+                        chapter = appDb.bookChapterDao.getChapter(it.bookUrl, ReadManga.durChapterIndex)
+                    }
                 }
 
                 BookType.video -> {

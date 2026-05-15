@@ -1091,7 +1091,7 @@ class ReadMenu @JvmOverloads constructor(
 
     private fun updateTopBarLoginAction() = binding.run {
         titleBar.menu.findItem(R.id.menu_login)?.isVisible =
-            !ReadBook.isLocalBook && !ReadBook.bookSource?.loginUrl.isNullOrEmpty()
+            !ReadBook.isLocalBook && ReadBook.bookSource != null
         applyTopBarIconColor()
     }
 

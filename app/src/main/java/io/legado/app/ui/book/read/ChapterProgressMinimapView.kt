@@ -11,6 +11,7 @@ import android.text.TextPaint
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import androidx.core.graphics.ColorUtils
 import io.legado.app.utils.dpToPx
 import kotlin.math.roundToInt
@@ -49,7 +50,10 @@ class ChapterProgressMinimapView @JvmOverloads constructor(
     private var progress: Int = 0
     private var dragRatio: Float? = null
     private var pinnedProgressRatio: Float? = null
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     private var dragThumbTouchOffset = 0f
+    private var dragStartY = 0f
+    private var hasDragged = false
     private var isDragging = false
 
     init {
@@ -75,9 +79,23 @@ class ChapterProgressMinimapView @JvmOverloads constructor(
         invalidate()
     }
 
+    fun pinProgressRatio(progressRatio: Float) {
+        pinnedProgressRatio = progressRatio.coerceIn(0f, 1f)
+        invalidate()
+    }
+
+    fun shouldPreservePanelPosition(): Boolean {
+        return isDragging || pinnedProgressRatio != null
+    }
+
     fun updateProgress(pageCount: Int, progress: Int) {
         val safePageCount = pageCount.coerceAtLeast(0)
         val safeProgress = progress.coerceIn(0, (safePageCount - 1).coerceAtLeast(0))
+        if (!isDragging && pinnedProgressRatio == null &&
+            (this.pageCount != safePageCount || this.progress != safeProgress)
+        ) {
+            pinnedProgressRatio = null
+        }
         if (this.pageCount == safePageCount && this.progress == safeProgress && !isDragging) {
             return
         }
@@ -110,10 +128,12 @@ class ChapterProgressMinimapView @JvmOverloads constructor(
         }
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                if (!beginDrag(event.y)) {
+                    return false
+                }
                 parent.requestDisallowInterceptTouchEvent(true)
                 isPressed = true
                 isDragging = true
-                beginDrag(event.y)
                 return true
             }
 
@@ -123,6 +143,10 @@ class ChapterProgressMinimapView @JvmOverloads constructor(
             }
 
             MotionEvent.ACTION_UP -> {
+                if (!hasDragged) {
+                    finishDrag()
+                    return true
+                }
                 commitDrag(event.y)
                 performClick()
                 return true
@@ -147,21 +171,39 @@ class ChapterProgressMinimapView @JvmOverloads constructor(
         isDragging = false
         dragRatio = null
         dragThumbTouchOffset = 0f
+        dragStartY = 0f
+        hasDragged = false
         invalidate()
     }
 
-    private fun beginDrag(y: Float) {
-        pinnedProgressRatio = null
+    private fun beginDrag(y: Float): Boolean {
         updateTrackRect()
         val thumbHeight = thumbHeight(trackRect.height())
         val travel = (trackRect.height() - thumbHeight).coerceAtLeast(0f)
-        val thumbTop = trackRect.top + travel * progressRatio()
+        val initialRatio = dragRatio ?: pinnedProgressRatio ?: progressRatio()
+        val thumbTop = trackRect.top + travel * initialRatio.coerceIn(0f, 1f)
+        if (!isTouchInsideThumb(y, thumbTop, thumbHeight)) {
+            return false
+        }
         dragThumbTouchOffset = (y - thumbTop).coerceIn(0f, thumbHeight)
-        dragRatio = progressRatio()
+        dragStartY = y
+        hasDragged = false
+        pinnedProgressRatio = null
+        dragRatio = initialRatio
         invalidate()
+        return true
+    }
+
+    private fun isTouchInsideThumb(y: Float, thumbTop: Float, thumbHeight: Float): Boolean {
+        val hitSlop = 10f.dpToPx()
+        return y >= thumbTop - hitSlop && y <= thumbTop + thumbHeight + hitSlop
     }
 
     private fun updateDragFromY(y: Float) {
+        if (!hasDragged && kotlin.math.abs(y - dragStartY) < touchSlop) {
+            return
+        }
+        hasDragged = true
         updateTrackRect()
         val ratio = ratioForY(y)
         dragRatio = ratio

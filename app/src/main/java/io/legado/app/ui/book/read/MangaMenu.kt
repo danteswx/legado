@@ -9,6 +9,7 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.util.AttributeSet
 import android.view.LayoutInflater
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.Animation
@@ -33,7 +34,6 @@ import io.legado.app.ui.browser.WebViewActivity
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.applyStatusBarPadding
 import io.legado.app.utils.activity
-import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.gone
 import io.legado.app.utils.invisible
@@ -54,12 +54,6 @@ class MangaMenu @JvmOverloads constructor(
     }
     private val menuTopOut: Animation by lazy {
         loadAnimation(context, R.anim.anim_readbook_top_out)
-    }
-    private val menuBottomIn: Animation by lazy {
-        loadAnimation(context, R.anim.anim_readbook_bottom_in)
-    }
-    private val menuBottomOut: Animation by lazy {
-        loadAnimation(context, R.anim.anim_readbook_bottom_out)
     }
     private var isMenuOutAnimating = false
     private var bgColor = context.bottomBackground
@@ -90,6 +84,7 @@ class MangaMenu @JvmOverloads constructor(
                 ReadManga.bookSource?.bookSourceName ?: context.getString(R.string.book_source)
             callBack.upSystemUiVisibility(true)
             binding.tvSourceAction.isGone = false
+            updateTopBarLoginAction()
             syncToolbarActionIconSize()
             configureTopBarFrostedGlass()
         }
@@ -116,12 +111,11 @@ class MangaMenu @JvmOverloads constructor(
         val secondaryTextColor = ColorUtils.withAlpha(textColor, 0.78f)
         toolbarIconColor = Color.WHITE
         configureCompactMangaToolbar()
+        setupTopBarLoginAction()
         titleBar.setTextColor(textColor)
         titleBar.setColorFilter(toolbarIconColor)
         tvChapterName.setTextColor(secondaryTextColor)
         tvChapterUrl.setTextColor(secondaryTextColor)
-        tvPre.setTextColor(textColor)
-        tvNext.setTextColor(textColor)
         if (AppConfig.isEInkMode) {
             titleBarGlassView.gone()
             titleBarShellOverlay.gone()
@@ -129,13 +123,11 @@ class MangaMenu @JvmOverloads constructor(
             titleBar.toolbar.background = null
             titleBarAddition.background = null
             llTitleInfo.background = null
-            bottomMenu.setBackgroundResource(R.drawable.bg_eink_border_top)
         } else {
             titleBar.setBackgroundColor(Color.TRANSPARENT)
             titleBar.toolbar.background = null
             titleBarAddition.background = null
             llTitleInfo.background = null
-            bottomMenu.setBackgroundColor(Color.TRANSPARENT)
             configureTopBarFrostedGlass()
         }
         if (AppConfig.showReadTitleBarAddition) {
@@ -146,7 +138,6 @@ class MangaMenu @JvmOverloads constructor(
         /**
          * 确保视图不被导航栏遮挡
          */
-        bottomMenu.applyNavigationBarPadding()
     }
 
     private fun configureCompactMangaToolbar() = binding.run {
@@ -185,6 +176,31 @@ class MangaMenu @JvmOverloads constructor(
     fun refreshMenuColorFilter() {
         toolbarIconColor = Color.WHITE
         binding.titleBar.setColorFilter(toolbarIconColor)
+        syncToolbarActionIconSize()
+    }
+
+    private fun setupTopBarLoginAction() = binding.run {
+        val loginItem = titleBar.menu.findItem(R.id.menu_login)
+            ?: titleBar.menu.add(0, R.id.menu_login, 0, R.string.login).apply {
+                setIcon(R.drawable.ic_lucide_link_2)
+                setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
+            }
+        loginItem.setIcon(R.drawable.ic_lucide_link_2)
+        loginItem.title = context.getString(R.string.login)
+        titleBar.toolbar.setOnMenuItemClickListener { item ->
+            if (item.itemId == R.id.menu_login) {
+                callBack.showLogin()
+                true
+            } else {
+                false
+            }
+        }
+        updateTopBarLoginAction()
+    }
+
+    private fun updateTopBarLoginAction() = binding.run {
+        titleBar.menu.findItem(R.id.menu_login)?.isVisible =
+            ReadManga.bookSource != null
         syncToolbarActionIconSize()
     }
 
@@ -357,10 +373,9 @@ class MangaMenu @JvmOverloads constructor(
         if (this.isVisible) {
             if (anim) {
                 binding.titleBarShell.startAnimation(menuTopOut)
-                binding.bottomMenu.startAnimation(menuBottomOut)
             } else {
-                menuOutListener.onAnimationStart(menuBottomOut)
-                menuOutListener.onAnimationEnd(menuBottomOut)
+                menuOutListener.onAnimationStart(menuTopOut)
+                menuOutListener.onAnimationEnd(menuTopOut)
             }
         }
     }
@@ -368,13 +383,11 @@ class MangaMenu @JvmOverloads constructor(
     fun runMenuIn(anim: Boolean = !AppConfig.isEInkMode) {
         this.visible()
         binding.titleBarShell.visible()
-        binding.bottomMenu.visible()
         if (anim) {
             binding.titleBarShell.startAnimation(menuTopIn)
-            binding.bottomMenu.startAnimation(menuBottomIn)
         } else {
-            menuInListener.onAnimationStart(menuBottomIn)
-            menuInListener.onAnimationEnd(menuBottomIn)
+            menuInListener.onAnimationStart(menuTopIn)
+            menuInListener.onAnimationEnd(menuTopIn)
         }
     }
 
@@ -414,16 +427,11 @@ class MangaMenu @JvmOverloads constructor(
         tvChapterUrl.setOnClickListener(chapterViewClickListener)
         tvChapterUrl.setOnLongClickListener(chapterViewLongClickListener)
 
-        tvNext.setOnClickListener {
-            ReadManga.moveToNextChapter(true)
-        }
-        tvPre.setOnClickListener {
-            ReadManga.moveToPrevChapter(true)
-        }
     }
 
     fun upBookView() = binding.run {
         syncToolbarActionIconSize()
+        updateTopBarLoginAction()
         titleBar.title = null
         tvChapterName.text = ReadManga.book?.name.orEmpty()
         tvChapterName.visible(tvChapterName.text.isNotBlank())
@@ -431,8 +439,6 @@ class MangaMenu @JvmOverloads constructor(
             tvChapterUrl.text = it.chapter.title
             tvChapterUrl.tag = it.chapter.getAbsoluteURL()
             tvChapterUrl.visible()
-            tvPre.isEnabled = ReadManga.durChapterIndex != 0
-            tvNext.isEnabled = ReadManga.durChapterIndex != ReadManga.simulatedChapterSize - 1
         } ?: let {
             tvChapterUrl.tag = null
             tvChapterUrl.gone()
@@ -442,5 +448,6 @@ class MangaMenu @JvmOverloads constructor(
     interface CallBack {
         fun openBookInfoActivity()
         fun upSystemUiVisibility(menuIsVisible: Boolean)
+        fun showLogin()
     }
 }
