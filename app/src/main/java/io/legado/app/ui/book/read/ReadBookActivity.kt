@@ -1150,10 +1150,10 @@ class ReadBookActivity : BaseReadBookActivity(),
     private fun bindChapterProgressMinimap() {
         binding.chapterProgressMinimap.onProgressChanging = ::previewChapterProgressMinimap
         binding.chapterProgressMinimap.onProgressChanged = ::commitChapterProgressMinimap
-        binding.btnChapterMinimapPrevious.setOnClickListener {
+        binding.btnChapterMinimapPrevious.setMinimapChapterNavigationClickListener(binding.tvChapterMinimapPrevious) {
             ReadBook.moveToPrevChapter(upContent = true, toLast = false)
         }
-        binding.btnChapterMinimapNext.setOnClickListener {
+        binding.btnChapterMinimapNext.setMinimapChapterNavigationClickListener(binding.tvChapterMinimapNext) {
             ReadBook.moveToNextChapter(true)
         }
     }

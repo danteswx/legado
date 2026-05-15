@@ -62,6 +62,7 @@ import io.legado.app.ui.book.manga.recyclerview.ScrollTimer
 import io.legado.app.ui.book.read.MangaMenu
 import io.legado.app.ui.book.read.ReaderBottomGlassStyle
 import io.legado.app.ui.book.read.ReadBookActivity.Companion.RESULT_DELETED
+import io.legado.app.ui.book.read.setMinimapChapterNavigationClickListener
 import io.legado.app.ui.book.toc.TocActivityResult
 import io.legado.app.ui.browser.WebViewActivity
 import io.legado.app.ui.widget.number.NumberPickerDialog
@@ -407,10 +408,10 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     private fun bindMangaProgressMinimap() {
         binding.mangaProgressMinimap.onProgressChanging = ::previewMangaProgressMinimap
         binding.mangaProgressMinimap.onProgressChanged = ::commitMangaProgressMinimap
-        binding.btnMangaMinimapPrevious.setOnClickListener {
+        binding.btnMangaMinimapPrevious.setMinimapChapterNavigationClickListener(binding.tvMangaMinimapPrevious) {
             ReadManga.moveToPrevChapter(true)
         }
-        binding.btnMangaMinimapNext.setOnClickListener {
+        binding.btnMangaMinimapNext.setMinimapChapterNavigationClickListener(binding.tvMangaMinimapNext) {
             ReadManga.moveToNextChapter(true)
         }
     }

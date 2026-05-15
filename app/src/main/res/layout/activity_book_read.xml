@@ -50,6 +50,8 @@
         android:layout_height="wrap_content"
         android:layout_gravity="end|top"
         android:layout_marginEnd="8dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         android:gravity="center_horizontal"
         android:orientation="vertical"
         android:visibility="gone">
@@ -67,6 +69,8 @@
             android:layout_width="56dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
             android:gravity="center"
             android:orientation="vertical">
 
@@ -75,8 +79,9 @@
                 android:layout_width="56dp"
                 android:layout_height="32dp"
                 android:clickable="true"
-                android:clipChildren="true"
-                android:clipToOutline="true"
+                android:clipChildren="false"
+                android:clipToOutline="false"
+                android:clipToPadding="false"
                 android:contentDescription="@string/previous_chapter"
                 android:focusable="true">
 
@@ -113,8 +118,9 @@
                 android:layout_height="32dp"
                 android:layout_marginTop="6dp"
                 android:clickable="true"
-                android:clipChildren="true"
-                android:clipToOutline="true"
+                android:clipChildren="false"
+                android:clipToOutline="false"
+                android:clipToPadding="false"
                 android:contentDescription="@string/next_chapter"
                 android:focusable="true">
 
