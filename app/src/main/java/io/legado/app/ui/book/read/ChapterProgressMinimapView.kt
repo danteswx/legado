@@ -48,6 +48,7 @@ class ChapterProgressMinimapView @JvmOverloads constructor(
     private var pageCount: Int = 0
     private var progress: Int = 0
     private var dragRatio: Float? = null
+    private var pinnedProgressRatio: Float? = null
     private var dragThumbTouchOffset = 0f
     private var isDragging = false
 
@@ -61,8 +62,17 @@ class ChapterProgressMinimapView @JvmOverloads constructor(
         if (chapterText != safeContent) {
             chapterText = safeContent
             contentLayout = null
+            pinnedProgressRatio = null
         }
         updateProgress(pageCount, progress)
+    }
+
+    fun clearPinnedProgressRatio() {
+        if (pinnedProgressRatio == null) {
+            return
+        }
+        pinnedProgressRatio = null
+        invalidate()
     }
 
     fun updateProgress(pageCount: Int, progress: Int) {
@@ -141,6 +151,7 @@ class ChapterProgressMinimapView @JvmOverloads constructor(
     }
 
     private fun beginDrag(y: Float) {
+        pinnedProgressRatio = null
         updateTrackRect()
         val thumbHeight = thumbHeight(trackRect.height())
         val travel = (trackRect.height() - thumbHeight).coerceAtLeast(0f)
@@ -162,6 +173,7 @@ class ChapterProgressMinimapView @JvmOverloads constructor(
         updateDragFromY(y)
         val ratio = dragRatio ?: progressRatio()
         progress = pageForRatio(ratio)
+        pinnedProgressRatio = ratio
         finishDrag()
         onProgressChanged?.invoke(ratio)
     }
@@ -238,7 +250,7 @@ class ChapterProgressMinimapView @JvmOverloads constructor(
     private fun drawThumb(canvas: Canvas) {
         val thumbHeight = thumbHeight(trackRect.height())
         val travel = (trackRect.height() - thumbHeight).coerceAtLeast(0f)
-        val ratio = dragRatio ?: progressRatio()
+        val ratio = dragRatio ?: pinnedProgressRatio ?: progressRatio()
         val top = trackRect.top + travel * ratio.coerceIn(0f, 1f)
         thumbRect.set(
             trackRect.left + 2f.dpToPx(),

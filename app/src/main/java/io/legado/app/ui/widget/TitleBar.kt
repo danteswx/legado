@@ -13,6 +13,7 @@ import android.view.View
 import android.widget.ImageView
 import androidx.annotation.ColorInt
 import androidx.annotation.StyleRes
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.appcompat.widget.Toolbar
 import androidx.core.graphics.alpha
 import androidx.core.view.WindowInsetsCompat
@@ -24,6 +25,7 @@ import io.legado.app.lib.theme.elevation
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.transparentNavBar
 import io.legado.app.utils.activity
+import io.legado.app.utils.applyTopBarIconMetrics
 import io.legado.app.utils.setOnApplyWindowInsetsListenerCompat
 import splitties.views.bottomPadding
 import splitties.views.topPadding
@@ -61,6 +63,8 @@ class TitleBar @JvmOverloads constructor(
     private val fitNavigationBar: Boolean
     private val attachToActivity: Boolean
     private val opaque: Boolean
+    private val explicitNavigationIcon: Drawable?
+    private val navigationContentDescription: CharSequence?
 
     init {
         val a = context.obtainStyledAttributes(
@@ -75,9 +79,8 @@ class TitleBar @JvmOverloads constructor(
         fitNavigationBar = a.getBoolean(R.styleable.TitleBar_fitNavigationBar, false)
         opaque = a.getBoolean(R.styleable.TitleBar_opaque, false)
 
-        val navigationIcon = a.getDrawable(R.styleable.TitleBar_navigationIcon)
-        val navigationContentDescription =
-            a.getText(R.styleable.TitleBar_navigationContentDescription)
+        explicitNavigationIcon = a.getDrawable(R.styleable.TitleBar_navigationIcon)
+        navigationContentDescription = a.getText(R.styleable.TitleBar_navigationContentDescription)
         val titleText = a.getString(R.styleable.TitleBar_title)
         val subtitleText = a.getString(R.styleable.TitleBar_subtitle)
 
@@ -88,7 +91,9 @@ class TitleBar @JvmOverloads constructor(
         toolbar = findViewById(R.id.toolbar)
 
         toolbar.apply {
-            navigationIcon?.let {
+            overflowIcon = AppCompatResources.getDrawable(context, R.drawable.ic_lucide_more_vertical)
+
+            explicitNavigationIcon?.let {
                 this.navigationIcon = it
                 this.navigationContentDescription = navigationContentDescription
             }
@@ -157,6 +162,8 @@ class TitleBar @JvmOverloads constructor(
             if (a.hasValue(R.styleable.TitleBar_contentLayout)) {
                 inflate(context, a.getResourceId(R.styleable.TitleBar_contentLayout, 0), this)
             }
+
+            applyTopBarIconMetrics()
         }
 
         if (!isInEditMode) {
@@ -241,6 +248,7 @@ class TitleBar @JvmOverloads constructor(
         toolbar.menu.children.forEach {
             it.icon?.colorFilter = colorFilter
         }
+        toolbar.applyTopBarIconMetrics(color)
     }
 
     override fun setBackgroundColor(color: Int) {
@@ -273,6 +281,18 @@ class TitleBar @JvmOverloads constructor(
             activity?.let {
                 it.setSupportActionBar(toolbar)
                 it.supportActionBar?.setDisplayHomeAsUpEnabled(displayHomeAsUp)
+                if (displayHomeAsUp) {
+                    toolbar.navigationIcon = (
+                        explicitNavigationIcon
+                            ?: AppCompatResources.getDrawable(context, R.drawable.ic_lucide_arrow_left)
+                        )?.mutate()
+                    navigationContentDescription?.let {
+                        toolbar.navigationContentDescription = it
+                    }
+                }
+                toolbar.overflowIcon =
+                    AppCompatResources.getDrawable(context, R.drawable.ic_lucide_more_vertical)
+                toolbar.applyTopBarIconMetrics()
             }
         }
     }

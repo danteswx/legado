@@ -100,7 +100,7 @@
                 android:layout_width="@dimen/bookshelf_title_arrow_size"
                 android:layout_height="@dimen/bookshelf_title_arrow_size"
                 android:contentDescription="@string/bookshelf"
-                android:src="@drawable/ic_arrow_drop_down"
+                android:src="@drawable/ic_lucide_chevron_down"
                 app:tint="@color/primaryText" />
 
         </LinearLayout>

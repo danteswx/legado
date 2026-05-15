@@ -15,67 +15,113 @@
         tools:layout_editor_absoluteX="0dp"
         tools:layout_editor_absoluteY="0dp" />
 
-    <io.legado.app.ui.widget.TitleBar
-        android:id="@+id/title_bar"
-        android:layout_width="match_parent"
+    <FrameLayout
+        android:id="@+id/title_bar_shell"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:theme="?attr/actionBarStyle"
+        android:clipChildren="true"
+        android:clipToPadding="true"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <androidx.constraintlayout.widget.ConstraintLayout
-            android:id="@+id/title_bar_addition"
+        <com.qmdeve.liquidglass.widget.LiquidGlassView
+            android:id="@+id/title_bar_glass_view"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:clickable="false"
+            android:focusable="false" />
+
+        <View
+            android:id="@+id/title_bar_shell_overlay"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:clickable="false"
+            android:focusable="false" />
+
+        <io.legado.app.ui.widget.TitleBar
+            android:id="@+id/title_bar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="-6dp">
+            android:theme="?attr/actionBarStyle"
+            app:opaque="false">
 
-            <TextView
-                android:id="@+id/tv_chapter_name"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:paddingLeft="10dp"
-                android:paddingRight="10dp"
-                android:singleLine="true"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:visibility="gone"
-                app:layout_constraintLeft_toLeftOf="parent"
-                app:layout_constraintRight_toRightOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/title_bar_addition"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/read_top_bar_button_size"
+                android:paddingStart="16dp"
+                android:paddingTop="0dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="0dp">
 
-            <TextView
-                android:id="@+id/tv_chapter_url"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:paddingLeft="10dp"
-                android:paddingRight="10dp"
-                android:singleLine="true"
-                android:textSize="12sp"
-                android:visibility="gone"
-                app:layout_constraintLeft_toLeftOf="parent"
-                app:layout_constraintRight_toRightOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/tv_chapter_name" />
+                <LinearLayout
+                    android:id="@+id/ll_title_info"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="12dp"
+                    android:gravity="center_vertical"
+                    android:minHeight="34dp"
+                    android:orientation="vertical"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toStartOf="@+id/tv_source_action"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintVertical_bias="0.05">
 
-            <io.legado.app.ui.widget.text.AccentBgTextView
-                android:id="@+id/tv_source_action"
-                android:layout_width="wrap_content"
-                android:layout_height="0dp"
-                android:layout_margin="1dp"
-                android:gravity="center"
-                android:maxWidth="120dp"
-                android:paddingLeft="6dp"
-                android:paddingRight="6dp"
-                android:text="@string/book_source"
-                android:visibility="gone"
-                app:layout_constraintBottom_toBottomOf="@+id/tv_chapter_url"
-                app:layout_constraintRight_toRightOf="parent"
-                app:layout_constraintTop_toTopOf="parent"
-                app:radius="2dp" />
+                    <TextView
+                        android:id="@+id/tv_chapter_name"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="middle"
+                        android:includeFontPadding="false"
+                        android:maxLines="1"
+                        android:singleLine="true"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
 
-        </androidx.constraintlayout.widget.ConstraintLayout>
+                    <TextView
+                        android:id="@+id/tv_chapter_url"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:ellipsize="end"
+                        android:includeFontPadding="false"
+                        android:maxLines="1"
+                        android:singleLine="true"
+                        android:textSize="12sp"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
 
-    </io.legado.app.ui.widget.TitleBar>
+                </LinearLayout>
+
+                <io.legado.app.ui.widget.text.AccentBgTextView
+                    android:id="@+id/tv_source_action"
+                    android:layout_width="wrap_content"
+                    android:layout_height="34dp"
+                    android:ellipsize="end"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:maxWidth="120dp"
+                    android:minWidth="64dp"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:text="@string/book_source"
+                    android:textSize="12sp"
+                    app:layout_constraintBottom_toBottomOf="@+id/ll_title_info"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="@+id/ll_title_info"
+                    app:radius="4dp"
+                    tools:visibility="visible" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+        </io.legado.app.ui.widget.TitleBar>
+
+    </FrameLayout>
 
     <FrameLayout
         android:id="@+id/layout_margin_adjust_overlay"
@@ -3287,7 +3333,7 @@
                     android:minHeight="56dp"
                     android:paddingStart="@dimen/read_bottom_nav_horizontal_padding"
                     android:paddingEnd="@dimen/read_bottom_nav_horizontal_padding"
-                    app:itemIconSize="22dp"
+                    app:itemIconSize="@dimen/read_top_bar_icon_size"
                     app:labelVisibilityMode="selected"
                     app:menu="@menu/read_bottom_primary" />
 
@@ -3300,7 +3346,7 @@
                     android:paddingStart="@dimen/read_bottom_nav_horizontal_padding"
                     android:paddingEnd="@dimen/read_bottom_nav_horizontal_padding"
                     android:visibility="invisible"
-                    app:itemIconSize="22dp"
+                    app:itemIconSize="@dimen/read_top_bar_icon_size"
                     app:labelVisibilityMode="selected"
                     app:menu="@menu/read_bottom_interface" />
 

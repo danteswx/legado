@@ -27,6 +27,7 @@ import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.lib.theme.UiCorner
 import io.legado.app.ui.widget.TitleBar
 import io.legado.app.utils.ColorUtils
+import io.legado.app.utils.applyTopBarIconMetrics
 import io.legado.app.utils.applyOpenTint
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.disableAutoFill
@@ -138,6 +139,7 @@ abstract class BaseActivity<VB : ViewBinding>(
     final override fun onCreateOptionsMenu(menu: Menu): Boolean {
         val bool = onCompatCreateOptionsMenu(menu)
         menu.applyTint(this, toolBarTheme)
+        findViewById<TitleBar>(R.id.title_bar)?.toolbar?.applyTopBarIconMetrics()
         return bool
     }
 

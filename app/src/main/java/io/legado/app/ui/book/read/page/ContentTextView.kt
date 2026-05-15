@@ -72,6 +72,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
     private val pageFactory get() = callBack.pageFactory
     private val pageDelegate get() = callBack.pageDelegate
     private var pageOffset = 0
+    private var chapterProgressPreview = false
     private var backgroundScrollOffset = 0
     private var scrollFollowBackgroundDrawable: ScrollFollowBackgroundDrawable? = null
     private var autoPager: AutoPager? = null
@@ -98,6 +99,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
      * 设置内容
      */
     fun setContent(textPage: TextPage, resetBackgroundOffset: Boolean = true) {
+        chapterProgressPreview = false
         if (this.textPage !== textPage) {
             nativeSelectedText = null
             nativeSelectionRect = null
@@ -112,6 +114,16 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         } else {
             invalidate()
         }
+    }
+
+    fun previewChapterProgress(textPage: TextPage, offset: Int) {
+        chapterProgressPreview = true
+        if (this.textPage !== textPage) {
+            nativeSelectedText = null
+            nativeSelectionRect = null
+        }
+        this.textPage = textPage
+        setPageOffset(offset)
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -144,8 +156,9 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
     private fun drawPage(canvas: Canvas) {
         var relativeOffset = relativeOffset(0)
         textPage.draw(this, canvas, relativeOffset)
-        if (callBack.isScroll) {
-            if (!pageFactory.hasNext()) {
+        val drawContinuousPages = callBack.isScroll || chapterProgressPreview
+        if (drawContinuousPages) {
+            if (!hasRelativePage(1)) {
                 nativeSelectionRect?.let { rect ->
                     canvas.drawRect(rect, selectedPaint)
                 }
@@ -154,7 +167,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
             val textPage1 = relativePage(1)
             relativeOffset += textPage.height
             textPage1.draw(this, canvas, relativeOffset)
-            if (pageFactory.hasNextPlus()) {
+            if (hasRelativePage(2)) {
                 relativeOffset += textPage1.height
                 if (relativeOffset < ChapterProvider.visibleHeight) {
                     val textPage2 = relativePage(2)
@@ -253,6 +266,7 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
      * 重置滚动位置
      */
     fun resetPageOffset() {
+        chapterProgressPreview = false
         pageOffset = 0
         backgroundScrollOffset = 0
         invalidateBackgroundHost()
@@ -975,6 +989,18 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
             textPage.index < textPage.textChapter.lastIndex
         } else {
             pageFactory.hasNext()
+        }
+    }
+
+    private fun hasRelativePage(relativePos: Int): Boolean {
+        return if (isDetachedChapterPage()) {
+            textPage.index + relativePos <= textPage.textChapter.lastIndex
+        } else {
+            when (relativePos) {
+                1 -> pageFactory.hasNext()
+                2 -> pageFactory.hasNextPlus()
+                else -> relativePos == 0
+            }
         }
     }
 

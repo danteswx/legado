@@ -79,7 +79,7 @@
                             android:layout_width="@dimen/bookshelf_title_arrow_size"
                             android:layout_height="@dimen/bookshelf_title_arrow_size"
                             android:contentDescription="@string/discovery"
-                            android:src="@drawable/ic_arrow_drop_down"
+                            android:src="@drawable/ic_lucide_chevron_down"
                             app:tint="@color/primaryText" />
 
                     </LinearLayout>
@@ -97,7 +97,7 @@
                         android:contentDescription="@string/search"
                         android:padding="@dimen/discover_top_action_button_padding"
                         android:scaleType="centerInside"
-                        android:src="@drawable/ic_search"
+                        android:src="@drawable/ic_lucide_search"
                         android:tint="@color/primaryText"
                         android:visibility="gone" />
 
@@ -143,7 +143,7 @@
                         android:contentDescription="@string/login"
                         android:padding="@dimen/discover_top_action_button_padding"
                         android:scaleType="centerInside"
-                        android:src="@drawable/ic_bottom_person"
+                        android:src="@drawable/ic_lucide_link_2"
                         android:tint="@color/primaryText" />
 
                 </LinearLayout>

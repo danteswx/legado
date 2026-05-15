@@ -5,7 +5,7 @@
     <item
         android:id="@+id/menu_group"
         android:title="@string/group"
-        android:icon="@drawable/ic_groups"
+        android:icon="@drawable/ic_lucide_tags"
         app:showAsAction="always">
 
         <menu />

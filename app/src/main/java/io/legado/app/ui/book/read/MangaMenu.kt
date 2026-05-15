@@ -3,28 +3,38 @@ package io.legado.app.ui.book.read
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
 import android.util.AttributeSet
 import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
 import android.view.animation.Animation
 import android.widget.FrameLayout
-import android.widget.SeekBar
+import androidx.annotation.DrawableRes
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
+import androidx.core.view.children
+import androidx.core.view.updateLayoutParams
+import com.qmdeve.liquidglass.widget.LiquidGlassView
 import io.legado.app.R
 import io.legado.app.databinding.ViewMangaMenuBinding
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.source.getSourceType
 import io.legado.app.lib.dialogs.alert
+import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.getPrimaryTextColor
-import io.legado.app.model.ReadBook
 import io.legado.app.model.ReadManga
 import io.legado.app.ui.browser.WebViewActivity
-import io.legado.app.ui.widget.seekbar.SeekBarChangeListener
 import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.applyStatusBarPadding
 import io.legado.app.utils.activity
 import io.legado.app.utils.applyNavigationBarPadding
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.gone
 import io.legado.app.utils.invisible
 import io.legado.app.utils.loadAnimation
@@ -53,6 +63,9 @@ class MangaMenu @JvmOverloads constructor(
     }
     private var isMenuOutAnimating = false
     private var bgColor = context.bottomBackground
+    private var toolbarIconColor = Color.WHITE
+    private var topBarGlassStyleKey: String? = null
+    private val boundTopBarGlassViewIds = hashSetOf<Int>()
 
     private val menuOutListener = object : Animation.AnimationListener {
         override fun onAnimationStart(animation: Animation) {
@@ -62,7 +75,7 @@ class MangaMenu @JvmOverloads constructor(
 
         override fun onAnimationEnd(animation: Animation) {
             this@MangaMenu.invisible()
-            binding.titleBar.invisible()
+            binding.titleBarShell.invisible()
             binding.bottomMenu.invisible()
             isMenuOutAnimating = false
             canShowMenu = false
@@ -77,6 +90,8 @@ class MangaMenu @JvmOverloads constructor(
                 ReadManga.bookSource?.bookSourceName ?: context.getString(R.string.book_source)
             callBack.upSystemUiVisibility(true)
             binding.tvSourceAction.isGone = false
+            syncToolbarActionIconSize()
+            configureTopBarFrostedGlass()
         }
 
         @SuppressLint("RtlHardcoded")
@@ -99,24 +114,29 @@ class MangaMenu @JvmOverloads constructor(
         initAnimation()
         val textColor = context.getPrimaryTextColor(ColorUtils.isColorLight(bgColor))
         val secondaryTextColor = ColorUtils.withAlpha(textColor, 0.78f)
+        toolbarIconColor = Color.WHITE
+        configureCompactMangaToolbar()
         titleBar.setTextColor(textColor)
-        titleBar.setColorFilter(textColor)
+        titleBar.setColorFilter(toolbarIconColor)
         tvChapterName.setTextColor(secondaryTextColor)
         tvChapterUrl.setTextColor(secondaryTextColor)
         tvPre.setTextColor(textColor)
         tvNext.setTextColor(textColor)
         if (AppConfig.isEInkMode) {
+            titleBarGlassView.gone()
+            titleBarShellOverlay.gone()
             titleBar.setBackgroundResource(R.drawable.bg_eink_border_bottom)
             titleBar.toolbar.background = null
             titleBarAddition.background = null
             llTitleInfo.background = null
             bottomMenu.setBackgroundResource(R.drawable.bg_eink_border_top)
         } else {
-            titleBar.setBackgroundColor(ColorUtils.withAlpha(bgColor, 0.75f))
+            titleBar.setBackgroundColor(Color.TRANSPARENT)
             titleBar.toolbar.background = null
             titleBarAddition.background = null
             llTitleInfo.background = null
             bottomMenu.setBackgroundColor(Color.TRANSPARENT)
+            configureTopBarFrostedGlass()
         }
         if (AppConfig.showReadTitleBarAddition) {
             titleBarAddition.visible()
@@ -127,6 +147,202 @@ class MangaMenu @JvmOverloads constructor(
          * 确保视图不被导航栏遮挡
          */
         bottomMenu.applyNavigationBarPadding()
+    }
+
+    private fun configureCompactMangaToolbar() = binding.run {
+        titleBar.toolbar.updateLayoutParams<ViewGroup.LayoutParams> {
+            height = topBarButtonSize()
+        }
+        titleBarAddition.updateLayoutParams<ViewGroup.LayoutParams> {
+            height = topBarButtonSize()
+        }
+        titleBar.toolbar.minimumHeight = topBarButtonSize()
+        titleBar.toolbar.contentInsetStartWithNavigation = 0
+        titleBar.toolbar.contentInsetEndWithActions = 0
+        titleBar.toolbar.navigationIcon = toolbarLucideIcon(R.drawable.ic_lucide_arrow_left)
+        titleBar.toolbar.overflowIcon = toolbarLucideIcon(R.drawable.ic_lucide_more_vertical)
+        syncToolbarActionIconSize()
+    }
+
+    private fun toolbarLucideIcon(@DrawableRes resId: Int): Drawable? {
+        return AppCompatResources.getDrawable(context, resId)?.mutate()?.also(::fitToolbarIcon)
+    }
+
+    private fun syncToolbarActionIconSize() = binding.run {
+        titleBar.toolbar.navigationIcon?.let(::fitToolbarIcon)
+        titleBar.toolbar.overflowIcon?.let(::fitToolbarIcon)
+        titleBar.toolbar.menu.children.forEach { item ->
+            item.icon = item.icon?.mutate()?.also(::fitToolbarIcon)
+        }
+    }
+
+    private fun fitToolbarIcon(drawable: Drawable) {
+        val iconSize = topBarIconSize()
+        drawable.setBounds(0, 0, iconSize, iconSize)
+        drawable.colorFilter = PorterDuffColorFilter(toolbarIconColor, PorterDuff.Mode.SRC_ATOP)
+    }
+
+    fun refreshMenuColorFilter() {
+        toolbarIconColor = Color.WHITE
+        binding.titleBar.setColorFilter(toolbarIconColor)
+        syncToolbarActionIconSize()
+    }
+
+    private fun topBarButtonSize(): Int {
+        return resources.getDimensionPixelSize(R.dimen.read_top_bar_button_size)
+    }
+
+    private fun topBarIconSize(): Int {
+        return resources.getDimensionPixelSize(R.dimen.read_top_bar_icon_size)
+    }
+
+    private fun configureTopBarFrostedGlass() = binding.run {
+        if (AppConfig.isEInkMode) {
+            return@run
+        }
+        val glassLevel = (AppConfig.frostedGlassLevel / 100f).coerceIn(0.45f, 1f)
+        val glassStyleKey =
+            "manga-top:${topBarUseDarkGlass()}:${context.accentColor}:${AppConfig.frostedGlassLevel}:$bgColor"
+        if (topBarGlassStyleKey != glassStyleKey) {
+            titleBarShell.background = topBarGlassFallbackShell(glassLevel)
+            titleBarGlassView.visible()
+            titleBarShellOverlay.visible()
+            titleBarShellOverlay.background = topBarGlassShell(glassLevel)
+            topBarGlassStyleKey = glassStyleKey
+        } else {
+            if (!titleBarGlassView.isVisible) {
+                titleBarGlassView.visible()
+            }
+            if (!titleBarShellOverlay.isVisible) {
+                titleBarShellOverlay.visible()
+            }
+        }
+        syncTopBarGlassLayerHeight()
+        titleBarShell.post {
+            syncTopBarGlassLayerHeight()
+            setupTopBarFrostedGlassView(glassLevel)
+        }
+    }
+
+    private fun setupTopBarFrostedGlassView(glassLevel: Float) = binding.run {
+        val target = topBarGlassTarget()
+        if (!target.isLaidOut || !titleBarShell.isLaidOut || syncTopBarGlassLayerHeight() <= 0) {
+            return@run
+        }
+        setupTopBarFrostedGlassView(
+            liquidGlassView = titleBarGlassView,
+            target = target,
+            cornerRadius = 0f,
+            refractionHeight = (12f + glassLevel * 8f).dpToPx(),
+            refractionOffset = (34f + glassLevel * 18f).dpToPx(),
+            blurRadius = (22f + glassLevel * 30f).dpToPx(),
+            dispersion = (0.18f + glassLevel * 0.16f).coerceAtMost(0.42f),
+            tintAlpha = topBarGlassTintAlpha(glassLevel),
+            tintColor = topBarGlassTintColor()
+        )
+    }
+
+    private fun topBarGlassTarget(): ViewGroup {
+        return activity?.findViewById<ViewGroup>(R.id.webtoon_frame)
+            ?: parent as? ViewGroup
+            ?: binding.vwMenuRoot
+    }
+
+    private fun syncTopBarGlassLayerHeight(): Int = binding.run {
+        val targetHeight = titleBar.height.takeIf { it > 0 } ?: return@run 0
+        setTopBarGlassLayerChildHeight(titleBarGlassView, targetHeight)
+        setTopBarGlassLayerChildHeight(titleBarShellOverlay, targetHeight)
+        targetHeight
+    }
+
+    private fun setTopBarGlassLayerChildHeight(view: View, height: Int) {
+        view.updateLayoutParams<FrameLayout.LayoutParams> {
+            this.height = height
+        }
+    }
+
+    private fun setupTopBarFrostedGlassView(
+        liquidGlassView: LiquidGlassView,
+        target: ViewGroup,
+        cornerRadius: Float,
+        refractionHeight: Float,
+        refractionOffset: Float,
+        blurRadius: Float,
+        dispersion: Float,
+        tintAlpha: Float,
+        tintColor: FloatArray
+    ) {
+        if (boundTopBarGlassViewIds.add(liquidGlassView.id)) {
+            liquidGlassView.bind(target)
+        }
+        liquidGlassView.setCornerRadius(cornerRadius)
+        liquidGlassView.setRefractionHeight(refractionHeight)
+        liquidGlassView.setRefractionOffset(refractionOffset)
+        liquidGlassView.setDispersion(dispersion)
+        liquidGlassView.setBlurRadius(blurRadius)
+        liquidGlassView.setTintAlpha(tintAlpha)
+        liquidGlassView.setTintColorRed(tintColor[0])
+        liquidGlassView.setTintColorGreen(tintColor[1])
+        liquidGlassView.setTintColorBlue(tintColor[2])
+        liquidGlassView.setDraggableEnabled(false)
+        liquidGlassView.setElasticEnabled(false)
+        liquidGlassView.setTouchEffectEnabled(false)
+        liquidGlassView.isClickable = false
+        liquidGlassView.isFocusable = false
+        liquidGlassView.invalidate()
+    }
+
+    private fun topBarGlassShell(glassLevel: Float): GradientDrawable {
+        val isDark = topBarUseDarkGlass()
+        val surfaceColor = if (isDark) {
+            Color.rgb(8, 10, 14)
+        } else {
+            ColorUtils.blendColors(Color.WHITE, context.accentColor, 0.05f)
+        }
+        val topAlpha = if (isDark) 0.52f + glassLevel * 0.18f else 0.28f + glassLevel * 0.16f
+        val centerAlpha = if (isDark) 0.44f + glassLevel * 0.16f else 0.20f + glassLevel * 0.12f
+        val bottomAlpha = if (isDark) 0.34f + glassLevel * 0.14f else 0.14f + glassLevel * 0.10f
+        return GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(
+                ColorUtils.withAlpha(surfaceColor, topAlpha.coerceAtMost(if (isDark) 0.70f else 0.44f)),
+                ColorUtils.withAlpha(surfaceColor, centerAlpha.coerceAtMost(if (isDark) 0.60f else 0.34f)),
+                ColorUtils.withAlpha(surfaceColor, bottomAlpha.coerceAtMost(if (isDark) 0.50f else 0.26f))
+            )
+        )
+    }
+
+    private fun topBarGlassFallbackShell(glassLevel: Float): GradientDrawable {
+        val isDark = topBarUseDarkGlass()
+        val surfaceColor = if (isDark) {
+            Color.rgb(8, 10, 14)
+        } else {
+            ColorUtils.blendColors(Color.WHITE, context.accentColor, 0.05f)
+        }
+        val alpha = if (isDark) 0.58f + glassLevel * 0.16f else 0.26f + glassLevel * 0.18f
+        return GradientDrawable().apply {
+            setColor(ColorUtils.withAlpha(surfaceColor, alpha.coerceAtMost(if (isDark) 0.74f else 0.46f)))
+        }
+    }
+
+    private fun topBarGlassTintAlpha(glassLevel: Float): Float {
+        return if (topBarUseDarkGlass()) {
+            (0.22f + glassLevel * 0.22f).coerceAtMost(0.44f)
+        } else {
+            (0.12f + glassLevel * 0.18f).coerceAtMost(0.30f)
+        }
+    }
+
+    private fun topBarGlassTintColor(): FloatArray {
+        return if (topBarUseDarkGlass()) {
+            floatArrayOf(0.08f, 0.10f, 0.14f)
+        } else {
+            floatArrayOf(0.70f, 0.79f, 0.86f)
+        }
+    }
+
+    private fun topBarUseDarkGlass(): Boolean {
+        return AppConfig.isNightTheme && !AppConfig.isEInkMode
     }
 
     private fun initAnimation() {
@@ -140,7 +356,7 @@ class MangaMenu @JvmOverloads constructor(
         }
         if (this.isVisible) {
             if (anim) {
-                binding.titleBar.startAnimation(menuTopOut)
+                binding.titleBarShell.startAnimation(menuTopOut)
                 binding.bottomMenu.startAnimation(menuBottomOut)
             } else {
                 menuOutListener.onAnimationStart(menuBottomOut)
@@ -151,10 +367,10 @@ class MangaMenu @JvmOverloads constructor(
 
     fun runMenuIn(anim: Boolean = !AppConfig.isEInkMode) {
         this.visible()
-        binding.titleBar.visible()
+        binding.titleBarShell.visible()
         binding.bottomMenu.visible()
         if (anim) {
-            binding.titleBar.startAnimation(menuTopIn)
+            binding.titleBarShell.startAnimation(menuTopIn)
             binding.bottomMenu.startAnimation(menuBottomIn)
         } else {
             menuInListener.onAnimationStart(menuBottomIn)
@@ -169,10 +385,10 @@ class MangaMenu @JvmOverloads constructor(
             callBack.openBookInfoActivity()
         }
         val chapterViewClickListener = OnClickListener {
-            val url = tvChapterUrl.text.toString().trim()
+            val url = tvChapterUrl.tag as? String ?: return@OnClickListener
             if (url.isBlank()) return@OnClickListener
             context.startActivity<WebViewActivity> {
-                val bookSource = ReadBook.bookSource
+                val bookSource = ReadManga.bookSource
                 putExtra("title", tvChapterName.text)
                 putExtra("url", url)
                 putExtra("sourceOrigin", bookSource?.bookSourceUrl)
@@ -181,7 +397,7 @@ class MangaMenu @JvmOverloads constructor(
             }
         }
         val chapterViewLongClickListener = OnLongClickListener {
-            val url = tvChapterUrl.text.toString().trim()
+            val url = tvChapterUrl.tag as? String ?: return@OnLongClickListener true
             if (url.isNotBlank()) {
                 context.alert(R.string.open_fun) {
                     setMessage(R.string.use_browser_open)
@@ -204,40 +420,21 @@ class MangaMenu @JvmOverloads constructor(
         tvPre.setOnClickListener {
             ReadManga.moveToPrevChapter(true)
         }
-        seekReadPage.setOnSeekBarChangeListener(object : SeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-                if (fromUser) {
-                    callBack.skipToPage(seekBar.progress)
-                }
-            }
-
-            override fun onStartTrackingTouch(seekBar: SeekBar) {
-                binding.vwMenuBg.setOnClickListener(null)
-            }
-
-            override fun onStopTrackingTouch(seekBar: SeekBar) {
-                binding.vwMenuBg.setOnClickListener { runMenuOut() }
-            }
-        })
-    }
-
-    fun upSeekBar(value: Int, count: Int) {
-        binding.seekReadPage.apply {
-            max = count.minus(1)
-            progress = value
-        }
     }
 
     fun upBookView() = binding.run {
-        titleBar.title = ReadManga.book?.name
+        syncToolbarActionIconSize()
+        titleBar.title = null
+        tvChapterName.text = ReadManga.book?.name.orEmpty()
+        tvChapterName.visible(tvChapterName.text.isNotBlank())
         ReadManga.curMangaChapter?.let {
-            tvChapterName.text = it.chapter.title
-            tvChapterName.visible()
-            tvChapterUrl.gone()
+            tvChapterUrl.text = it.chapter.title
+            tvChapterUrl.tag = it.chapter.getAbsoluteURL()
+            tvChapterUrl.visible()
             tvPre.isEnabled = ReadManga.durChapterIndex != 0
             tvNext.isEnabled = ReadManga.durChapterIndex != ReadManga.simulatedChapterSize - 1
         } ?: let {
-            tvChapterName.gone()
+            tvChapterUrl.tag = null
             tvChapterUrl.gone()
         }
     }
@@ -245,7 +442,5 @@ class MangaMenu @JvmOverloads constructor(
     interface CallBack {
         fun openBookInfoActivity()
         fun upSystemUiVisibility(menuIsVisible: Boolean)
-        fun skipToPage(index: Int)
     }
-
 }

@@ -7,19 +7,19 @@
     <group android:id="@+id/menu_group_on_line">
         <item
             android:id="@+id/menu_change_source"
-            android:icon="@drawable/ic_exchange"
+            android:icon="@drawable/ic_lucide_shuffle"
             android:title="@string/change_origin"
             app:showAsAction="always" />
 
         <item
             android:id="@+id/menu_refresh"
-            android:icon="@drawable/ic_refresh_black_24dp"
+            android:icon="@drawable/ic_lucide_refresh_cw"
             android:title="@string/refresh"
             app:showAsAction="always" />
 
         <item
             android:id="@+id/menu_catalog"
-            android:icon="@drawable/ic_toc"
+            android:icon="@drawable/ic_lucide_list"
             android:title="@string/chapter_list"
             app:showAsAction="always" />
 

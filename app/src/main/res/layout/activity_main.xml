@@ -137,7 +137,7 @@
                     android:layout_gravity="center"
                     android:contentDescription="@null"
                     android:importantForAccessibility="no"
-                    android:src="@drawable/ic_search"
+                    android:src="@drawable/ic_lucide_search"
                     android:tint="@color/primaryText" />
 
             </FrameLayout>
@@ -503,7 +503,7 @@
                     android:contentDescription="@string/search"
                     android:padding="@dimen/main_sidebar_search_icon_padding"
                     android:scaleType="centerInside"
-                    android:src="@drawable/ic_search"
+                    android:src="@drawable/ic_lucide_search"
                     android:tint="@color/primaryText" />
 
                 <TextView

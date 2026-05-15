@@ -4,15 +4,21 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.animation.LinearInterpolator
+import android.widget.FrameLayout
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.ViewCompat
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
+import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.PagerSnapHelper
@@ -20,6 +26,7 @@ import com.bumptech.glide.Glide
 import com.bumptech.glide.integration.recyclerview.RecyclerViewPreloader
 import com.bumptech.glide.request.target.Target.SIZE_ORIGINAL
 import com.bumptech.glide.util.FixedPreloadSizeProvider
+import com.qmdeve.liquidglass.widget.LiquidGlassView
 import io.legado.app.BuildConfig
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
@@ -52,6 +59,7 @@ import io.legado.app.ui.book.manga.recyclerview.MangaAdapter
 import io.legado.app.ui.book.manga.recyclerview.MangaLayoutManager
 import io.legado.app.ui.book.manga.recyclerview.ScrollTimer
 import io.legado.app.ui.book.read.MangaMenu
+import io.legado.app.ui.book.read.ReaderBottomGlassStyle
 import io.legado.app.ui.book.read.ReadBookActivity.Companion.RESULT_DELETED
 import io.legado.app.ui.book.toc.TocActivityResult
 import io.legado.app.ui.widget.number.NumberPickerDialog
@@ -60,6 +68,7 @@ import io.legado.app.utils.GSON
 import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.StartActivityContract
 import io.legado.app.utils.canScroll
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.fastBinarySearch
 import io.legado.app.utils.findCenterViewPosition
 import io.legado.app.utils.fromJsonObject
@@ -95,6 +104,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     private val mPagerSnapHelper: PagerSnapHelper by lazy {
         PagerSnapHelper()
     }
+    private val boundMangaMinimapGlassViewIds = hashSetOf<Int>()
 
     private lateinit var mMangaFooterConfig: MangaFooterConfig
     private val mLabelBuilder by lazy { StringBuilder() }
@@ -200,6 +210,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         ReadManga.register(this)
         upSystemUiVisibility(false)
         initRecyclerView()
+        bindMangaProgressMinimap()
         binding.tvRetry.setOnClickListener {
             binding.llLoading.isVisible = true
             binding.llRetry.isGone = true
@@ -260,7 +271,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                             ReadManga.curPageChanged()
                         }
                         if (item is MangaPage) {
-                            binding.mangaMenu.upSeekBar(item.index, item.imageCount)
+                            updateMangaProgressMinimap()
                             binding.mangaMenu.upBookView()
                             upInfoBar(item)
                         }
@@ -313,9 +324,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                     mLayoutManager.scrollToPositionWithOffset(pos, 0)
                     binding.flLoading.isGone = true
                     loadMoreView.visible()
-                    binding.mangaMenu.upSeekBar(
-                        ReadManga.durChapterPos, ReadManga.curMangaChapter!!.imageCount
-                    )
+                    updateMangaProgressMinimap()
                     binding.mangaMenu.upBookView()
                 }
 
@@ -389,6 +398,221 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         binding.infobar.update(
             if (mLabelBuilder.isEmpty()) "" else mLabelBuilder.toString()
         )
+    }
+
+    private fun bindMangaProgressMinimap() {
+        binding.mangaProgressMinimap.onProgressChanging = ::previewMangaProgressMinimap
+        binding.mangaProgressMinimap.onProgressChanged = ::commitMangaProgressMinimap
+        binding.btnMangaMinimapPrevious.setOnClickListener {
+            ReadManga.moveToPrevChapter(true)
+        }
+        binding.btnMangaMinimapNext.setOnClickListener {
+            ReadManga.moveToNextChapter(true)
+        }
+    }
+
+    private fun setupMangaMinimapControlGlass() {
+        val glassViews = listOf(
+            binding.mangaMinimapPreviousGlassView,
+            binding.mangaMinimapNextGlassView
+        )
+        if (!ViewCompat.isLaidOut(binding.webtoonFrame) || glassViews.any { !ViewCompat.isLaidOut(it) }) {
+            binding.mangaProgressMinimapPanel.post {
+                if (binding.mangaProgressMinimapPanel.isVisible) {
+                    setupMangaMinimapControlGlass()
+                }
+            }
+            return
+        }
+        val glassLevel = ReaderBottomGlassStyle.glassLevel()
+        val cornerRadius = 28f.dpToPx()
+        setupMangaMinimapControlGlassView(
+            button = binding.btnMangaMinimapPrevious,
+            glassView = binding.mangaMinimapPreviousGlassView,
+            shellOverlay = binding.mangaMinimapPreviousShellOverlay,
+            glassLevel = glassLevel,
+            cornerRadius = cornerRadius
+        )
+        setupMangaMinimapControlGlassView(
+            button = binding.btnMangaMinimapNext,
+            glassView = binding.mangaMinimapNextGlassView,
+            shellOverlay = binding.mangaMinimapNextShellOverlay,
+            glassLevel = glassLevel,
+            cornerRadius = cornerRadius
+        )
+    }
+
+    private fun setupMangaMinimapControlGlassView(
+        button: View,
+        glassView: LiquidGlassView,
+        shellOverlay: View,
+        glassLevel: Float,
+        cornerRadius: Float
+    ) {
+        button.clipToOutline = true
+        button.background = ReaderBottomGlassStyle.fallbackShell(this, glassLevel, cornerRadius)
+        shellOverlay.background = ReaderBottomGlassStyle.shell(this, glassLevel, cornerRadius)
+        val shouldBind = !boundMangaMinimapGlassViewIds.contains(glassView.id)
+        if (ReaderBottomGlassStyle.configureLiquidGlass(
+            liquidGlassView = glassView,
+            target = binding.webtoonFrame,
+            cornerRadius = cornerRadius,
+            bindTarget = shouldBind,
+            glassLevel = glassLevel
+        )) {
+            boundMangaMinimapGlassViewIds.add(glassView.id)
+        }
+    }
+
+    private fun updateMangaProgressMinimap(show: Boolean = binding.mangaMenu.isVisible) {
+        val imageUrls = currentMangaImageUrls()
+        val pageCount = imageUrls.size
+        if (show) {
+            binding.mangaProgressMinimap.updatePages(imageUrls, ReadManga.book?.origin, ReadManga.durChapterPos)
+        } else {
+            binding.mangaProgressMinimap.updateProgress(pageCount, ReadManga.durChapterPos)
+        }
+        binding.mangaProgressMinimapPanel.gone(!show || pageCount <= 1)
+        if (!show || pageCount <= 1) {
+            return
+        }
+        setupMangaMinimapControlGlass()
+        if (!constrainMangaProgressMinimapPanel()) {
+            binding.mangaProgressMinimapPanel.gone()
+        }
+    }
+
+    private fun constrainMangaProgressMinimapPanel(): Boolean {
+        val root = binding.root
+        if (root.height <= 0) {
+            root.post {
+                updateMangaProgressMinimap(show = true)
+            }
+            return true
+        }
+        val gap = 8.dpToPx()
+        val topLimit = minimapTopLimit(
+            root = root,
+            topBar = binding.mangaMenu.findViewById(R.id.title_bar_shell),
+            fallbackTop = 96.dpToPx(),
+            gap = gap
+        )
+        val bottomLimit = minimapBottomLimit(
+            root = root,
+            bottomBar = binding.mangaMenu.findViewById(R.id.bottom_menu),
+            fallbackBottom = 80.dpToPx(),
+            gap = gap
+        )
+        val availableHeight = (bottomLimit - topLimit).coerceAtLeast(0)
+        val controlsTopMargin = (binding.mangaProgressMinimapControls.layoutParams as? ViewGroup.MarginLayoutParams)
+            ?.topMargin ?: 0
+        val controlsHeight = binding.mangaProgressMinimapControls.height
+            .takeIf { it > 0 }
+            ?: 70.dpToPx()
+        val maxMinimapHeight = availableHeight - controlsTopMargin - controlsHeight
+        val minimumMinimapHeight = 96.dpToPx()
+        if (maxMinimapHeight < minimumMinimapHeight) {
+            return false
+        }
+        val minimapHeight = binding.mangaProgressMinimap.desiredHeightWithin(maxMinimapHeight)
+        val panelHeight = minimapHeight + controlsTopMargin + controlsHeight
+        binding.mangaProgressMinimap.setMaxAvailableHeight(maxMinimapHeight)
+        binding.mangaProgressMinimapPanel.updateLayoutParams<FrameLayout.LayoutParams> {
+            gravity = Gravity.END or Gravity.TOP
+            topMargin = centeredMinimapPanelTopMargin(topLimit, availableHeight, panelHeight)
+            height = ViewGroup.LayoutParams.WRAP_CONTENT
+        }
+        return true
+    }
+
+    private fun centeredMinimapPanelTopMargin(topLimit: Int, availableHeight: Int, panelHeight: Int): Int {
+        return topLimit + ((availableHeight - panelHeight).coerceAtLeast(0) / 2)
+    }
+
+    private fun minimapTopLimit(root: View, topBar: View?, fallbackTop: Int, gap: Int): Int {
+        val topBarBottom = topBar
+            ?.takeIf { it.isVisible && it.height > 0 }
+            ?.let { viewTopInRoot(root, it) + it.height }
+            ?: fallbackTop
+        return (topBarBottom + gap).coerceIn(0, root.height)
+    }
+
+    private fun minimapBottomLimit(root: View, bottomBar: View?, fallbackBottom: Int, gap: Int): Int {
+        val bottomBarTop = bottomBar
+            ?.takeIf { it.isVisible && it.height > 0 }
+            ?.let { viewTopInRoot(root, it) }
+            ?: (root.height - fallbackBottom)
+        return (bottomBarTop - gap).coerceIn(0, root.height)
+    }
+
+    private fun viewTopInRoot(root: View, view: View): Int {
+        val rootLocation = IntArray(2)
+        val viewLocation = IntArray(2)
+        root.getLocationOnScreen(rootLocation)
+        view.getLocationOnScreen(viewLocation)
+        return viewLocation[1] - rootLocation[1]
+    }
+
+    private fun previewMangaProgressMinimap(ratio: Float) {
+        scrollToMangaProgress(ratio, commit = false)
+    }
+
+    private fun commitMangaProgressMinimap(ratio: Float) {
+        scrollToMangaProgress(ratio, commit = true)
+        updateMangaProgressMinimap(show = true)
+    }
+
+    private fun scrollToMangaProgress(ratio: Float, commit: Boolean) {
+        val pageCount = currentMangaPageCount()
+        if (pageCount <= 0) {
+            return
+        }
+        val maxPage = (pageCount - 1).coerceAtLeast(0)
+        val targetPage = (ratio.coerceIn(0f, 1f) * maxPage).toInt().coerceIn(0, maxPage)
+        scrollToMangaPage(targetPage, commit)
+    }
+
+    private fun scrollToMangaPage(index: Int, commit: Boolean) {
+        val pageCount = currentMangaPageCount()
+        if (pageCount <= 0) {
+            return
+        }
+        val targetIndex = index.coerceIn(0, pageCount - 1)
+        val itemPos = adapterPositionForMangaPage(targetIndex)
+        if (itemPos <= -1) {
+            return
+        }
+        mLayoutManager.scrollToPositionWithOffset(itemPos, 0)
+        upInfoBar(mAdapter.getItem(itemPos))
+        ReadManga.durChapterPos = targetIndex
+        updateMangaProgressMinimap()
+        if (commit) {
+            ReadManga.curPageChanged()
+            ReadManga.saveRead(true)
+        }
+    }
+
+    private fun adapterPositionForMangaPage(index: Int): Int {
+        val durChapterIndex = ReadManga.durChapterIndex
+        return mAdapter.getItems().fastBinarySearch {
+            val page = it as? BaseMangaPage ?: error("unknown item type")
+            val chapterDelta = page.chapterIndex - durChapterIndex
+            if (chapterDelta != 0) {
+                chapterDelta
+            } else {
+                page.index - index
+            }
+        }
+    }
+
+    private fun currentMangaPageCount(): Int {
+        return ReadManga.curMangaChapter?.imageCount ?: 0
+    }
+
+    private fun currentMangaImageUrls(): List<String> {
+        return ReadManga.curMangaChapter?.pages?.filterIsInstance<MangaPage>()
+            ?.map { it.mImageUrl }
+            .orEmpty()
     }
 
     override fun onResume() {
@@ -508,6 +732,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     override fun onCompatCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.book_manga, menu)
         upMenu(menu)
+        binding.mangaMenu.refreshMenuColorFilter()
         return super.onCompatCreateOptionsMenu(menu)
     }
 
@@ -702,6 +927,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
 
     override fun upSystemUiVisibility(menuIsVisible: Boolean) {
         toggleSystemBar(menuIsVisible)
+        updateMangaProgressMinimap(menuIsVisible)
         if (enableAutoScroll) {
             mScrollTimer.isEnabled = !menuIsVisible
         }
@@ -916,31 +1142,6 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         window.attributes = layoutParams
         // 强制刷新屏幕
         window.decorView.postInvalidate()
-    }
-
-    override fun skipToPage(index: Int) {
-        val durChapterIndex = ReadManga.durChapterIndex
-        val itemPos = mAdapter.getItems().fastBinarySearch {
-            val chapterIndex: Int
-            val pageIndex: Int
-            if (it is BaseMangaPage) {
-                chapterIndex = it.chapterIndex
-                pageIndex = it.index
-            } else {
-                error("unknown item type")
-            }
-            val delta = chapterIndex - durChapterIndex
-            if (delta != 0) {
-                delta
-            } else {
-                pageIndex - index
-            }
-        }
-        if (itemPos > -1) {
-            mLayoutManager.scrollToPositionWithOffset(itemPos, 0)
-            upInfoBar(mAdapter.getItem(itemPos))
-            ReadManga.durChapterPos = index
-        }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {

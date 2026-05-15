@@ -16,6 +16,7 @@ import io.legado.app.R
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ThemeConfig
 import io.legado.app.ui.widget.TitleBar
+import io.legado.app.utils.applyTopBarIconMetrics
 import io.legado.app.utils.applyTint
 
 @Suppress("MemberVisibilityCanBePrivate")
@@ -69,6 +70,7 @@ abstract class BaseFragment(@LayoutRes layoutID: Int) : Fragment(layoutID) {
                 onCompatCreateOptionsMenu(this)
                 applyTint(requireContext())
             }
+            it.applyTopBarIconMetrics()
 
             it.setOnMenuItemClickListener { item ->
                 onCompatOptionsItemSelected(item)

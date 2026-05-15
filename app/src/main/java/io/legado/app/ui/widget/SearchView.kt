@@ -59,7 +59,7 @@ class SearchView @JvmOverloads constructor(
         try {
             if (textView == null) {
                 textView = findViewById(androidx.appcompat.R.id.search_src_text)
-                mSearchHintIcon = this.context.getDrawable(R.drawable.ic_search_hint)
+                mSearchHintIcon = this.context.getDrawable(R.drawable.ic_lucide_search)
             }
             // 改变字体
             textView!!.typeface = context.uiTypeface()

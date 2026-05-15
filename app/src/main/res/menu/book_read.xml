@@ -7,19 +7,19 @@
     <group android:id="@+id/menu_group_on_line">
         <item
             android:id="@+id/menu_change_source"
-            android:icon="@drawable/ic_exchange"
+            android:icon="@drawable/ic_lucide_shuffle"
             android:title="@string/change_origin"
             app:showAsAction="always" />
 
         <item
             android:id="@+id/menu_refresh"
-            android:icon="@drawable/ic_refresh_black_24dp"
+            android:icon="@drawable/ic_lucide_refresh_cw"
             android:title="@string/refresh"
             app:showAsAction="always" />
 
         <item
             android:id="@+id/menu_download"
-            android:icon="@drawable/ic_download_line"
+            android:icon="@drawable/ic_lucide_download"
             android:title="@string/offline_cache"
             app:showAsAction="always" />
 
@@ -28,7 +28,7 @@
     <group android:id="@+id/menu_group_text">
         <item
             android:id="@+id/menu_toc_regex"
-            android:icon="@drawable/ic_exchange"
+            android:icon="@drawable/ic_lucide_list"
             android:title="@string/txt_toc_rule"
             android:visible="false"
             app:showAsAction="always" />
@@ -38,7 +38,7 @@
 
         <item
             android:id="@+id/menu_set_charset"
-            android:icon="@drawable/ic_translate"
+            android:icon="@drawable/ic_lucide_languages"
             android:title="@string/set_charset"
             app:showAsAction="always" />
 

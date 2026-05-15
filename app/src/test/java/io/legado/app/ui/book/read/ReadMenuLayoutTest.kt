@@ -15,16 +15,17 @@ class ReadMenuLayoutTest {
         val zhDebugStrings = repoFile("app/src/debug/res/values-zh/strings.xml").readText()
         val defaultDebugStrings = repoFile("app/src/debug/res/values/strings.xml").readText()
 
-        assertTrue(zhDebugStrings.contains("<string name=\"app_name\">万卷·D</string>"))
-        assertTrue(zhDebugStrings.contains("<string name=\"receiving_shared_label\">万卷·D·搜索</string>"))
-        assertTrue(defaultDebugStrings.contains("<string name=\"app_name\">Wanjuan·D</string>"))
-        assertTrue(defaultDebugStrings.contains("<string name=\"receiving_shared_label\">Wanjuan·D·search</string>"))
+        assertTrue(zhDebugStrings.contains("<string name=\"app_name\">涓囧嵎路D</string>"))
+        assertTrue(zhDebugStrings.contains("<string name=\"receiving_shared_label\">涓囧嵎路D路鎼滅储</string>"))
+        assertTrue(defaultDebugStrings.contains("<string name=\"app_name\">Wanjuan路D</string>"))
+        assertTrue(defaultDebugStrings.contains("<string name=\"receiving_shared_label\">Wanjuan路D路search</string>"))
     }
 
     @Test
     fun discoverTopActionButtonsUseReaderToolbarScale() {
         val layout = parseXml(repoFile("app/src/main/res/layout/fragment_explore.xml"))
         val dimens = repoFile("app/src/main/res/values/dimens.xml").readText()
+        val readMenu = parseXml(repoFile("app/src/main/res/layout/view_read_menu.xml"))
 
         listOf(
             "btn_discover_source_search",
@@ -38,8 +39,18 @@ class ReadMenuLayoutTest {
             assertEquals("@dimen/discover_top_action_button_padding", button.androidAttr("padding"))
             assertEquals("centerInside", button.androidAttr("scaleType"))
         }
+        assertEquals(
+            "@dimen/read_top_bar_icon_size",
+            readMenu.elementById("read_bottom_primary_nav").appAttr("itemIconSize")
+        )
+        assertEquals(
+            "@dimen/read_top_bar_icon_size",
+            readMenu.elementById("read_bottom_interface_nav").appAttr("itemIconSize")
+        )
+        assertTrue(dimens.contains("<dimen name=\"read_top_bar_icon_size\">22dp</dimen>"))
+        assertTrue(dimens.contains("<dimen name=\"read_top_bar_icon_padding\">13dp</dimen>"))
         assertTrue(dimens.contains("<dimen name=\"discover_top_action_button_size\">48dp</dimen>"))
-        assertTrue(dimens.contains("<dimen name=\"discover_top_action_button_padding\">12dp</dimen>"))
+        assertTrue(dimens.contains("<dimen name=\"discover_top_action_button_padding\">13dp</dimen>"))
     }
 
     @Test
@@ -52,10 +63,84 @@ class ReadMenuLayoutTest {
         assertTrue(toggle.isBefore(settings))
         assertTrue(toggle.isBefore(layout.elementById("btn_discover_more")))
         assertEquals("@string/switchLayout", toggle.androidAttr("contentDescription"))
+        assertEquals(
+            "@drawable/ic_lucide_search",
+            layout.elementById("btn_discover_source_search").androidAttr("src")
+        )
+        assertEquals(
+            "@drawable/ic_lucide_chevron_down",
+            layout.elementById("iv_discover_source_arrow").androidAttr("src")
+        )
         assertEquals("@drawable/ic_lucide_layout_grid", toggle.androidAttr("src"))
         assertEquals("@drawable/ic_lucide_settings", settings.androidAttr("src"))
+        assertEquals(
+            "@drawable/ic_lucide_link_2",
+            layout.elementById("btn_discover_more").androidAttr("src")
+        )
         assertTrue(repoFile("app/src/main/res/drawable/ic_lucide_layout_grid.xml").exists())
         assertTrue(repoFile("app/src/main/res/drawable/ic_lucide_layout_list.xml").exists())
+    }
+
+    @Test
+    fun readerTopBarsUseLucideIconsAndSharedIconMetrics() {
+        val bookReadMenu = parseXml(repoFile("app/src/main/res/menu/book_read.xml"))
+        val mainExploreMenu = parseXml(repoFile("app/src/main/res/menu/main_explore.xml"))
+        val actionButton = parseXml(repoFile("app/src/main/res/layout/view_action_button.xml"))
+        val titleBar = repoFile("app/src/main/java/io/legado/app/ui/widget/TitleBar.kt").readText()
+        val toolbarExtensions = repoFile("app/src/main/java/io/legado/app/utils/ToolBarExtensions.kt").readText()
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+
+        assertEquals(
+            "@drawable/ic_lucide_shuffle",
+            bookReadMenu.elementById("menu_change_source").androidAttr("icon")
+        )
+        assertEquals(
+            "@drawable/ic_lucide_refresh_cw",
+            bookReadMenu.elementById("menu_refresh").androidAttr("icon")
+        )
+        assertEquals(
+            "@drawable/ic_lucide_download",
+            bookReadMenu.elementById("menu_download").androidAttr("icon")
+        )
+        assertEquals(
+            "@drawable/ic_lucide_list",
+            bookReadMenu.elementById("menu_toc_regex").androidAttr("icon")
+        )
+        assertEquals(
+            "@drawable/ic_lucide_languages",
+            bookReadMenu.elementById("menu_set_charset").androidAttr("icon")
+        )
+        assertEquals(
+            "@drawable/ic_lucide_tags",
+            mainExploreMenu.elementById("menu_group").androidAttr("icon")
+        )
+        assertEquals("@dimen/read_top_bar_button_size", actionButton.androidAttr("layout_width"))
+        assertEquals("@dimen/read_top_bar_button_size", actionButton.androidAttr("layout_height"))
+        assertEquals("@dimen/read_top_bar_icon_padding", actionButton.androidAttr("padding"))
+        assertTrue(titleBar.contains("R.drawable.ic_lucide_arrow_left"))
+        assertTrue(titleBar.contains("R.drawable.ic_lucide_more_vertical"))
+        assertTrue(toolbarExtensions.contains("fun Toolbar.applyTopBarIconMetrics"))
+        assertTrue(readMenu.contains("private fun applyTopBarIconColor()"))
+        assertTrue(readMenu.contains("binding.titleBar.setColorFilter(Color.WHITE)"))
+        assertTrue(readMenu.contains("binding.titleBar.toolbar.applyTopBarIconMetrics(Color.WHITE)"))
+        assertTrue(readMenu.contains("fun refreshMenuColorFilter()"))
+        assertTrue(repoFile("app/src/main/res/drawable/ic_lucide_languages.xml").exists())
+        assertTrue(repoFile("app/src/main/res/drawable/ic_lucide_tags.xml").exists())
+    }
+
+    @Test
+    fun lucideDrawableIntrinsicSizeMatchesReaderBottomIconSize() {
+        val drawableDir = repoFile("app/src/main/res/drawable")
+        val lucideDrawables = drawableDir.listFiles { file ->
+            file.name.startsWith("ic_lucide_") && file.extension == "xml"
+        }.orEmpty()
+
+        assertTrue("Expected lucide drawables to exist", lucideDrawables.isNotEmpty())
+        lucideDrawables.forEach { file ->
+            val vector = parseXml(file)
+            assertEquals("${file.name} width", "22dp", vector.androidAttr("width"))
+            assertEquals("${file.name} height", "22dp", vector.androidAttr("height"))
+        }
     }
 
     @Test
@@ -70,6 +155,62 @@ class ReadMenuLayoutTest {
         assertTrue(exploreFragment.contains("R.drawable.ic_lucide_layout_list"))
         assertTrue(exploreFragment.contains("DISCOVER_LAYOUT_GRID -> GridLayoutManager(requireContext(), AppConfig.modernDiscoveryGridColumns)"))
         assertFalse(exploreFragment.contains("DISCOVER_LAYOUT_COUNT = 3"))
+    }
+
+    @Test
+    fun mangaReaderToolbarUsesCompactLucideActionsMatchingDiscoverIconScale() {
+        val mangaMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/MangaMenu.kt").readText()
+        val mangaActivity = repoFile("app/src/main/java/io/legado/app/ui/book/manga/ReadMangaActivity.kt").readText()
+        val bookMangaMenu = parseXml(repoFile("app/src/main/res/menu/book_manga.xml"))
+        val dimens = repoFile("app/src/main/res/values/dimens.xml").readText()
+
+        assertTrue(mangaMenu.contains("R.dimen.read_top_bar_button_size"))
+        assertTrue(mangaMenu.contains("R.dimen.read_top_bar_icon_size"))
+        assertTrue(mangaMenu.contains("titleBar.toolbar.updateLayoutParams<ViewGroup.LayoutParams>"))
+        assertTrue(mangaMenu.contains("height = topBarButtonSize()"))
+        assertTrue(mangaMenu.contains("titleBar.toolbar.minimumHeight = topBarButtonSize()"))
+        assertTrue(mangaMenu.contains("R.drawable.ic_lucide_arrow_left"))
+        assertTrue(mangaMenu.contains("R.drawable.ic_lucide_more_vertical"))
+        assertTrue(mangaMenu.contains("private fun syncToolbarActionIconSize()"))
+        assertTrue(mangaMenu.contains("val iconSize = topBarIconSize()"))
+        assertTrue(mangaMenu.contains("toolbarIconColor = Color.WHITE"))
+        assertTrue(mangaMenu.contains("fun refreshMenuColorFilter()"))
+        assertTrue(mangaActivity.contains("binding.mangaMenu.refreshMenuColorFilter()"))
+        assertTrue(dimens.contains("<dimen name=\"discover_top_action_button_size\">48dp</dimen>"))
+        assertTrue(dimens.contains("<dimen name=\"discover_top_action_button_padding\">13dp</dimen>"))
+
+        assertEquals(
+            "@drawable/ic_lucide_shuffle",
+            bookMangaMenu.elementById("menu_change_source").androidAttr("icon")
+        )
+        assertEquals(
+            "@drawable/ic_lucide_refresh_cw",
+            bookMangaMenu.elementById("menu_refresh").androidAttr("icon")
+        )
+        assertEquals(
+            "@drawable/ic_lucide_list",
+            bookMangaMenu.elementById("menu_catalog").androidAttr("icon")
+        )
+        assertTrue(repoFile("app/src/main/res/drawable/ic_lucide_shuffle.xml").exists())
+        assertTrue(repoFile("app/src/main/res/drawable/ic_lucide_refresh_cw.xml").exists())
+        assertTrue(repoFile("app/src/main/res/drawable/ic_lucide_more_vertical.xml").exists())
+    }
+
+    @Test
+    fun mangaReaderMovesBookTitleBelowToolbarLikeTextReader() {
+        val mangaMenuLayout = parseXml(repoFile("app/src/main/res/layout/view_manga_menu.xml"))
+        val mangaMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/MangaMenu.kt").readText()
+
+        assertEquals("18sp", mangaMenuLayout.elementById("tv_chapter_name").androidAttr("textSize"))
+        assertEquals("12sp", mangaMenuLayout.elementById("tv_chapter_url").androidAttr("textSize"))
+        assertTrue(mangaMenu.contains("titleBar.title = null"))
+        assertFalse(mangaMenu.contains("titleBar.title = ReadManga.book?.name"))
+        assertTrue(mangaMenu.contains("tvChapterName.text = ReadManga.book?.name.orEmpty()"))
+        assertTrue(mangaMenu.contains("tvChapterUrl.text = it.chapter.title"))
+        assertTrue(mangaMenu.contains("tvChapterUrl.tag = it.chapter.getAbsoluteURL()"))
+        assertTrue(mangaMenu.contains("val url = tvChapterUrl.tag as? String ?: return@OnClickListener"))
+        assertTrue(mangaMenu.contains("ReadManga.bookSource"))
+        assertFalse(mangaMenu.contains("val url = tvChapterUrl.text.toString().trim()"))
     }
 
     @Test
@@ -96,7 +237,7 @@ class ReadMenuLayoutTest {
         assertTrue(exploreShowAdapter.contains("val isCompact = gridColumns >= 3"))
         assertTrue(rowUiViewFactory.contains("rowUi.viewName ?: rowUi.name"))
         assertTrue(defaultStrings.contains("<string name=\"discover_grid_columns\">Items per row</string>"))
-        assertTrue(zhStrings.contains("<string name=\"discover_grid_columns\">每行数量</string>"))
+        assertTrue(zhStrings.contains("<string name=\"discover_grid_columns\">姣忚鏁伴噺</string>"))
     }
 
     @Test
@@ -403,30 +544,57 @@ class ReadMenuLayoutTest {
     }
 
     @Test
-    fun readMenuTopBarAlwaysGetsOpaqueMenuSurface() {
+    fun readMenuTopBarUsesFrostedGlassMenuSurface() {
         val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
         val initBlock = readMenu.substringAfter("private fun initView")
             .substringBefore("if (AppConfig.isEInkMode)")
 
-        assertTrue(initBlock.contains("titleBar.setBackgroundColor(ColorUtils.withAlpha(bgColor, 1f))"))
+        assertTrue(initBlock.contains("titleBar.setBackgroundColor(Color.TRANSPARENT)"))
+        assertTrue(readMenu.contains("private fun configureTopBarFrostedGlass()"))
+        assertTrue(readMenu.contains("binding.titleBar.applyStatusBarPadding(withInitialPadding = true)"))
         assertFalse(initBlock.contains("} else if (reset) {"))
     }
 
     @Test
     fun readerTopBarShowsBookAndChapterInAdditionWithLoginIconAction() {
         val layout = readMenuLayout()
+        val mangaLayout = parseXml(repoFile("app/src/main/res/layout/view_manga_menu.xml"))
         val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val shell = layout.elementById("title_bar_shell")
+        val mangaShell = mangaLayout.elementById("title_bar_shell")
         val titleAddition = layout.elementById("title_bar_addition")
+        val mangaTitleAddition = mangaLayout.elementById("title_bar_addition")
+        val titleInfo = layout.elementById("ll_title_info")
+        val mangaTitleInfo = mangaLayout.elementById("ll_title_info")
+        val sourceAction = layout.elementById("tv_source_action")
+        val mangaSourceAction = mangaLayout.elementById("tv_source_action")
 
         assertTrue(repoFile("app/src/main/res/drawable/ic_lucide_link_2.xml").exists())
-        assertEquals("-6dp", titleAddition.androidAttr("layout_marginTop"))
+        assertEquals(mangaShell.androidAttr("layout_width"), shell.androidAttr("layout_width"))
+        assertEquals(mangaShell.androidAttr("clipChildren"), shell.androidAttr("clipChildren"))
+        assertEquals(mangaShell.androidAttr("clipToPadding"), shell.androidAttr("clipToPadding"))
+        assertEquals(mangaShell.appAttr("layout_constraintStart_toStartOf"), shell.appAttr("layout_constraintStart_toStartOf"))
+        assertEquals(mangaShell.appAttr("layout_constraintEnd_toEndOf"), shell.appAttr("layout_constraintEnd_toEndOf"))
+        assertEquals(mangaTitleAddition.androidAttr("layout_height"), titleAddition.androidAttr("layout_height"))
+        assertEquals(mangaTitleAddition.androidAttr("paddingStart"), titleAddition.androidAttr("paddingStart"))
+        assertEquals(mangaTitleAddition.androidAttr("paddingTop"), titleAddition.androidAttr("paddingTop"))
+        assertEquals(mangaTitleAddition.androidAttr("paddingEnd"), titleAddition.androidAttr("paddingEnd"))
+        assertEquals(mangaTitleAddition.androidAttr("paddingBottom"), titleAddition.androidAttr("paddingBottom"))
+        assertEquals(mangaTitleInfo.androidAttr("minHeight"), titleInfo.androidAttr("minHeight"))
+        assertEquals(mangaTitleInfo.appAttr("layout_constraintVertical_bias"), titleInfo.appAttr("layout_constraintVertical_bias"))
         assertEquals("18sp", layout.elementById("tv_chapter_name").androidAttr("textSize"))
         assertEquals("12sp", layout.elementById("tv_chapter_url").androidAttr("textSize"))
-        assertEquals("gone", layout.elementById("tv_source_action").androidAttr("visibility"))
+        assertEquals(mangaSourceAction.androidAttr("layout_height"), sourceAction.androidAttr("layout_height"))
+        assertEquals(mangaSourceAction.androidAttr("minWidth"), sourceAction.androidAttr("minWidth"))
+        assertEquals(mangaSourceAction.appAttr("radius"), sourceAction.appAttr("radius"))
         assertTrue(readMenu.contains("setupTopBarLoginAction()"))
         assertTrue(readMenu.contains("titleBar.menu.add(0, R.id.menu_login"))
         assertTrue(readMenu.contains("setIcon(R.drawable.ic_lucide_link_2)"))
         assertTrue(readMenu.contains("callBack.showLogin()"))
+        assertTrue(readMenu.contains("private fun updateTopBarSourceAction()"))
+        assertTrue(readMenu.contains("ReadBook.bookSource?.bookSourceName ?: context.getString(R.string.book_source)"))
+        assertTrue(readMenu.contains("tvSourceAction.visible()"))
+        assertTrue(readMenu.contains("updateTopBarSourceAction()"))
         assertTrue(readMenu.contains("binding.titleBar.title = null"))
         assertTrue(readMenu.contains("binding.tvChapterName.text = ReadBook.book?.name.orEmpty()"))
         assertTrue(readMenu.contains("binding.tvChapterUrl.text = it.title"))
@@ -736,23 +904,79 @@ class ReadMenuLayoutTest {
         val textChapter = repoFile("app/src/main/java/io/legado/app/ui/book/read/page/entities/TextChapter.kt").readText()
         val chapterProvider = repoFile("app/src/main/java/io/legado/app/ui/book/read/page/provider/ChapterProvider.kt").readText()
         val textChapterLayout = repoFile("app/src/main/java/io/legado/app/ui/book/read/page/provider/TextChapterLayout.kt").readText()
+        val minimapPanel = layout.elementById("chapter_progress_minimap_panel")
         val minimap = layout.elementById("chapter_progress_minimap")
+        val minimapControls = layout.elementById("chapter_progress_minimap_controls")
+        val previousButton = layout.elementById("btn_chapter_minimap_previous")
+        val nextButton = layout.elementById("btn_chapter_minimap_next")
+        val previousText = layout.elementById("tv_chapter_minimap_previous")
+        val nextText = layout.elementById("tv_chapter_minimap_next")
         val readContent = layout.elementById("read_content_container")
         val readMenu = layout.elementById("read_menu")
         val searchMenu = layout.elementById("search_menu")
 
+        assertEquals("LinearLayout", minimapPanel.tagName)
+        assertEquals("56dp", minimapPanel.androidAttr("layout_width"))
+        assertEquals("wrap_content", minimapPanel.androidAttr("layout_height"))
+        assertEquals("end|top", minimapPanel.androidAttr("layout_gravity"))
+        assertEquals("8dp", minimapPanel.androidAttr("layout_marginEnd"))
+        assertEquals("gone", minimapPanel.androidAttr("visibility"))
         assertEquals("io.legado.app.ui.book.read.ChapterProgressMinimapView", minimap.tagName)
         assertEquals("56dp", minimap.androidAttr("layout_width"))
         assertEquals("300dp", minimap.androidAttr("layout_height"))
-        assertEquals("end|center_vertical", minimap.androidAttr("layout_gravity"))
-        assertEquals("8dp", minimap.androidAttr("layout_marginEnd"))
-        assertEquals("gone", minimap.androidAttr("visibility"))
         assertEquals("true", minimap.androidAttr("clickable"))
         assertEquals("@string/chapter_progress_minimap", minimap.androidAttr("contentDescription"))
-        assertTrue(readContent.isBefore(minimap))
-        assertTrue(readMenu.isBefore(minimap))
-        assertTrue(minimap.isBefore(searchMenu))
+        assertTrue(minimap.hasAncestor(minimapPanel))
+        assertTrue(minimap.isBefore(minimapControls))
+        assertEquals("vertical", minimapControls.androidAttr("orientation"))
+        assertEquals("56dp", minimapControls.androidAttr("layout_width"))
+        assertEquals("wrap_content", minimapControls.androidAttr("layout_height"))
+        listOf(previousButton, nextButton).forEach { button ->
+            assertEquals("FrameLayout", button.tagName)
+            assertEquals("56dp", button.androidAttr("layout_width"))
+            assertEquals("32dp", button.androidAttr("layout_height"))
+            assertEquals("true", button.androidAttr("clickable"))
+            assertEquals("true", button.androidAttr("focusable"))
+            assertTrue(button.hasAncestor(minimapControls))
+        }
+        assertEquals("@string/previous_chapter", previousButton.androidAttr("contentDescription"))
+        assertEquals("@string/previous_chapter", previousText.androidAttr("text"))
+        assertEquals("@color/white", previousText.androidAttr("textColor"))
+        assertEquals("12sp", previousText.androidAttr("textSize"))
+        assertEquals("center", previousText.androidAttr("gravity"))
+        assertTrue(previousText.hasAncestor(previousButton))
+        assertEquals("@string/next_chapter", nextButton.androidAttr("contentDescription"))
+        assertEquals("@string/next_chapter", nextText.androidAttr("text"))
+        assertEquals("@color/white", nextText.androidAttr("textColor"))
+        assertEquals("12sp", nextText.androidAttr("textSize"))
+        assertEquals("center", nextText.androidAttr("gravity"))
+        assertTrue(nextText.hasAncestor(nextButton))
+        assertTrue(layout.elementById("chapter_minimap_previous_glass_view").hasAncestor(previousButton))
+        assertTrue(layout.elementById("chapter_minimap_previous_shell_overlay").hasAncestor(previousButton))
+        assertTrue(layout.elementById("chapter_minimap_next_glass_view").hasAncestor(nextButton))
+        assertTrue(layout.elementById("chapter_minimap_next_shell_overlay").hasAncestor(nextButton))
+        assertTrue(previousButton.isBefore(nextButton))
+        assertTrue(readContent.isBefore(minimapPanel))
+        assertTrue(readMenu.isBefore(minimapPanel))
+        assertTrue(minimapPanel.isBefore(searchMenu))
         assertTrue(readActivity.contains("private fun bindChapterProgressMinimap()"))
+        assertTrue(readActivity.contains("private fun setupChapterMinimapControlGlass()"))
+        assertFalse(
+            readActivity.substringAfter("private fun bindChapterProgressMinimap()")
+                .substringBefore("private fun setupChapterMinimapControlGlass()")
+                .contains("setupChapterMinimapControlGlass()")
+        )
+        assertTrue(readActivity.contains("if (!ViewCompat.isLaidOut(binding.readContentContainer) || glassViews.any { !ViewCompat.isLaidOut(it) })"))
+        assertTrue(readActivity.contains("binding.chapterProgressMinimapPanel.post"))
+        assertTrue(readActivity.contains("binding.chapterMinimapPreviousGlassView"))
+        assertTrue(readActivity.contains("binding.chapterMinimapNextGlassView"))
+        assertTrue(readActivity.contains("ReaderBottomGlassStyle.configureLiquidGlass"))
+        assertTrue(readActivity.contains("ReaderBottomGlassStyle.shell"))
+        assertTrue(readActivity.contains("ReaderBottomGlassStyle.fallbackShell"))
+        assertTrue(readActivity.contains("binding.btnChapterMinimapPrevious.setOnClickListener"))
+        assertTrue(readActivity.contains("ReadBook.moveToPrevChapter(upContent = true, toLast = false)"))
+        assertTrue(readActivity.contains("binding.btnChapterMinimapNext.setOnClickListener"))
+        assertTrue(readActivity.contains("ReadBook.moveToNextChapter(true)"))
         assertTrue(readActivity.contains("private fun updateChapterProgressMinimap()"))
         assertTrue(readActivity.contains("ReadBook.curTextChapter?.pageSize"))
         assertTrue(readActivity.contains("textChapter.getContent()"))
@@ -769,16 +993,29 @@ class ReadMenuLayoutTest {
         assertFalse(readActivity.contains("ReadBook.setPageIndex(target.pageIndex)"))
         assertFalse(readActivity.contains("binding.readView.upContent(resetPageOffset = false)"))
         assertTrue(readActivity.contains("private fun chapterPositionForMinimapOffset(page: TextPage, offsetInPage: Float): Int"))
-        assertTrue(readActivity.contains("binding.chapterProgressMinimap.gone(!show || pageCount <= 1)"))
+        assertTrue(readActivity.contains("private fun constrainChapterProgressMinimapPanel(): Boolean"))
+        assertTrue(readActivity.contains("binding.chapterProgressMinimapPanel.updateLayoutParams<FrameLayout.LayoutParams>"))
+        assertTrue(readActivity.contains("binding.chapterProgressMinimap.updateLayoutParams<ViewGroup.LayoutParams>"))
+        assertTrue(readActivity.contains("val minimapHeight = 300.dpToPx().coerceAtMost(maxMinimapHeight)"))
+        assertTrue(readActivity.contains("val panelHeight = minimapHeight + controlsTopMargin + controlsHeight"))
+        assertTrue(readActivity.contains("topMargin = centeredMinimapPanelTopMargin(topLimit, availableHeight, panelHeight)"))
+        assertTrue(readActivity.contains("private fun centeredMinimapPanelTopMargin(topLimit: Int, availableHeight: Int, panelHeight: Int): Int"))
+        assertTrue(readActivity.contains("R.id.title_bar_shell"))
+        assertTrue(readActivity.contains("R.id.bottom_menu"))
+        assertTrue(readActivity.contains("binding.chapterProgressMinimapPanel.gone(!show || pageCount <= 1)"))
         assertTrue(readActivity.contains("updateChapterProgressMinimap(show = true)"))
-        assertTrue(readActivity.contains("override fun onMenuHide() {\n        binding.readView.autoPager.resume()\n        binding.chapterProgressMinimap.gone()"))
+        assertTrue(readActivity.contains("override fun onMenuHide() {\n        binding.readView.autoPager.resume()\n        binding.chapterProgressMinimap.clearPinnedProgressRatio()\n        binding.chapterProgressMinimapPanel.gone()"))
         assertTrue(minimapView.contains("private var dragRatio: Float? = null"))
+        assertTrue(minimapView.contains("private var pinnedProgressRatio: Float? = null"))
+        assertTrue(minimapView.contains("fun clearPinnedProgressRatio()"))
         assertTrue(minimapView.contains("var onProgressChanging: ((progressRatio: Float) -> Unit)? = null"))
         assertTrue(minimapView.contains("fun updateChapter("))
         assertTrue(minimapView.contains("private var chapterText: String"))
         assertTrue(minimapView.contains("StaticLayout.Builder.obtain"))
         assertTrue(minimapView.contains("onProgressChanging?.invoke(ratio)"))
         assertTrue(minimapView.contains("onProgressChanged?.invoke(ratio)"))
+        assertTrue(minimapView.contains("pinnedProgressRatio = ratio"))
+        assertTrue(minimapView.contains("dragRatio ?: pinnedProgressRatio ?: progressRatio()"))
         assertTrue(minimapView.contains("private var dragThumbTouchOffset = 0f"))
         assertTrue(minimapView.contains("private fun beginDrag(y: Float)"))
         assertTrue(minimapView.contains("dragThumbTouchOffset = (y - thumbTop).coerceIn(0f, thumbHeight)"))
@@ -793,7 +1030,11 @@ class ReadMenuLayoutTest {
         assertTrue(readView.contains("fun previewChapterProgress(pageIndex: Int, pageOffset: Int)"))
         assertTrue(readView.contains("curPage.previewChapterProgress(page, pageOffset)"))
         assertTrue(pageView.contains("fun previewChapterProgress(textPage: TextPage, pageOffset: Int)"))
-        assertTrue(pageView.contains("binding.contentTextView.setPageOffset(pageOffset)"))
+        assertTrue(pageView.contains("binding.contentTextView.previewChapterProgress(textPage, pageOffset)"))
+        assertTrue(contentTextView.contains("fun previewChapterProgress(textPage: TextPage, offset: Int)"))
+        assertTrue(contentTextView.contains("private var chapterProgressPreview = false"))
+        assertTrue(contentTextView.contains("val drawContinuousPages = callBack.isScroll || chapterProgressPreview"))
+        assertTrue(contentTextView.contains("private fun hasRelativePage(relativePos: Int): Boolean"))
         assertTrue(contentTextView.contains("fun setPageOffset(offset: Int)"))
         assertTrue(readBook.contains("fun commitChapterProgressPosition(position: Int"))
         assertTrue(readBook.contains("chapterProgressPageBreak = ChapterProgressPageBreak(durChapterIndex, targetPosition)"))
@@ -803,6 +1044,163 @@ class ReadMenuLayoutTest {
         assertTrue(chapterProvider.contains("ReadBook.chapterProgressPageBreakPosition(bookChapter.index)"))
         assertTrue(textChapterLayout.contains("private val forcedPageBreakPosition = textChapter.forcedPageBreakPosition"))
         assertTrue(textChapterLayout.contains("private fun shouldApplyForcedPageBreak(textLine: TextLine): Boolean"))
+    }
+
+    @Test
+    fun mangaProgressMinimapSitsOnMangaSurfaceAndReplacesBottomSeek() {
+        val layout = mangaActivityLayout()
+        val mangaMenuLayout = parseXml(repoFile("app/src/main/res/layout/view_manga_menu.xml"))
+        val mangaActivity = repoFile("app/src/main/java/io/legado/app/ui/book/manga/ReadMangaActivity.kt").readText()
+        val mangaMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/MangaMenu.kt").readText()
+        val minimapView = repoFile("app/src/main/java/io/legado/app/ui/book/manga/MangaProgressMinimapView.kt").readText()
+        val strings = repoFile("app/src/main/res/values/strings.xml").readText()
+        val zhStrings = repoFile("app/src/main/res/values-zh/strings.xml").readText()
+        val webtoonFrame = layout.elementById("webtoon_frame")
+        val mangaMenuView = layout.elementById("manga_menu")
+        val minimapPanel = layout.elementById("manga_progress_minimap_panel")
+        val minimap = layout.elementById("manga_progress_minimap")
+        val minimapControls = layout.elementById("manga_progress_minimap_controls")
+        val previousButton = layout.elementById("btn_manga_minimap_previous")
+        val nextButton = layout.elementById("btn_manga_minimap_next")
+        val previousText = layout.elementById("tv_manga_minimap_previous")
+        val nextText = layout.elementById("tv_manga_minimap_next")
+        val loading = layout.elementById("fl_loading")
+
+        assertEquals("LinearLayout", minimapPanel.tagName)
+        assertEquals("56dp", minimapPanel.androidAttr("layout_width"))
+        assertEquals("wrap_content", minimapPanel.androidAttr("layout_height"))
+        assertEquals("end|top", minimapPanel.androidAttr("layout_gravity"))
+        assertEquals("8dp", minimapPanel.androidAttr("layout_marginEnd"))
+        assertEquals("gone", minimapPanel.androidAttr("visibility"))
+        assertEquals("io.legado.app.ui.book.manga.MangaProgressMinimapView", minimap.tagName)
+        assertEquals("56dp", minimap.androidAttr("layout_width"))
+        assertEquals("wrap_content", minimap.androidAttr("layout_height"))
+        assertEquals("true", minimap.androidAttr("clickable"))
+        assertEquals("true", minimap.androidAttr("focusable"))
+        assertEquals("@string/manga_progress_minimap", minimap.androidAttr("contentDescription"))
+        assertTrue(minimap.hasAncestor(minimapPanel))
+        assertTrue(minimap.isBefore(minimapControls))
+        assertEquals("vertical", minimapControls.androidAttr("orientation"))
+        assertEquals("56dp", minimapControls.androidAttr("layout_width"))
+        assertEquals("wrap_content", minimapControls.androidAttr("layout_height"))
+        listOf(previousButton, nextButton).forEach { button ->
+            assertEquals("FrameLayout", button.tagName)
+            assertEquals("56dp", button.androidAttr("layout_width"))
+            assertEquals("32dp", button.androidAttr("layout_height"))
+            assertEquals("true", button.androidAttr("clickable"))
+            assertEquals("true", button.androidAttr("focusable"))
+            assertTrue(button.hasAncestor(minimapControls))
+        }
+        assertEquals("@string/previous_chapter", previousButton.androidAttr("contentDescription"))
+        assertEquals("@string/previous_chapter", previousText.androidAttr("text"))
+        assertEquals("@color/white", previousText.androidAttr("textColor"))
+        assertEquals("12sp", previousText.androidAttr("textSize"))
+        assertEquals("center", previousText.androidAttr("gravity"))
+        assertTrue(previousText.hasAncestor(previousButton))
+        assertEquals("@string/next_chapter", nextButton.androidAttr("contentDescription"))
+        assertEquals("@string/next_chapter", nextText.androidAttr("text"))
+        assertEquals("@color/white", nextText.androidAttr("textColor"))
+        assertEquals("12sp", nextText.androidAttr("textSize"))
+        assertEquals("center", nextText.androidAttr("gravity"))
+        assertTrue(nextText.hasAncestor(nextButton))
+        assertTrue(layout.elementById("manga_minimap_previous_glass_view").hasAncestor(previousButton))
+        assertTrue(layout.elementById("manga_minimap_previous_shell_overlay").hasAncestor(previousButton))
+        assertTrue(layout.elementById("manga_minimap_next_glass_view").hasAncestor(nextButton))
+        assertTrue(layout.elementById("manga_minimap_next_shell_overlay").hasAncestor(nextButton))
+        assertTrue(previousButton.isBefore(nextButton))
+        assertTrue(webtoonFrame.isBefore(minimapPanel))
+        assertTrue(mangaMenuView.isBefore(minimapPanel))
+        assertTrue(minimapPanel.isBefore(loading))
+        assertTrue(strings.contains("<string name=\"manga_progress_minimap\">Manga progress</string>"))
+        assertTrue(zhStrings.contains("<string name=\"manga_progress_minimap\">漫画进度</string>"))
+
+        assertFalse(mangaMenuLayout.elementsByName("io.legado.app.lib.theme.view.ThemeSeekBar")
+            .any { it.androidAttr("id") == "@+id/seek_read_page" })
+        assertFalse(mangaMenu.contains("seekReadPage.setOnSeekBarChangeListener"))
+        assertFalse(mangaMenu.contains("fun upSeekBar("))
+        assertFalse(mangaMenu.contains("fun skipToPage(index: Int)"))
+        assertFalse(mangaActivity.contains("binding.mangaMenu.upSeekBar"))
+
+        assertTrue(mangaActivity.contains("private fun bindMangaProgressMinimap()"))
+        assertTrue(mangaActivity.contains("binding.mangaProgressMinimap.onProgressChanging = ::previewMangaProgressMinimap"))
+        assertTrue(mangaActivity.contains("binding.mangaProgressMinimap.onProgressChanged = ::commitMangaProgressMinimap"))
+        assertTrue(mangaActivity.contains("private fun setupMangaMinimapControlGlass()"))
+        assertFalse(
+            mangaActivity.substringAfter("private fun bindMangaProgressMinimap()")
+                .substringBefore("private fun setupMangaMinimapControlGlass()")
+                .contains("setupMangaMinimapControlGlass()")
+        )
+        assertTrue(mangaActivity.contains("if (!ViewCompat.isLaidOut(binding.webtoonFrame) || glassViews.any { !ViewCompat.isLaidOut(it) })"))
+        assertTrue(mangaActivity.contains("binding.mangaProgressMinimapPanel.post"))
+        assertTrue(mangaActivity.contains("binding.mangaMinimapPreviousGlassView"))
+        assertTrue(mangaActivity.contains("binding.mangaMinimapNextGlassView"))
+        assertTrue(mangaActivity.contains("ReaderBottomGlassStyle.configureLiquidGlass"))
+        assertTrue(mangaActivity.contains("ReaderBottomGlassStyle.shell"))
+        assertTrue(mangaActivity.contains("ReaderBottomGlassStyle.fallbackShell"))
+        assertTrue(mangaActivity.contains("binding.btnMangaMinimapPrevious.setOnClickListener"))
+        assertTrue(mangaActivity.contains("ReadManga.moveToPrevChapter(true)"))
+        assertTrue(mangaActivity.contains("binding.btnMangaMinimapNext.setOnClickListener"))
+        assertTrue(mangaActivity.contains("ReadManga.moveToNextChapter(true)"))
+        assertTrue(mangaActivity.contains("private fun updateMangaProgressMinimap(show: Boolean = binding.mangaMenu.isVisible)"))
+        assertTrue(mangaActivity.contains("val imageUrls = currentMangaImageUrls()"))
+        assertTrue(mangaActivity.contains("binding.mangaProgressMinimap.updatePages(imageUrls, ReadManga.book?.origin, ReadManga.durChapterPos)"))
+        assertTrue(mangaActivity.contains("binding.mangaProgressMinimapPanel.gone(!show || pageCount <= 1)"))
+        assertTrue(mangaActivity.contains("private fun currentMangaImageUrls(): List<String>"))
+        assertTrue(mangaActivity.contains("ReadManga.curMangaChapter?.pages?.filterIsInstance<MangaPage>()"))
+        assertTrue(mangaActivity.contains("private fun previewMangaProgressMinimap(ratio: Float)"))
+        assertTrue(mangaActivity.contains("private fun commitMangaProgressMinimap(ratio: Float)"))
+        assertTrue(mangaActivity.contains("private fun scrollToMangaProgress(ratio: Float, commit: Boolean)"))
+        assertTrue(mangaActivity.contains("ReadManga.saveRead(true)"))
+        assertTrue(mangaActivity.contains("updateMangaProgressMinimap(menuIsVisible)"))
+        assertTrue(mangaActivity.contains("private fun constrainMangaProgressMinimapPanel(): Boolean"))
+        assertTrue(mangaActivity.contains("binding.mangaProgressMinimapPanel.updateLayoutParams<FrameLayout.LayoutParams>"))
+        assertTrue(mangaActivity.contains("binding.mangaProgressMinimap.setMaxAvailableHeight"))
+        assertTrue(mangaActivity.contains("val minimapHeight = binding.mangaProgressMinimap.desiredHeightWithin(maxMinimapHeight)"))
+        assertTrue(mangaActivity.contains("val panelHeight = minimapHeight + controlsTopMargin + controlsHeight"))
+        assertTrue(mangaActivity.contains("topMargin = centeredMinimapPanelTopMargin(topLimit, availableHeight, panelHeight)"))
+        assertTrue(mangaActivity.contains("private fun centeredMinimapPanelTopMargin(topLimit: Int, availableHeight: Int, panelHeight: Int): Int"))
+        assertTrue(mangaActivity.contains("R.id.title_bar_shell"))
+        assertTrue(mangaActivity.contains("R.id.bottom_menu"))
+
+        assertTrue(minimapView.contains("var onProgressChanging: ((progressRatio: Float) -> Unit)? = null"))
+        assertTrue(minimapView.contains("var onProgressChanged: ((progressRatio: Float) -> Unit)? = null"))
+        assertTrue(minimapView.contains("fun updatePages(imageUrls: List<String>, sourceOrigin: String?, progress: Int)"))
+        assertTrue(minimapView.contains("fun updateProgress(pageCount: Int, progress: Int)"))
+        assertTrue(minimapView.contains("fun setMaxAvailableHeight(maxHeightPx: Int)"))
+        assertTrue(minimapView.contains("fun desiredHeightWithin(maxHeightPx: Int): Int"))
+        assertTrue(minimapView.contains("private var maxAvailableHeightPx"))
+        assertTrue(minimapView.contains("coerceAtMost(maxAvailableHeightPx)"))
+        assertTrue(minimapView.contains("override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int)"))
+        assertTrue(minimapView.contains("private fun desiredHeightForPageCount(): Int"))
+        assertTrue(minimapView.contains("MINIMAP_MIN_HEIGHT_DP"))
+        assertTrue(minimapView.contains("MINIMAP_MAX_HEIGHT_DP"))
+        assertTrue(minimapView.contains("MINIMAP_PAGE_HEIGHT_DP"))
+        assertTrue(minimapView.contains("requestLayout()"))
+        assertTrue(minimapView.contains("private val thumbnailDrawables = mutableMapOf<Int, Drawable>()"))
+        assertTrue(minimapView.contains("private val thumbnailTargets = mutableMapOf<Int, CustomTarget<Drawable>>()"))
+        assertTrue(minimapView.contains("BookCover.loadManga("))
+        assertTrue(minimapView.contains("private fun loadThumbnail(index: Int, url: String)"))
+        assertTrue(minimapView.contains("private fun drawPageThumbnail(canvas: Canvas, index: Int)"))
+        assertTrue(minimapView.contains("private fun clearThumbnailTargets()"))
+        assertTrue(minimapView.contains("override fun onDetachedFromWindow()"))
+        assertTrue(minimapView.contains("private var dragThumbTouchOffset = 0f"))
+        assertTrue(minimapView.contains("private fun beginDrag(y: Float)"))
+        assertTrue(minimapView.contains("dragThumbTouchOffset = (y - thumbTop).coerceIn(0f, thumbHeight)"))
+        assertTrue(minimapView.contains("val thumbTop = (y - dragThumbTouchOffset)"))
+        assertTrue(minimapView.contains("onProgressChanging?.invoke(ratio)"))
+        assertTrue(minimapView.contains("onProgressChanged?.invoke(ratio)"))
+        assertTrue(minimapView.contains("drawPageStrip(canvas)"))
+        assertFalse(minimapView.contains("drawRoundRect"))
+    }
+
+    @Test
+    fun minimapControlGlassWaitsForLaidOutViewsBeforeConfiguringLiquidGlass() {
+        val glassStyle = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReaderBottomGlassStyle.kt").readText()
+
+        assertTrue(glassStyle.contains("import androidx.core.view.ViewCompat"))
+        assertTrue(glassStyle.contains("): Boolean {"))
+        assertTrue(glassStyle.contains("if (!ViewCompat.isLaidOut(target) || !ViewCompat.isLaidOut(liquidGlassView)) {\n            return false\n        }"))
+        assertTrue(glassStyle.contains("return true"))
     }
 
     @Test
@@ -1778,6 +2176,14 @@ class ReadMenuLayoutTest {
         val file = findRepoFile("app/src/main/res/layout/activity_book_read.xml")
             ?: findRepoFile("src/main/res/layout/activity_book_read.xml")
             ?: error("activity_book_read.xml not found")
+
+        return parseXml(file)
+    }
+
+    private fun mangaActivityLayout(): Element {
+        val file = findRepoFile("app/src/main/res/layout/activity_manga.xml")
+            ?: findRepoFile("src/main/res/layout/activity_manga.xml")
+            ?: error("activity_manga.xml not found")
 
         return parseXml(file)
     }

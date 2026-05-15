@@ -99,9 +99,11 @@ import io.legado.app.ui.widget.number.NumberPickerDialog
 import io.legado.app.ui.widget.seekbar.SeekBarChangeListener
 import io.legado.app.utils.ChineseUtils
 import io.legado.app.utils.ColorUtils
+import io.legado.app.utils.applyTopBarIconMetrics
 import io.legado.app.utils.canvasrecorder.CanvasRecorderFactory
 import io.legado.app.utils.activity
 import io.legado.app.utils.applyNavigationBarPadding
+import io.legado.app.utils.applyStatusBarPadding
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getCompatColor
@@ -183,6 +185,7 @@ class ReadMenu @JvmOverloads constructor(
     private var bottomTabPanelAttached: Boolean = false
     private var bottomTabHeightAnimator: ValueAnimator? = null
     private var bottomTabGlassStyleKey: String? = null
+    private var topBarGlassStyleKey: String? = null
     private var layoutAdjustGlassStyleKey: String? = null
     private var bottomTabGlassLayerHeight: Int = 0
     private var layoutAdjustGlassLayerHeight: Int = 0
@@ -402,9 +405,10 @@ class ReadMenu @JvmOverloads constructor(
     }
     private val menuInListener = object : Animation.AnimationListener {
         override fun onAnimationStart(animation: Animation) {
-            binding.tvSourceAction.gone()
+            updateTopBarSourceAction()
             updateTopBarLoginAction()
             callBack.upSystemUiVisibility()
+            configureTopBarFrostedGlass()
         }
 
         @SuppressLint("RtlHardcoded")
@@ -426,7 +430,7 @@ class ReadMenu @JvmOverloads constructor(
 
         override fun onAnimationEnd(animation: Animation) {
             this@ReadMenu.invisible()
-            binding.titleBar.invisible()
+            binding.titleBarShell.invisible()
             binding.bottomMenu.invisible()
             binding.layoutMarginAdjustOverlay.gone()
             clearLayoutAdjustBackdrop()
@@ -446,6 +450,7 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     init {
+        binding.titleBar.applyStatusBarPadding(withInitialPadding = true)
         initView()
         upBrightnessState()
         bindEvent()
@@ -459,19 +464,24 @@ class ReadMenu @JvmOverloads constructor(
         setupAloudPanel()
         setupTopBarLoginAction()
         val topBarTextColor = textColor
+        configureCompactReadToolbar()
         val additionTextColor = if (immersiveMenu) {
             ColorUtils.withAlpha(ColorUtils.lightenColor(topBarTextColor), 0.75f)
         } else {
             topBarTextColor
         }
         titleBar.setTextColor(topBarTextColor)
-        titleBar.setBackgroundColor(ColorUtils.withAlpha(bgColor, 1f))
-        titleBar.setColorFilter(topBarTextColor)
+        titleBar.setBackgroundColor(Color.TRANSPARENT)
+        applyTopBarIconColor()
         tvChapterName.setTextColor(additionTextColor)
         tvChapterUrl.setTextColor(additionTextColor)
         tvSourceAction.gone()
         if (AppConfig.isEInkMode) {
+            titleBarGlassView.gone()
+            titleBarShellOverlay.gone()
             titleBar.setBackgroundResource(R.drawable.bg_eink_border_bottom)
+        } else {
+            configureTopBarFrostedGlass()
         }
         flExpandedPanel.background = null
         flExpandedPanel.elevation = 0f
@@ -539,10 +549,35 @@ class ReadMenu @JvmOverloads constructor(
         } else {
             titleBarAddition.gone()
         }
+        if (!AppConfig.isEInkMode) {
+            configureTopBarFrostedGlass()
+        }
         /**
          * 确保视图不被导航栏遮挡
          */
         applyNavigationBarPadding()
+    }
+
+    private fun configureCompactReadToolbar() = binding.run {
+        titleBar.toolbar.updateLayoutParams<ViewGroup.LayoutParams> {
+            height = topBarButtonSize()
+        }
+        titleBarAddition.updateLayoutParams<ViewGroup.LayoutParams> {
+            height = topBarButtonSize()
+        }
+        titleBar.toolbar.minimumHeight = topBarButtonSize()
+        titleBar.toolbar.contentInsetStartWithNavigation = 0
+        titleBar.toolbar.contentInsetEndWithActions = 0
+        applyTopBarIconColor()
+    }
+
+    private fun topBarButtonSize(): Int {
+        return resources.getDimensionPixelSize(R.dimen.read_top_bar_button_size)
+    }
+
+    private fun applyTopBarIconColor() {
+        binding.titleBar.setColorFilter(Color.WHITE)
+        binding.titleBar.toolbar.applyTopBarIconMetrics(Color.WHITE)
     }
 
     fun reset() {
@@ -551,9 +586,7 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     fun refreshMenuColorFilter() {
-        if (immersiveMenu) {
-            binding.titleBar.setColorFilter(textColor)
-        }
+        applyTopBarIconColor()
     }
 
     private fun upColorConfig() {
@@ -615,13 +648,13 @@ class ReadMenu @JvmOverloads constructor(
     fun runMenuIn(anim: Boolean = !AppConfig.isEInkMode) {
         callBack.onMenuShow()
         this.visible()
-        binding.titleBar.visible()
+        binding.titleBarShell.visible()
         binding.bottomMenu.visible()
         binding.layoutMarginAdjustOverlay.gone()
         switchBottomTabMode(BottomTabMode.Primary, animate = false)
         hideExpandedPanel(anim = false)
         if (anim) {
-            binding.titleBar.startAnimation(menuTopIn)
+            binding.titleBarShell.startAnimation(menuTopIn)
             binding.bottomMenu.startAnimation(menuBottomIn)
         } else {
             menuInListener.onAnimationStart(menuBottomIn)
@@ -637,7 +670,7 @@ class ReadMenu @JvmOverloads constructor(
         this.onMenuOutEnd = onMenuOutEnd
         if (this.isVisible) {
             if (anim) {
-                binding.titleBar.startAnimation(menuTopOut)
+                binding.titleBarShell.startAnimation(menuTopOut)
                 binding.bottomMenu.startAnimation(menuBottomOut)
             } else {
                 menuOutListener.onAnimationStart(menuBottomOut)
@@ -1044,6 +1077,7 @@ class ReadMenu @JvmOverloads constructor(
             }
         loginItem.setIcon(R.drawable.ic_lucide_link_2)
         loginItem.title = context.getString(R.string.login)
+        applyTopBarIconColor()
         titleBar.toolbar.setOnMenuItemClickListener { item ->
             if (item.itemId == R.id.menu_login) {
                 callBack.showLogin()
@@ -1058,6 +1092,17 @@ class ReadMenu @JvmOverloads constructor(
     private fun updateTopBarLoginAction() = binding.run {
         titleBar.menu.findItem(R.id.menu_login)?.isVisible =
             !ReadBook.isLocalBook && !ReadBook.bookSource?.loginUrl.isNullOrEmpty()
+        applyTopBarIconColor()
+    }
+
+    private fun updateTopBarSourceAction() = binding.run {
+        if (ReadBook.isLocalBook) {
+            tvSourceAction.gone()
+            return@run
+        }
+        tvSourceAction.text =
+            ReadBook.bookSource?.bookSourceName ?: context.getString(R.string.book_source)
+        tvSourceAction.visible()
     }
 
     private fun updateAloudControls() = binding.run {
@@ -1673,7 +1718,7 @@ class ReadMenu @JvmOverloads constructor(
         val screenCap = (rootHeight - bottomBarHeight - bottomPadding - topGap)
             .coerceAtLeast(96.dpToPx())
         val minHeight = 180.dpToPx().coerceAtMost(screenCap)
-        val belowTitle = rootHeight - binding.titleBar.bottom - topGap -
+        val belowTitle = rootHeight - binding.titleBarShell.bottom - topGap -
                 bottomBarHeight - bottomPadding
         return belowTitle.coerceIn(minHeight, screenCap)
     }
@@ -4013,6 +4058,72 @@ class ReadMenu @JvmOverloads constructor(
         }
     }
 
+    private fun configureTopBarFrostedGlass() = binding.run {
+        titleBarShell.clipToOutline = true
+        if (AppConfig.isEInkMode) {
+            titleBarGlassView.gone()
+            titleBarShellOverlay.gone()
+            return@run
+        }
+
+        val glassLevel = (AppConfig.frostedGlassLevel / 100f)
+            .coerceIn(0.45f, 1f)
+        val glassStyleKey =
+            "top-glass:${bottomTabUseDarkGlass()}:${context.accentColor}:${AppConfig.frostedGlassLevel}:$bgColor:$textColor"
+        if (topBarGlassStyleKey != glassStyleKey) {
+            titleBarShell.background = readBottomTabGlassFallbackShell(glassLevel, 0f)
+            titleBarGlassView.visible()
+            titleBarShellOverlay.visible()
+            titleBarShellOverlay.background = readBottomTabGlassShell(glassLevel, 0f)
+            topBarGlassStyleKey = glassStyleKey
+        } else {
+            if (!titleBarGlassView.isVisible) {
+                titleBarGlassView.visible()
+            }
+            if (!titleBarShellOverlay.isVisible) {
+                titleBarShellOverlay.visible()
+            }
+        }
+
+        syncTopBarGlassLayerHeight()
+        titleBarShell.post {
+            syncTopBarGlassLayerHeight()
+            setupTopBarFrostedGlassView(glassLevel)
+        }
+    }
+
+    private fun setupTopBarFrostedGlassView(glassLevel: Float) = binding.run {
+        val target = bottomTabGlassTarget()
+        if (!target.isLaidOut || !titleBarShell.isLaidOut || syncTopBarGlassLayerHeight() <= 0) {
+            return@run
+        }
+        setupBottomTabFrostedGlassView(
+            liquidGlassView = titleBarGlassView,
+            target = target,
+            cornerRadius = 0f,
+            refractionHeight = (12f + glassLevel * 8f).dpToPx(),
+            refractionOffset = (34f + glassLevel * 18f).dpToPx(),
+            blurRadius = (22f + glassLevel * 30f).dpToPx(),
+            dispersion = (0.18f + glassLevel * 0.16f).coerceAtMost(0.42f),
+            tintAlpha = bottomTabGlassTintAlpha(glassLevel),
+            tintColor = bottomTabGlassTintColor()
+        )
+    }
+
+    private fun syncTopBarGlassLayerHeight(): Int = binding.run {
+        val targetHeight = titleBar.height.takeIf { it > 0 } ?: return@run 0
+        setTopBarGlassLayerChildHeight(titleBarGlassView, targetHeight)
+        setTopBarGlassLayerChildHeight(titleBarShellOverlay, targetHeight)
+        targetHeight
+    }
+
+    private fun setTopBarGlassLayerChildHeight(view: View, height: Int) {
+        view.updateLayoutParams<FrameLayout.LayoutParams> {
+            this.height = height
+            gravity = Gravity.TOP
+        }
+    }
+
     private fun configureBottomTabFrostedGlass() = binding.run {
         bottomTabBar.clipToOutline = true
         if (AppConfig.isEInkMode) {
@@ -4855,6 +4966,7 @@ class ReadMenu @JvmOverloads constructor(
         binding.titleBar.subtitle = null
         binding.tvChapterName.text = ReadBook.book?.name.orEmpty()
         binding.tvChapterName.visible()
+        updateTopBarSourceAction()
         updateTopBarLoginAction()
         ReadBook.curTextChapter?.let {
             binding.tvChapterUrl.text = it.title
