@@ -1038,7 +1038,7 @@ class ReadMenuLayoutTest {
         assertTrue(readActivity.contains("private fun centeredMinimapPanelTopMargin(topLimit: Int, availableHeight: Int, panelHeight: Int): Int"))
         assertTrue(readActivity.contains("R.id.title_bar_shell"))
         assertTrue(readActivity.contains("R.id.bottom_menu"))
-        assertTrue(readActivity.contains("binding.chapterProgressMinimapPanel.gone(!show || pageCount <= 1)"))
+        assertTrue(readActivity.contains("binding.chapterProgressMinimapPanel.gone(!shouldShow || pageCount <= 1)"))
         assertTrue(readActivity.contains("updateChapterProgressMinimap(show = true)"))
         assertTrue(readActivity.contains("private fun scheduleChapterProgressMinimapStableSync()"))
         assertTrue(readActivity.contains("private var pendingChapterProgressMinimapLayoutSync = false"))
@@ -1297,6 +1297,29 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun expandedReaderPanelHidesChapterProgressMinimapUntilDismissed() {
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val readActivity = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt").readText()
+
+        assertTrue(readMenu.contains("val isExpandedPanelVisible: Boolean"))
+        assertTrue(readMenu.contains("callBack.onReadMenuExpandedPanelVisibilityChanged(true)"))
+        assertTrue(readMenu.contains("callBack.onReadMenuExpandedPanelVisibilityChanged(false)"))
+        assertTrue(readMenu.contains("fun onReadMenuExpandedPanelVisibilityChanged(isVisible: Boolean)"))
+        assertTrue(readActivity.contains("override fun onReadMenuExpandedPanelVisibilityChanged(isVisible: Boolean)"))
+        assertTrue(readActivity.contains("val shouldShow = show && !binding.readMenu.isExpandedPanelVisible"))
+        assertTrue(readActivity.contains("binding.chapterProgressMinimapPanel.gone(!shouldShow || pageCount <= 1)"))
+        assertTrue(
+            readActivity.contains(
+                "if (isVisible) {\n" +
+                        "            binding.chapterProgressMinimapPanel.gone()\n" +
+                        "        } else {\n" +
+                        "            updateChapterProgressMinimap(show = binding.readMenu.isVisible)\n" +
+                        "        }"
+            )
+        )
+    }
+
+    @Test
     fun minimapControlGlassWaitsForLaidOutViewsBeforeConfiguringLiquidGlass() {
         val glassStyle = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReaderBottomGlassStyle.kt").readText()
 
@@ -1304,6 +1327,15 @@ class ReadMenuLayoutTest {
         assertTrue(glassStyle.contains("): Boolean {"))
         assertTrue(glassStyle.contains("if (!ViewCompat.isLaidOut(target) || !ViewCompat.isLaidOut(liquidGlassView)) {\n            return false\n        }"))
         assertTrue(glassStyle.contains("return true"))
+    }
+
+    @Test
+    fun readerGlassChromeUsesMoreTransparentAlphaRecipe() {
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val mangaMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/MangaMenu.kt").readText()
+        val minimapButtons = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReaderBottomGlassStyle.kt").readText()
+
+        listOf(readMenu, mangaMenu, minimapButtons).forEach(::assertMoreTransparentGlassRecipe)
     }
 
     @Test
@@ -2478,6 +2510,37 @@ class ReadMenuLayoutTest {
 
     private fun Element.appAttr(name: String): String =
         getAttributeNS(APP_NAMESPACE, name)
+
+    private fun assertMoreTransparentGlassRecipe(source: String) {
+        listOf(
+            "0.42f + glassLevel * 0.14f",
+            "0.22f + glassLevel * 0.12f",
+            "0.35f + glassLevel * 0.13f",
+            "0.16f + glassLevel * 0.09f",
+            "0.26f + glassLevel * 0.11f",
+            "0.10f + glassLevel * 0.07f",
+            "0.46f + glassLevel * 0.14f",
+            "0.20f + glassLevel * 0.14f",
+            "(0.16f + glassLevel * 0.18f).coerceAtMost(0.34f)",
+            "(0.08f + glassLevel * 0.14f).coerceAtMost(0.22f)"
+        ).forEach { expected ->
+            assertTrue("Missing transparent glass recipe value: $expected", source.contains(expected))
+        }
+        listOf(
+            "0.52f + glassLevel * 0.18f",
+            "0.28f + glassLevel * 0.16f",
+            "0.44f + glassLevel * 0.16f",
+            "0.20f + glassLevel * 0.12f",
+            "0.34f + glassLevel * 0.14f",
+            "0.14f + glassLevel * 0.10f",
+            "0.58f + glassLevel * 0.16f",
+            "0.26f + glassLevel * 0.18f",
+            "(0.22f + glassLevel * 0.22f).coerceAtMost(0.44f)",
+            "(0.12f + glassLevel * 0.18f).coerceAtMost(0.30f)"
+        ).forEach { oldValue ->
+            assertFalse("Old opaque glass recipe value is still present: $oldValue", source.contains(oldValue))
+        }
+    }
 
     private fun String.camelCaseBindingName(): String {
         return split('_').mapIndexed { index, segment ->

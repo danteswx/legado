@@ -315,15 +315,15 @@ class MangaMenu @JvmOverloads constructor(
         } else {
             ColorUtils.blendColors(Color.WHITE, context.accentColor, 0.05f)
         }
-        val topAlpha = if (isDark) 0.52f + glassLevel * 0.18f else 0.28f + glassLevel * 0.16f
-        val centerAlpha = if (isDark) 0.44f + glassLevel * 0.16f else 0.20f + glassLevel * 0.12f
-        val bottomAlpha = if (isDark) 0.34f + glassLevel * 0.14f else 0.14f + glassLevel * 0.10f
+        val topAlpha = if (isDark) 0.42f + glassLevel * 0.14f else 0.22f + glassLevel * 0.12f
+        val centerAlpha = if (isDark) 0.35f + glassLevel * 0.13f else 0.16f + glassLevel * 0.09f
+        val bottomAlpha = if (isDark) 0.26f + glassLevel * 0.11f else 0.10f + glassLevel * 0.07f
         return GradientDrawable(
             GradientDrawable.Orientation.TOP_BOTTOM,
             intArrayOf(
-                ColorUtils.withAlpha(surfaceColor, topAlpha.coerceAtMost(if (isDark) 0.70f else 0.44f)),
-                ColorUtils.withAlpha(surfaceColor, centerAlpha.coerceAtMost(if (isDark) 0.60f else 0.34f)),
-                ColorUtils.withAlpha(surfaceColor, bottomAlpha.coerceAtMost(if (isDark) 0.50f else 0.26f))
+                ColorUtils.withAlpha(surfaceColor, topAlpha.coerceAtMost(if (isDark) 0.56f else 0.34f)),
+                ColorUtils.withAlpha(surfaceColor, centerAlpha.coerceAtMost(if (isDark) 0.48f else 0.25f)),
+                ColorUtils.withAlpha(surfaceColor, bottomAlpha.coerceAtMost(if (isDark) 0.37f else 0.17f))
             )
         )
     }
@@ -335,17 +335,17 @@ class MangaMenu @JvmOverloads constructor(
         } else {
             ColorUtils.blendColors(Color.WHITE, context.accentColor, 0.05f)
         }
-        val alpha = if (isDark) 0.58f + glassLevel * 0.16f else 0.26f + glassLevel * 0.18f
+        val alpha = if (isDark) 0.46f + glassLevel * 0.14f else 0.20f + glassLevel * 0.14f
         return GradientDrawable().apply {
-            setColor(ColorUtils.withAlpha(surfaceColor, alpha.coerceAtMost(if (isDark) 0.74f else 0.46f)))
+            setColor(ColorUtils.withAlpha(surfaceColor, alpha.coerceAtMost(if (isDark) 0.60f else 0.34f)))
         }
     }
 
     private fun topBarGlassTintAlpha(glassLevel: Float): Float {
         return if (topBarUseDarkGlass()) {
-            (0.22f + glassLevel * 0.22f).coerceAtMost(0.44f)
+            (0.16f + glassLevel * 0.18f).coerceAtMost(0.34f)
         } else {
-            (0.12f + glassLevel * 0.18f).coerceAtMost(0.30f)
+            (0.08f + glassLevel * 0.14f).coerceAtMost(0.22f)
         }
     }
 

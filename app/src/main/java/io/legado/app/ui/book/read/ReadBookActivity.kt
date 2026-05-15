@@ -1214,6 +1214,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     private fun updateChapterProgressMinimap(show: Boolean = binding.readMenu.isVisible) {
         val textChapter = ReadBook.curTextChapter
         val pageCount = textChapter?.pageSize ?: 0
+        val shouldShow = show && !binding.readMenu.isExpandedPanelVisible
         if (show && textChapter != null) {
             binding.chapterProgressMinimap.updateChapter(
                 textChapter.getContent(),
@@ -1223,8 +1224,8 @@ class ReadBookActivity : BaseReadBookActivity(),
         } else {
             binding.chapterProgressMinimap.updateProgress(pageCount, ReadBook.durPageIndex)
         }
-        binding.chapterProgressMinimapPanel.gone(!show || pageCount <= 1)
-        if (!show || pageCount <= 1) {
+        binding.chapterProgressMinimapPanel.gone(!shouldShow || pageCount <= 1)
+        if (!shouldShow || pageCount <= 1) {
             return
         }
         if (!chapterProgressMinimapMenuChromeReady()) {
@@ -1958,6 +1959,14 @@ class ReadBookActivity : BaseReadBookActivity(),
         binding.readView.autoPager.resume()
         binding.chapterProgressMinimap.clearPinnedProgressRatio()
         binding.chapterProgressMinimapPanel.gone()
+    }
+
+    override fun onReadMenuExpandedPanelVisibilityChanged(isVisible: Boolean) {
+        if (isVisible) {
+            binding.chapterProgressMinimapPanel.gone()
+        } else {
+            updateChapterProgressMinimap(show = binding.readMenu.isVisible)
+        }
     }
 
     override fun onLayoutPageCompleted(index: Int, page: TextPage) {
