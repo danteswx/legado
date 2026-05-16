@@ -108,11 +108,11 @@ object NavigationBarIconConfig {
     )
 
     val items = listOf(
-        NavItem("bookshelf", R.string.bookshelf, R.id.menu_bookshelf, R.drawable.ic_bottom_books),
-        NavItem("discovery", R.string.discovery, R.id.menu_discovery, R.drawable.ic_bottom_explore),
-        NavItem("rss", R.string.rss, R.id.menu_rss, R.drawable.ic_bottom_rss_feed),
-        NavItem("readRecord", R.string.side_nav_stats, R.id.menu_read_record, R.drawable.ic_bottom_read_record),
-        NavItem("my", R.string.my, R.id.menu_my_config, R.drawable.ic_bottom_person),
+        NavItem("bookshelf", R.string.bookshelf, R.id.menu_bookshelf, R.drawable.ic_lucide_books),
+        NavItem("discovery", R.string.discovery, R.id.menu_discovery, R.drawable.ic_lucide_compass),
+        NavItem("rss", R.string.rss, R.id.menu_rss, R.drawable.ic_lucide_rss),
+        NavItem("readRecord", R.string.side_nav_stats, R.id.menu_read_record, R.drawable.ic_lucide_chart_bar),
+        NavItem("my", R.string.my, R.id.menu_my_config, R.drawable.ic_lucide_settings),
         NavItem("ai", R.string.side_nav_assistant, R.id.menu_ai, R.drawable.ic_bottom_ai_assistant)
     )
 
@@ -504,8 +504,7 @@ object NavigationBarIconConfig {
         val selectedColor = ThemeStore.accentColor(context)
         val normal = loadDrawable(context, iconPath(entry, item.key, STATE_NORMAL))
             ?: defaultDrawable(context, item.defaultIconRes, defaultColor)
-        val selected = loadDrawable(context, iconPath(entry, item.key, STATE_SELECTED))
-            ?: loadDrawable(context, iconPath(entry, item.key, STATE_NORMAL))
+        val selected = loadDrawable(context, iconPath(entry, item.key, STATE_NORMAL))
             ?: defaultDrawable(context, item.defaultIconRes, selectedColor)
         return StateListDrawable().apply {
             addState(intArrayOf(android.R.attr.state_checked), selected)

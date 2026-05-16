@@ -280,7 +280,7 @@
                                 android:layout_width="17dp"
                                 android:layout_height="17dp"
                                 android:contentDescription="@string/change_origin"
-                                android:src="@drawable/ic_exchange"
+                                android:src="@drawable/ic_lucide_shuffle"
                                 app:tint="@color/tv_text_summary" />
 
                             <TextView

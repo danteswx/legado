@@ -21,7 +21,7 @@
         android:title="@string/read_record" />
     <item
         android:id="@+id/menu_my_config"
-        android:icon="@drawable/ic_lucide_user"
+        android:icon="@drawable/ic_lucide_settings"
         android:title="@string/my" />
 
 </menu>
