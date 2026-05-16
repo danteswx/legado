@@ -21,6 +21,7 @@ import io.legado.app.help.book.BookTagHelper
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
+import io.legado.app.ui.main.MainActivity
 import io.legado.app.ui.main.bookshelf.BaseBookshelfFragment
 import io.legado.app.ui.main.bookshelf.style1.books.BooksFragment
 import io.legado.app.ui.widget.GridColumnsPopup
@@ -62,6 +63,8 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
     private companion object {
         private const val BOOKSHELF_GRID_COLUMNS_MIN = 2
         private const val BOOKSHELF_GRID_COLUMNS_MAX = 7
+        private const val BOOKSHELF_GRID_SPACING_MIN = 0
+        private const val BOOKSHELF_GRID_SPACING_MAX = 60
     }
 
     override val books: List<Book>
@@ -86,6 +89,9 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
         binding.btnMore.setOnClickListener {
             showModernBookshelfMenu(it)
         }
+        binding.btnBookshelfReadRecord.setOnClickListener {
+            (activity as? MainActivity)?.openReadRecordPage()
+        }
         binding.btnBookshelfLayoutToggle.setOnClickListener {
             switchBookshelfLayout()
         }
@@ -105,6 +111,7 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
         binding.btnMore.setBackgroundResource(R.drawable.bg_more_icon_button_clear)
         val iconColor = ContextCompat.getColor(requireContext(), R.color.primaryText)
         binding.btnMore.setColorFilter(iconColor)
+        binding.btnBookshelfReadRecord.setColorFilter(iconColor)
         binding.ivBookshelfTitleArrow.setColorFilter(iconColor)
         binding.tabLayout.setOnTagClickListener { index ->
             val tag = bookTags.getOrNull(index).orEmpty()
@@ -178,9 +185,13 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
     }
 
     private fun switchBookshelfLayout() {
-        AppConfig.bookshelfLayout = if (AppConfig.bookshelfLayout >= 2) 0 else 2
+        val targetLayout = if (AppConfig.bookshelfLayout >= 2) 0 else 2
+        if (AppConfig.bookshelfLayout == targetLayout) return
+        AppConfig.bookshelfLayout = targetLayout
         updateBookshelfLayoutToggleIcon()
-        activity?.recreate()
+        fragmentMap.values.forEach { fragment ->
+            fragment.updateBookshelfLayout(targetLayout)
+        }
     }
 
     private fun showBookshelfGridColumnsPopup(anchor: View) {
@@ -191,7 +202,14 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
             maxColumns = BOOKSHELF_GRID_COLUMNS_MAX,
             initialColumns = AppConfig.bookshelfLayout.coerceAtLeast(BOOKSHELF_GRID_COLUMNS_MIN),
             previousPopup = gridColumnsPopup,
-            onColumnsChanged = ::setBookshelfGridColumns
+            onColumnsChanging = ::setBookshelfGridColumns,
+            onColumnsChanged = ::setBookshelfGridColumns,
+            initialSpacing = AppConfig.bookshelfMargin,
+            spacingTitleRes = R.string.margin,
+            minSpacing = BOOKSHELF_GRID_SPACING_MIN,
+            maxSpacing = BOOKSHELF_GRID_SPACING_MAX,
+            onSpacingChanging = ::setBookshelfGridSpacing,
+            onSpacingChanged = ::setBookshelfGridSpacing
         )
     }
 
@@ -200,7 +218,18 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
         if (AppConfig.bookshelfLayout == gridColumns) return
         AppConfig.bookshelfLayout = gridColumns
         updateBookshelfLayoutToggleIcon()
-        activity?.recreate()
+        fragmentMap.values.forEach { fragment ->
+            fragment.updateBookshelfLayout(gridColumns)
+        }
+    }
+
+    private fun setBookshelfGridSpacing(spacing: Int) {
+        val gridSpacing = spacing.coerceIn(BOOKSHELF_GRID_SPACING_MIN, BOOKSHELF_GRID_SPACING_MAX)
+        if (AppConfig.bookshelfMargin == gridSpacing) return
+        AppConfig.bookshelfMargin = gridSpacing
+        fragmentMap.values.forEach { fragment ->
+            fragment.updateBookshelfSpacing(spacing)
+        }
     }
 
     private fun updateBookshelfLayoutToggleIcon() {

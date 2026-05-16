@@ -46,6 +46,21 @@
     </FrameLayout>
 
     <androidx.appcompat.widget.AppCompatImageButton
+        android:id="@+id/btn_bookshelf_read_record"
+        android:layout_width="@dimen/discover_top_action_button_size"
+        android:layout_height="@dimen/discover_top_action_button_size"
+        android:layout_marginEnd="10dp"
+        android:background="@drawable/bg_discover_embedded_action"
+        android:contentDescription="@string/read_record"
+        android:padding="@dimen/discover_top_action_button_padding"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_lucide_chart_bar"
+        android:tint="@color/primaryText"
+        app:layout_constraintBottom_toBottomOf="@id/title_row"
+        app:layout_constraintEnd_toStartOf="@id/btn_bookshelf_layout_toggle"
+        app:layout_constraintTop_toTopOf="@id/title_row" />
+
+    <androidx.appcompat.widget.AppCompatImageButton
         android:id="@+id/btn_bookshelf_layout_toggle"
         android:layout_width="@dimen/discover_top_action_button_size"
         android:layout_height="@dimen/discover_top_action_button_size"
@@ -69,7 +84,7 @@
         android:layout_marginEnd="@dimen/bookshelf_title_row_margin_end"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        app:layout_constraintEnd_toStartOf="@id/btn_bookshelf_layout_toggle"
+        app:layout_constraintEnd_toStartOf="@id/btn_bookshelf_read_record"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 

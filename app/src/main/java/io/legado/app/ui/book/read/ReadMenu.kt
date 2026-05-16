@@ -5348,7 +5348,7 @@ class ReadMenu @JvmOverloads constructor(
                 minimumHeight = 54.dpToPx()
                 gravity = Gravity.CENTER_VERTICAL
                 orientation = LinearLayout.HORIZONTAL
-                setPadding(4.dpToPx(), 6.dpToPx(), 4.dpToPx(), 6.dpToPx())
+                setPadding(12.dpToPx(), 6.dpToPx(), 12.dpToPx(), 6.dpToPx())
             }
             val textColumn = LinearLayout(context).apply {
                 layoutParams = LinearLayout.LayoutParams(
@@ -5407,11 +5407,12 @@ class ReadMenu @JvmOverloads constructor(
                 downloadingChapters.remove(chapter.index)
             }
             val downloading = chapter.index in downloadingChapters
+            holder.itemView.background = if (selected) tocSelectedBackground(context) else null
             holder.title.text = chapter.title
             holder.title.setTypeface(null, if (chapter.isVolume) Typeface.BOLD else Typeface.NORMAL)
             holder.title.setTextColor(
                 when {
-                    selected -> context.accentColor
+                    selected -> Color.WHITE
                     AppConfig.isNightTheme -> ColorUtils.adjustAlpha(Color.WHITE, 0.86f)
                     else -> ColorUtils.adjustAlpha(Color.BLACK, 0.82f)
                 }
@@ -5419,14 +5420,14 @@ class ReadMenu @JvmOverloads constructor(
             holder.meta.text = buildTocMeta(context, chapter, downloaded, downloading)
             holder.meta.setTextColor(
                 when {
-                    selected -> ColorUtils.adjustAlpha(context.accentColor, 0.72f)
+                    selected -> ColorUtils.adjustAlpha(Color.WHITE, 0.76f)
                     AppConfig.isNightTheme -> ColorUtils.adjustAlpha(Color.WHITE, 0.52f)
                     else -> ColorUtils.adjustAlpha(Color.BLACK, 0.48f)
                 }
             )
             holder.download.isVisible = !chapter.isVolume && !downloaded && !downloading
             holder.download.setColorFilter(
-                if (selected) context.accentColor else holder.title.currentTextColor,
+                if (selected) Color.WHITE else holder.title.currentTextColor,
                 PorterDuff.Mode.SRC_IN
             )
             holder.download.setOnClickListener {
@@ -5445,6 +5446,13 @@ class ReadMenu @JvmOverloads constructor(
         }
 
         override fun getItemCount(): Int = chapters.size
+
+        private fun tocSelectedBackground(context: Context): GradientDrawable {
+            return GradientDrawable().apply {
+                cornerRadius = 12f.dpToPx()
+                setColor(context.accentColor)
+            }
+        }
 
         private fun notifyTocChapterChanged(chapterIndex: Int) {
             val adapterPosition = chapters.indexOfFirst { it.index == chapterIndex }

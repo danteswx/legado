@@ -26,7 +26,13 @@ object GridColumnsPopup {
         initialColumns: Int,
         previousPopup: PopupWindow? = null,
         onColumnsChanging: ((Int) -> Unit)? = null,
-        onColumnsChanged: (Int) -> Unit
+        onColumnsChanged: (Int) -> Unit,
+        initialSpacing: Int? = null,
+        spacingTitleRes: Int? = null,
+        minSpacing: Int = 0,
+        maxSpacing: Int = 60,
+        onSpacingChanging: ((Int) -> Unit)? = null,
+        onSpacingChanged: ((Int) -> Unit)? = null
     ): PopupWindow? {
         if (maxColumns < minColumns) return previousPopup
         previousPopup?.dismiss()
@@ -37,7 +43,13 @@ object GridColumnsPopup {
             maxColumns = maxColumns,
             initialColumns = initialColumns,
             onColumnsChanging = onColumnsChanging,
-            onColumnsChanged = onColumnsChanged
+            onColumnsChanged = onColumnsChanged,
+            initialSpacing = initialSpacing,
+            spacingTitleRes = spacingTitleRes,
+            minSpacing = minSpacing,
+            maxSpacing = maxSpacing,
+            onSpacingChanging = onSpacingChanging,
+            onSpacingChanged = onSpacingChanged
         )
         val width = 284.dpToPx()
         content.measure(
@@ -66,21 +78,15 @@ object GridColumnsPopup {
         maxColumns: Int,
         initialColumns: Int,
         onColumnsChanging: ((Int) -> Unit)?,
-        onColumnsChanged: (Int) -> Unit
+        onColumnsChanged: (Int) -> Unit,
+        initialSpacing: Int?,
+        spacingTitleRes: Int?,
+        minSpacing: Int,
+        maxSpacing: Int,
+        onSpacingChanging: ((Int) -> Unit)?,
+        onSpacingChanged: ((Int) -> Unit)?
     ): View {
         val context = anchor.context
-        val seekBar = DetailSeekBar(context).apply {
-            max = maxColumns - minColumns
-            valueFormat = { (it + minColumns).toString() }
-            progress = (initialColumns - minColumns).coerceIn(0, max)
-            findViewById<TextView>(R.id.tv_seek_title)?.setText(titleRes)
-            onChanging = { progress ->
-                onColumnsChanging?.invoke(progress + minColumns)
-            }
-            onChanged = { progress ->
-                onColumnsChanged(progress + minColumns)
-            }
-        }
         return LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(12.dpToPx(), 10.dpToPx(), 12.dpToPx(), 10.dpToPx())
@@ -91,14 +97,54 @@ object GridColumnsPopup {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 clipToOutline = true
             }
-            addView(
-                seekBar,
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
+            addSlider(
+                titleRes = titleRes,
+                minColumns = minColumns,
+                maxColumns = maxColumns,
+                initialColumns = initialColumns,
+                onValueChanging = onColumnsChanging,
+                onValueChanged = onColumnsChanged
             )
+            if (initialSpacing != null && spacingTitleRes != null && maxSpacing >= minSpacing) {
+                addSlider(
+                    titleRes = spacingTitleRes,
+                    minColumns = minSpacing,
+                    maxColumns = maxSpacing,
+                    initialColumns = initialSpacing,
+                    onValueChanging = onSpacingChanging,
+                    onValueChanged = onSpacingChanged
+                )
+            }
         }
+    }
+
+    private fun LinearLayout.addSlider(
+        @StringRes titleRes: Int,
+        minColumns: Int,
+        maxColumns: Int,
+        initialColumns: Int,
+        onValueChanging: ((Int) -> Unit)?,
+        onValueChanged: ((Int) -> Unit)?
+    ) {
+        val seekBar = DetailSeekBar(context).apply {
+            max = maxColumns - minColumns
+            valueFormat = { (it + minColumns).toString() }
+            progress = (initialColumns - minColumns).coerceIn(0, max)
+            findViewById<TextView>(R.id.tv_seek_title)?.setText(titleRes)
+            onChanging = { progress ->
+                onValueChanging?.invoke(progress + minColumns)
+            }
+            onChanged = { progress ->
+                onValueChanged?.invoke(progress + minColumns)
+            }
+        }
+        addView(
+            seekBar,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
     }
 
     private fun PopupWindow.showAnchored(anchor: View) {

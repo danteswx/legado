@@ -115,6 +115,33 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun readRecordOpensFromBookshelfShortcutWithActivityBackInsteadOfBottomTab() {
+        val mainMenu = parseXml(repoFile("app/src/main/res/menu/main_bnv.xml"))
+        val mainActivity = repoFile("app/src/main/java/io/legado/app/ui/main/MainActivity.kt").readText()
+        val readRecordLayout = parseXml(repoFile("app/src/main/res/layout/activity_read_record.xml"))
+        val readRecordActivity = repoFile("app/src/main/java/io/legado/app/ui/about/ReadRecordActivity.kt").readText()
+        val bottomItemIds = mainMenu.childElements("item").map { it.androidAttr("id") }
+
+        assertFalse(bottomItemIds.contains("@+id/menu_read_record"))
+        assertFalse(mainActivity.contains("val showReadRecord = AppConfig.showReadRecord"))
+        assertFalse(mainActivity.contains("realPositions[index] = idReadRecord"))
+        assertTrue(mainActivity.contains("fun openReadRecordPage() {\n        startActivity(Intent(this, ReadRecordActivity::class.java))\n    }"))
+        assertEquals("@string/read_record", readRecordLayout.elementById("title_bar").appAttr("title"))
+        assertTrue(readRecordActivity.contains("binding.titleBar.setNavigationOnClickListener"))
+        assertTrue(readRecordActivity.contains("finish()"))
+    }
+
+    @Test
+    fun readRecordActivityTintsTitleBarActionsFromCurrentThemeTextColor() {
+        val readRecordActivity = repoFile("app/src/main/java/io/legado/app/ui/about/ReadRecordActivity.kt").readText()
+
+        assertTrue(readRecordActivity.contains("private fun applyTitleBarColor()"))
+        assertTrue(readRecordActivity.contains("binding.titleBar.setColorFilter(primaryTextColor)"))
+        assertTrue(readRecordActivity.contains("binding.titleBar.setTextColor(primaryTextColor)"))
+        assertTrue(readRecordActivity.contains("applyTitleBarColor()"))
+    }
+
+    @Test
     fun discoverTopActionLayoutToggleUsesLucideIconsBetweenSearchAndMenu() {
         val layout = parseXml(repoFile("app/src/main/res/layout/fragment_explore.xml"))
         val toggle = layout.elementById("btn_discover_layout_toggle")
@@ -253,6 +280,13 @@ class ReadMenuLayoutTest {
         assertTrue(bookshelfFragment.contains("maxColumns = BOOKSHELF_GRID_COLUMNS_MAX"))
         assertTrue(bookshelfFragment.contains("private const val BOOKSHELF_GRID_COLUMNS_MIN = 2"))
         assertTrue(bookshelfFragment.contains("private const val BOOKSHELF_GRID_COLUMNS_MAX = 7"))
+        assertTrue(bookshelfFragment.contains("initialSpacing = AppConfig.bookshelfMargin"))
+        assertTrue(bookshelfFragment.contains("spacingTitleRes = R.string.margin"))
+        assertTrue(bookshelfFragment.contains("onSpacingChanging = ::setBookshelfGridSpacing"))
+        assertTrue(bookshelfFragment.contains("onSpacingChanged = ::setBookshelfGridSpacing"))
+        assertTrue(bookshelfFragment.contains("fragment.updateBookshelfLayout(gridColumns)"))
+        assertTrue(bookshelfFragment.contains("fragment.updateBookshelfSpacing(spacing)"))
+        assertFalse(bookshelfFragment.contains("activity?.recreate()"))
 
         assertTrue(exploreFragment.contains("binding.btnDiscoverLayoutToggle.setOnLongClickListener"))
         assertTrue(exploreFragment.contains("showDiscoverGridColumnsPopup(it)"))
@@ -261,6 +295,10 @@ class ReadMenuLayoutTest {
         assertTrue(exploreFragment.contains("maxColumns = DISCOVER_GRID_COLUMNS_MAX"))
 
         assertTrue(sliderPopup.contains("object GridColumnsPopup"))
+        assertTrue(sliderPopup.contains("initialSpacing: Int? = null"))
+        assertTrue(sliderPopup.contains("onSpacingChanging: ((Int) -> Unit)? = null"))
+        assertTrue(sliderPopup.contains("addSlider("))
+        assertTrue(sliderPopup.contains("spacingTitleRes"))
         assertTrue(sliderPopup.contains("max = maxColumns - minColumns"))
         assertTrue(sliderPopup.contains("progress = (initialColumns - minColumns).coerceIn(0, max)"))
         assertTrue(sliderPopup.contains("valueFormat = { (it + minColumns).toString() }"))
@@ -268,6 +306,68 @@ class ReadMenuLayoutTest {
         assertTrue(bookshelfConfig.contains("@string/layout_grid7"))
         assertTrue(defaultStrings.contains("<string name=\"layout_grid7\">Grid-7</string>"))
         assertTrue(zhStrings.contains("<string name=\"layout_grid7\">网格七列</string>"))
+    }
+
+    @Test
+    fun bookshelfFolderStyleKeepsLayoutTogglePopupAndPrimaryTextOverflow() {
+        val layout = parseXml(repoFile("app/src/main/res/layout/fragment_bookshelf2.xml"))
+        val fragment = repoFile("app/src/main/java/io/legado/app/ui/main/bookshelf/style2/BookshelfFragment2.kt").readText()
+        val toggle = layout.elementById("btn_bookshelf_layout_toggle")
+
+        assertEquals("@string/switchLayout", toggle.androidAttr("contentDescription"))
+        assertEquals("@drawable/ic_lucide_layout_grid", toggle.androidAttr("src"))
+        assertEquals("@color/primaryText", toggle.androidAttr("tint"))
+        assertEquals("@dimen/discover_top_action_button_size", toggle.androidAttr("layout_marginEnd"))
+        assertEquals("parent", toggle.appAttr("layout_constraintEnd_toEndOf"))
+        assertTrue(fragment.contains("import io.legado.app.lib.theme.primaryTextColor"))
+        assertTrue(fragment.contains("binding.titleBar.setColorFilter(primaryTextColor)"))
+        assertTrue(fragment.contains("binding.btnBookshelfLayoutToggle.setOnClickListener"))
+        assertTrue(fragment.contains("binding.btnBookshelfLayoutToggle.setOnLongClickListener"))
+        assertTrue(fragment.contains("showBookshelfGridColumnsPopup(it)"))
+        assertTrue(fragment.contains("GridColumnsPopup.show("))
+        assertTrue(fragment.contains("initialSpacing = AppConfig.bookshelfMargin"))
+        assertTrue(fragment.contains("onColumnsChanging = ::setBookshelfGridColumns"))
+        assertTrue(fragment.contains("onSpacingChanging = ::setBookshelfGridSpacing"))
+        assertTrue(fragment.contains("fun updateBookshelfLayout(layout: Int)"))
+        assertTrue(fragment.contains("fun updateBookshelfSpacing(spacing: Int)"))
+        assertFalse(fragment.contains("activity?.recreate()"))
+    }
+
+    @Test
+    fun bookshelfTopBarsShowReadRecordShortcutInBothStyles() {
+        val style1Layout = parseXml(repoFile("app/src/main/res/layout/fragment_bookshelf1.xml"))
+        val style2Layout = parseXml(repoFile("app/src/main/res/layout/fragment_bookshelf2.xml"))
+        val style1Fragment = repoFile("app/src/main/java/io/legado/app/ui/main/bookshelf/style1/BookshelfFragment1.kt").readText()
+        val style2Fragment = repoFile("app/src/main/java/io/legado/app/ui/main/bookshelf/style2/BookshelfFragment2.kt").readText()
+        val mainActivity = repoFile("app/src/main/java/io/legado/app/ui/main/MainActivity.kt").readText()
+        val style1ReadRecord = style1Layout.elementById("btn_bookshelf_read_record")
+        val style2ReadRecord = style2Layout.elementById("btn_bookshelf_read_record")
+
+        listOf(style1ReadRecord, style2ReadRecord).forEach { button ->
+            assertEquals("@string/read_record", button.androidAttr("contentDescription"))
+            assertEquals("@drawable/ic_lucide_chart_bar", button.androidAttr("src"))
+            assertEquals("@color/primaryText", button.androidAttr("tint"))
+            assertEquals("@dimen/discover_top_action_button_size", button.androidAttr("layout_width"))
+            assertEquals("@dimen/discover_top_action_button_size", button.androidAttr("layout_height"))
+        }
+        assertEquals(
+            "@id/btn_bookshelf_read_record",
+            style1Layout.elementById("title_row").appAttr("layout_constraintEnd_toStartOf")
+        )
+        assertEquals(
+            "@id/btn_bookshelf_layout_toggle",
+            style1ReadRecord.appAttr("layout_constraintEnd_toStartOf")
+        )
+        assertEquals(
+            "@id/btn_bookshelf_layout_toggle",
+            style2ReadRecord.appAttr("layout_constraintEnd_toStartOf")
+        )
+        assertTrue(style1Fragment.contains("binding.btnBookshelfReadRecord.setOnClickListener"))
+        assertTrue(style2Fragment.contains("binding.btnBookshelfReadRecord.setOnClickListener"))
+        assertTrue(style1Fragment.contains("openReadRecordPage()"))
+        assertTrue(style2Fragment.contains("openReadRecordPage()"))
+        assertTrue(mainActivity.contains("fun openReadRecordPage()"))
+        assertTrue(mainActivity.contains("ReadRecordActivity::class.java"))
     }
 
     @Test
@@ -1094,6 +1194,20 @@ class ReadMenuLayoutTest {
         assertTrue(readMenu.contains("chapter.wordCount"))
         assertTrue(readMenu.contains("BookHelp.hasContent"))
         assertTrue(readMenu.contains("ic_lucide_download"))
+    }
+
+    @Test
+    fun tocPanelCurrentChapterUsesSelectedBackgroundInsteadOfAccentText() {
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val tocAdapter = readMenu.substringAfter("private class ReadMenuTocAdapter(")
+            .substringBefore("private class ReadMenuBookmarkAdapter(")
+
+        assertTrue(tocAdapter.contains("holder.itemView.background = if (selected) tocSelectedBackground(context) else null"))
+        assertTrue(tocAdapter.contains("private fun tocSelectedBackground(context: Context): GradientDrawable"))
+        assertTrue(tocAdapter.contains("selected -> Color.WHITE"))
+        assertFalse(tocAdapter.contains("selected -> context.accentColor"))
+        assertFalse(tocAdapter.contains("selected -> ColorUtils.adjustAlpha(context.accentColor"))
+        assertFalse(tocAdapter.contains("if (selected) context.accentColor else holder.title.currentTextColor"))
     }
 
     @Test

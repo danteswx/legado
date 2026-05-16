@@ -14,6 +14,36 @@
         app:layout_constraintTop_toTopOf="parent"
         app:title="@string/bookshelf" />
 
+    <androidx.appcompat.widget.AppCompatImageButton
+        android:id="@+id/btn_bookshelf_layout_toggle"
+        android:layout_width="@dimen/discover_top_action_button_size"
+        android:layout_height="@dimen/discover_top_action_button_size"
+        android:layout_marginEnd="@dimen/discover_top_action_button_size"
+        android:background="@drawable/bg_discover_embedded_action"
+        android:contentDescription="@string/switchLayout"
+        android:padding="@dimen/discover_top_action_button_padding"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_lucide_layout_grid"
+        android:tint="@color/primaryText"
+        app:layout_constraintBottom_toBottomOf="@id/title_bar"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/title_bar" />
+
+    <androidx.appcompat.widget.AppCompatImageButton
+        android:id="@+id/btn_bookshelf_read_record"
+        android:layout_width="@dimen/discover_top_action_button_size"
+        android:layout_height="@dimen/discover_top_action_button_size"
+        android:layout_marginEnd="10dp"
+        android:background="@drawable/bg_discover_embedded_action"
+        android:contentDescription="@string/read_record"
+        android:padding="@dimen/discover_top_action_button_padding"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_lucide_chart_bar"
+        android:tint="@color/primaryText"
+        app:layout_constraintBottom_toBottomOf="@id/title_bar"
+        app:layout_constraintEnd_toStartOf="@id/btn_bookshelf_layout_toggle"
+        app:layout_constraintTop_toTopOf="@id/title_bar" />
+
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/refresh_layout"
         android:layout_width="match_parent"

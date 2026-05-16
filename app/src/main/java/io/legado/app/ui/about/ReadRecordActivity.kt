@@ -147,6 +147,10 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
     }
 
     private fun initView() {
+        binding.titleBar.setNavigationOnClickListener {
+            finish()
+        }
+        applyTitleBarColor()
         binding.scrollView.applyNavigationBarPadding()
         binding.tvRecordDate.setOnClickListener {
             showDatePicker()
@@ -603,6 +607,12 @@ class ReadRecordActivity : BaseActivity<ActivityReadRecordBinding>() {
         binding.ivRankMore.setColorFilter(secondaryTextColor)
         binding.ivGoalEdit.setColorFilter(secondaryTextColor)
         binding.heatmapView.submit(currentHeatmapCells, accentColor, panelSurfaceColor)
+        applyTitleBarColor()
+    }
+
+    private fun applyTitleBarColor() {
+        binding.titleBar.setTextColor(primaryTextColor)
+        binding.titleBar.setColorFilter(primaryTextColor)
     }
 
     private fun createDivider(): View {

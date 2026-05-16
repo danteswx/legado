@@ -66,6 +66,7 @@ import io.legado.app.lib.theme.bottomBackground
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.ui.about.CrashLogsDialog
+import io.legado.app.ui.about.ReadRecordActivity
 import io.legado.app.ui.about.ReadRecordWidgetStore
 import io.legado.app.ui.about.loadReadRecordAvatar
 import io.legado.app.ui.about.loadReadRecordCover
@@ -145,7 +146,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     private val fragmentMap = hashMapOf<Int, Fragment>()
     private var bottomMenuCount = 4
     private val EXIT_INTERVAL = 2000L
-    private val realPositions = arrayOf(idBookshelf, idExplore, idRss, idReadRecord, idMy)
+    private val realPositions = arrayOf(idBookshelf, idExplore, idRss, idMy, idReadRecord)
     private val adapter by lazy {
         TabFragmentPageAdapter(supportFragmentManager)
     }
@@ -280,9 +281,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
                 viewPagerMain.setCurrentItem(realPositions.indexOf(idRss), false)
 
             R.id.menu_read_record ->
-                realPositions.indexOf(idReadRecord).takeIf { it >= 0 }?.let {
-                    viewPagerMain.setCurrentItem(it, false)
-                }
+                openReadRecordPage()
 
             R.id.menu_my_config ->
                 viewPagerMain.setCurrentItem(realPositions.indexOf(idMy), false)
@@ -291,6 +290,10 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             closeSideNavigation()
         }
         return false
+    }
+
+    fun openReadRecordPage() {
+        startActivity(Intent(this, ReadRecordActivity::class.java))
     }
 
     override fun onNavigationItemReselected(item: MenuItem) {
@@ -1653,12 +1656,11 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     private fun upBottomMenu() {
         val showDiscovery = AppConfig.showDiscovery
         val showRss = AppConfig.showRSS && binding.bottomNavigationView.menu.findItem(R.id.menu_rss) != null
-        val showReadRecord = AppConfig.showReadRecord
         val mergedDiscovery = AppConfig.mergeDiscoveryRss && showDiscovery && showRss
         binding.bottomNavigationView.menu.let { menu ->
             menu.findItem(R.id.menu_discovery).isVisible = showDiscovery || (mergedDiscovery && showRss)
             menu.findItem(R.id.menu_rss)?.isVisible = showRss && !mergedDiscovery
-            menu.findItem(R.id.menu_read_record)?.isVisible = showReadRecord
+            menu.findItem(R.id.menu_read_record)?.isVisible = false
             if (mergedDiscovery) {
                 if (resolveDiscoveryNavTarget() == idRss) {
                     menu.findItem(R.id.menu_discovery).setIcon(R.drawable.ic_bottom_rss_feed)
@@ -1681,10 +1683,6 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         if (showRss) {
             index++
             realPositions[index] = idRss
-        }
-        if (showReadRecord) {
-            index++
-            realPositions[index] = idReadRecord
         }
         index++
         realPositions[index] = idMy

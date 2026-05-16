@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.graphics.Rect
 import android.os.Bundle
 import android.view.View
+import android.widget.PopupWindow
 import androidx.appcompat.widget.SearchView
 import androidx.core.view.isGone
 import androidx.lifecycle.Lifecycle
@@ -22,10 +23,13 @@ import io.legado.app.databinding.FragmentBookshelf2Binding
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.primaryColor
+import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.ui.book.group.GroupEditDialog
 import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.book.search.SearchActivity
+import io.legado.app.ui.main.MainActivity
 import io.legado.app.ui.main.bookshelf.BaseBookshelfFragment
+import io.legado.app.ui.widget.GridColumnsPopup
 import io.legado.app.utils.applyMainBottomBarPadding
 import io.legado.app.utils.cnCompare
 import io.legado.app.utils.dpToPx
@@ -53,6 +57,13 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
     SearchView.OnQueryTextListener,
     BaseBooksAdapter.CallBack {
 
+    private companion object {
+        private const val BOOKSHELF_GRID_COLUMNS_MIN = 2
+        private const val BOOKSHELF_GRID_COLUMNS_MAX = 7
+        private const val BOOKSHELF_GRID_SPACING_MIN = 0
+        private const val BOOKSHELF_GRID_SPACING_MAX = 60
+    }
+
     constructor(position: Int) : this() {
         val bundle = Bundle()
         bundle.putInt("position", position)
@@ -60,33 +71,42 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
     }
 
     private val binding by viewBinding(FragmentBookshelf2Binding::bind)
-    private val bookshelfLayout by lazy { AppConfig.bookshelfLayout }
-    private val booksAdapter: BaseBooksAdapter<*> by lazy {
-        if (bookshelfLayout >= 2) {
-            BooksAdapterGrid(requireContext(), this)
-        } else {
-            BooksAdapterList(requireContext(), this)
-        }
-    }
+    private var gridColumnsPopup: PopupWindow? = null
+    private var bookshelfLayout = AppConfig.bookshelfLayout
+    private lateinit var booksAdapter: BaseBooksAdapter<*>
     private var bookGroups: List<BookGroup> = emptyList()
     private var booksFlowJob: Job? = null
     override var groupId = BookGroup.IdRoot
     override var books: List<Book> = emptyList()
     private var enableRefresh = true
     override var onlyUpdateRead = false
-    private val bookshelfMargin by lazy { AppConfig.bookshelfMargin }
+    private var bookshelfMargin = AppConfig.bookshelfMargin
     private var itemCount = 0
     private var totalRows = 0
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         setSupportToolbar(binding.titleBar.toolbar)
+        binding.titleBar.setColorFilter(primaryTextColor)
+        binding.btnBookshelfReadRecord.setColorFilter(primaryTextColor)
         installModernBookshelfOverflow(binding.titleBar.toolbar)
+        binding.btnBookshelfReadRecord.setOnClickListener {
+            (activity as? MainActivity)?.openReadRecordPage()
+        }
+        binding.btnBookshelfLayoutToggle.setOnClickListener {
+            switchBookshelfLayout()
+        }
+        binding.btnBookshelfLayoutToggle.setOnLongClickListener {
+            showBookshelfGridColumnsPopup(it)
+            true
+        }
+        updateBookshelfLayoutToggleIcon()
         initRecyclerView()
         initBookGroupData()
         initBooksData()
     }
 
     private fun initRecyclerView() {
+        booksAdapter = createBooksAdapter(bookshelfLayout)
         binding.rvBookshelf.setEdgeEffectColor(primaryColor)
         binding.rvBookshelf.clipToPadding = true
         binding.rvBookshelf.applyMainBottomBarPadding()
@@ -96,11 +116,7 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
             binding.refreshLayout.isRefreshing = false
             activityViewModel.upToc(books, onlyUpdateRead)
         }
-        if (bookshelfLayout >= 2) {
-            binding.rvBookshelf.layoutManager = GridLayoutManager(context, bookshelfLayout)
-        } else {
-            binding.rvBookshelf.layoutManager = LinearLayoutManager(context)
-        }
+        updateLayoutManager()
         binding.rvBookshelf.adapter = booksAdapter
         /**
          * 采用 layoutManager?.onRestoreInstanceState(layoutState)
@@ -146,15 +162,113 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         })
     }
 
+    private fun createBooksAdapter(layout: Int): BaseBooksAdapter<*> {
+        return if (layout >= 2) {
+            BooksAdapterGrid(requireContext(), this)
+        } else {
+            BooksAdapterList(requireContext(), this)
+        }
+    }
+
+    private fun updateLayoutManager() {
+        if (bookshelfLayout >= 2) {
+            val layoutManager = binding.rvBookshelf.layoutManager
+            if (layoutManager is GridLayoutManager) {
+                layoutManager.spanCount = bookshelfLayout
+            } else {
+                binding.rvBookshelf.layoutManager = GridLayoutManager(context, bookshelfLayout)
+            }
+        } else if (binding.rvBookshelf.layoutManager !is LinearLayoutManager ||
+            binding.rvBookshelf.layoutManager is GridLayoutManager
+        ) {
+            binding.rvBookshelf.layoutManager = LinearLayoutManager(context)
+        }
+    }
+
+    @SuppressLint("NotifyDataSetChanged")
+    fun updateBookshelfLayout(layout: Int) {
+        val newLayout = layout.coerceAtLeast(0)
+        if (bookshelfLayout == newLayout) return
+        val oldLayout = bookshelfLayout
+        bookshelfLayout = newLayout
+        updateTotalRows()
+        updateLayoutManager()
+        val adapterTypeChanged = oldLayout < 2 || newLayout < 2
+        if (adapterTypeChanged && ::booksAdapter.isInitialized) {
+            booksAdapter = createBooksAdapter(newLayout)
+            binding.rvBookshelf.adapter = booksAdapter
+            booksAdapter.updateItems(groupId)
+        } else if (::booksAdapter.isInitialized) {
+            booksAdapter.notifyDataSetChanged()
+        }
+        binding.rvBookshelf.invalidateItemDecorations()
+    }
+
+    fun updateBookshelfSpacing(spacing: Int) {
+        val newSpacing = spacing.coerceIn(BOOKSHELF_GRID_SPACING_MIN, BOOKSHELF_GRID_SPACING_MAX)
+        if (bookshelfMargin == newSpacing) return
+        bookshelfMargin = newSpacing
+        binding.rvBookshelf.invalidateItemDecorations()
+    }
+
+    private fun switchBookshelfLayout() {
+        val targetLayout = if (AppConfig.bookshelfLayout >= 2) 0 else 2
+        if (AppConfig.bookshelfLayout == targetLayout) return
+        AppConfig.bookshelfLayout = targetLayout
+        updateBookshelfLayoutToggleIcon()
+        updateBookshelfLayout(targetLayout)
+    }
+
+    private fun showBookshelfGridColumnsPopup(anchor: View) {
+        gridColumnsPopup = GridColumnsPopup.show(
+            anchor = anchor,
+            titleRes = R.string.discover_grid_columns,
+            minColumns = BOOKSHELF_GRID_COLUMNS_MIN,
+            maxColumns = BOOKSHELF_GRID_COLUMNS_MAX,
+            initialColumns = AppConfig.bookshelfLayout.coerceAtLeast(BOOKSHELF_GRID_COLUMNS_MIN),
+            previousPopup = gridColumnsPopup,
+            onColumnsChanging = ::setBookshelfGridColumns,
+            onColumnsChanged = ::setBookshelfGridColumns,
+            initialSpacing = AppConfig.bookshelfMargin,
+            spacingTitleRes = R.string.margin,
+            minSpacing = BOOKSHELF_GRID_SPACING_MIN,
+            maxSpacing = BOOKSHELF_GRID_SPACING_MAX,
+            onSpacingChanging = ::setBookshelfGridSpacing,
+            onSpacingChanged = ::setBookshelfGridSpacing
+        )
+    }
+
+    private fun setBookshelfGridColumns(columns: Int) {
+        val gridColumns = columns.coerceIn(BOOKSHELF_GRID_COLUMNS_MIN, BOOKSHELF_GRID_COLUMNS_MAX)
+        if (AppConfig.bookshelfLayout == gridColumns) return
+        AppConfig.bookshelfLayout = gridColumns
+        updateBookshelfLayoutToggleIcon()
+        updateBookshelfLayout(gridColumns)
+    }
+
+    private fun setBookshelfGridSpacing(spacing: Int) {
+        val gridSpacing = spacing.coerceIn(BOOKSHELF_GRID_SPACING_MIN, BOOKSHELF_GRID_SPACING_MAX)
+        if (AppConfig.bookshelfMargin == gridSpacing) return
+        AppConfig.bookshelfMargin = gridSpacing
+        updateBookshelfSpacing(gridSpacing)
+    }
+
+    private fun updateBookshelfLayoutToggleIcon() {
+        binding.btnBookshelfLayoutToggle.setImageResource(
+            if (AppConfig.bookshelfLayout >= 2) {
+                R.drawable.ic_lucide_layout_list
+            } else {
+                R.drawable.ic_lucide_layout_grid
+            }
+        )
+    }
+
     override fun upGroup(data: List<BookGroup>) {
         if (data != bookGroups) {
             bookGroups = data
             booksAdapter.updateItems(groupId)
             itemCount = getItemCount()
-            val spanCount = bookshelfLayout
-            if (spanCount >= 2) {
-                totalRows = if (itemCount % spanCount == 0) itemCount / spanCount else itemCount / spanCount + 1
-            }
+            updateTotalRows()
             binding.tvEmptyMsg.isGone = itemCount > 0
             binding.refreshLayout.isEnabled = enableRefresh && itemCount > 0
         }
@@ -216,14 +330,20 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
                 books = list
                 booksAdapter.updateItems(groupId)
                 itemCount = getItemCount()
-                val spanCount = bookshelfLayout
-                if (spanCount >= 2) {
-                    totalRows = if (itemCount % spanCount == 0) itemCount / spanCount else itemCount / spanCount + 1
-                }
+                updateTotalRows()
                 binding.tvEmptyMsg.isGone = itemCount > 0
                 binding.refreshLayout.isEnabled = enableRefresh && itemCount > 0
                 delay(100)
             }
+        }
+    }
+
+    private fun updateTotalRows() {
+        val spanCount = bookshelfLayout
+        totalRows = if (spanCount >= 2 && itemCount > 0) {
+            if (itemCount % spanCount == 0) itemCount / spanCount else itemCount / spanCount + 1
+        } else {
+            0
         }
     }
 
