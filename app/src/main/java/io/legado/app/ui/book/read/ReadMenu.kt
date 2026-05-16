@@ -181,6 +181,7 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     private var activeBottomTab: BottomTab? = null
+    private var bottomTabSelectionAnchor: BottomTab? = null
     private var bottomTabMode: BottomTabMode = BottomTabMode.Primary
     private var activeLayoutMarginAdjustMode: LayoutMarginAdjustMode = LayoutMarginAdjustMode.Body
     private var suppressBottomNavSelection: Boolean = false
@@ -190,6 +191,7 @@ class ReadMenu @JvmOverloads constructor(
     private var topBarGlassStyleKey: String? = null
     private var layoutAdjustGlassStyleKey: String? = null
     private var bottomTabGlassLayerHeight: Int = 0
+    private var bottomTabIndicatorRequestToken: Int = 0
     private var layoutAdjustGlassLayerHeight: Int = 0
     private var layoutAdjustBackdropBitmap: Bitmap? = null
     private var layoutAdjustBackdropCropBitmap: Bitmap? = null
@@ -440,6 +442,7 @@ class ReadMenu @JvmOverloads constructor(
             binding.flExpandedPanel.alpha = 0f
             setBottomTabBarHeight(bottomTabCollapsedHeight())
             activeBottomTab = null
+            bottomTabSelectionAnchor = null
             switchBottomTabMode(BottomTabMode.Primary, animate = false)
             renderBottomTabState()
             canShowMenu = false
@@ -655,6 +658,7 @@ class ReadMenu @JvmOverloads constructor(
         binding.layoutMarginAdjustOverlay.gone()
         switchBottomTabMode(BottomTabMode.Primary, animate = false)
         hideExpandedPanel(anim = false)
+        bottomTabSelectionAnchor = null
         if (anim) {
             binding.titleBarShell.startAnimation(menuTopIn)
             binding.bottomMenu.startAnimation(menuBottomIn)
@@ -1533,6 +1537,7 @@ class ReadMenu @JvmOverloads constructor(
         val wasExpanded = flExpandedPanel.isVisible &&
                 bottomTabBar.height > bottomTabCollapsedHeight()
         activeBottomTab = tab
+        bottomTabSelectionAnchor = tab
         when (tab) {
             BottomTab.Search -> Unit
 
@@ -1598,6 +1603,7 @@ class ReadMenu @JvmOverloads constructor(
     ) {
         if (!binding.flExpandedPanel.isVisible) {
             activeBottomTab = null
+            bottomTabSelectionAnchor = null
             if (returnToPrimary) {
                 switchBottomTabMode(BottomTabMode.Primary)
             } else {
@@ -1605,7 +1611,9 @@ class ReadMenu @JvmOverloads constructor(
             }
             return
         }
+        val closingTab = activeBottomTab
         activeBottomTab = null
+        bottomTabSelectionAnchor = closingTab
         binding.flExpandedPanel.animate().cancel()
         binding.flExpandedPanel.alpha = 0f
         if (returnToPrimary) {
@@ -1621,7 +1629,15 @@ class ReadMenu @JvmOverloads constructor(
             binding.flExpandedPanel.updateLayoutParams<FrameLayout.LayoutParams> {
                 height = ViewGroup.LayoutParams.WRAP_CONTENT
             }
+            clearBottomTabSelectionAnchor(closingTab)
             callBack.onReadMenuExpandedPanelVisibilityChanged(false)
+        }
+    }
+
+    private fun clearBottomTabSelectionAnchor(tab: BottomTab?) {
+        if (activeBottomTab == null && bottomTabSelectionAnchor == tab) {
+            bottomTabSelectionAnchor = null
+            renderBottomTabState()
         }
     }
 
@@ -1992,17 +2008,27 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     private fun applyBottomNavigationColors() = binding.run {
+        val selectedContentColor = if (activeBottomTab == null) {
+            bottomTabContentColor()
+        } else {
+            bottomTabSelectedContentColor()
+        }
+        val selectedLabelColor = if (activeBottomTab == null) {
+            bottomTabContentColor()
+        } else {
+            bottomTabSelectedLabelColor()
+        }
         val iconColors = Selector.colorBuild()
             .setDefaultColor(bottomTabContentColor())
             .setPressedColor(Color.WHITE)
-            .setSelectedColor(bottomTabSelectedContentColor())
-            .setCheckedColor(bottomTabSelectedContentColor())
+            .setSelectedColor(selectedContentColor)
+            .setCheckedColor(selectedContentColor)
             .create()
         val textColors = Selector.colorBuild()
             .setDefaultColor(bottomTabContentColor())
             .setPressedColor(Color.WHITE)
-            .setSelectedColor(bottomTabSelectedLabelColor())
-            .setCheckedColor(bottomTabSelectedLabelColor())
+            .setSelectedColor(selectedLabelColor)
+            .setCheckedColor(selectedLabelColor)
             .create()
         listOf(readBottomPrimaryNav, readBottomInterfaceNav).forEach { nav ->
             nav.itemIconTintList = iconColors
@@ -2012,40 +2038,38 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     private fun syncBottomNavigationSelection() = binding.run {
+        val selectedTab = activeBottomTab ?: bottomTabSelectionAnchor
         setBottomNavigationSelection(
             readBottomPrimaryNav,
-            when (val tab = activeBottomTab) {
+            when (selectedTab) {
                 BottomTab.Search,
                 BottomTab.Toc,
                 BottomTab.Aloud,
-                BottomTab.Settings -> tab.menuItemId()
-
-                null -> if (bottomTabMode == BottomTabMode.Interface) {
-                    R.id.menu_read_interface
-                } else {
-                    null
-                }
+                BottomTab.Settings -> selectedTab.menuItemId()
 
                 else -> null
             }
         )
         setBottomNavigationSelection(
             readBottomInterfaceNav,
-            if (activeBottomTab?.usesPrimaryNavigation() == true) {
+            if (selectedTab?.usesPrimaryNavigation() == true) {
                 null
             } else {
-                activeBottomTab?.menuItemId()
+                selectedTab?.menuItemId()
             }
         )
     }
 
     private fun setBottomNavigationSelection(nav: BottomNavigationView, itemId: Int?) {
+        val wasSelectedItemId = checkedBottomNavigationItemId(nav)
         suppressBottomNavSelection = true
         try {
             if (itemId == null) {
                 clearBottomNavigationSelection(nav)
             } else {
-                nav.selectedItemId = itemId
+                clearBottomNavigationSelection(nav)
+                nav.menu.findItem(itemId)?.isChecked = true
+                animateBottomNavigationSelectedItem(nav, itemId, wasSelectedItemId != itemId)
             }
         } finally {
             suppressBottomNavSelection = false
@@ -2058,6 +2082,70 @@ class ReadMenu @JvmOverloads constructor(
             nav.menu.getItem(index).isChecked = false
         }
         nav.menu.setGroupCheckable(0, true, true)
+        resetBottomNavigationItemAnimations(nav)
+    }
+
+    private fun checkedBottomNavigationItemId(nav: BottomNavigationView): Int? {
+        for (index in 0 until nav.menu.size()) {
+            val item = nav.menu.getItem(index)
+            if (item.isChecked) {
+                return item.itemId
+            }
+        }
+        return null
+    }
+
+    private fun animateBottomNavigationSelectedItem(
+        nav: BottomNavigationView,
+        itemId: Int,
+        changed: Boolean
+    ) {
+        if (!changed || AppConfig.isEInkMode) return
+        val itemView = findBottomNavigationItemView(nav, itemId) ?: return
+        val contentContainer = itemView.findViewById<View>(
+            com.google.android.material.R.id.navigation_bar_item_content_container
+        ) ?: return
+        val labelsGroup = itemView.findViewById<View>(
+            com.google.android.material.R.id.navigation_bar_item_labels_group
+        )
+        itemView.doOnPreDraw {
+            val labelHeight = labelsGroup?.height?.takeIf { it > 0 } ?: 0
+            val startOffset = (labelHeight * 0.46f)
+                .coerceIn(8.dpToPx().toFloat(), 18.dpToPx().toFloat())
+            contentContainer.animate().cancel()
+            contentContainer.translationY = startOffset
+            contentContainer.animate()
+                .translationY(0f)
+                .setDuration(180L)
+                .setInterpolator(bottomTabIndicatorInterpolator)
+                .start()
+            labelsGroup?.animate()?.cancel()
+            labelsGroup?.alpha = 0f
+            labelsGroup?.animate()
+                ?.alpha(1f)
+                ?.setDuration(120L)
+                ?.setInterpolator(bottomTabPulseInterpolator)
+                ?.start()
+        }
+    }
+
+    private fun resetBottomNavigationItemAnimations(nav: BottomNavigationView) {
+        val menuView = nav.getChildAt(0) as? ViewGroup ?: return
+        for (index in 0 until menuView.childCount) {
+            val itemView = menuView.getChildAt(index)
+            itemView.findViewById<View>(
+                com.google.android.material.R.id.navigation_bar_item_content_container
+            )?.run {
+                animate().cancel()
+                translationY = 0f
+            }
+            itemView.findViewById<View>(
+                com.google.android.material.R.id.navigation_bar_item_labels_group
+            )?.run {
+                animate().cancel()
+                alpha = 1f
+            }
+        }
     }
 
     private fun flashBottomTabIndicator(nav: BottomNavigationView, itemId: Int) {
@@ -2070,9 +2158,15 @@ class ReadMenu @JvmOverloads constructor(
         animate: Boolean,
         autoHide: Boolean
     ) = binding.run {
+        val requestToken = nextBottomTabIndicatorRequestToken()
         bottomTabIndicatorContainer.removeCallbacks(hideBottomTabIndicatorRunnable)
         bottomTabIndicatorContainer.animate().cancel()
         bottomTabIndicatorContainer.post {
+            if (requestToken != bottomTabIndicatorRequestToken ||
+                !isBottomTabIndicatorRequestCurrent(nav, itemId)
+            ) {
+                return@post
+            }
             val itemView = findBottomNavigationItemView(nav, itemId) ?: return@post
             val menuView = nav.getChildAt(0) as? ViewGroup ?: return@post
             val maxWidth = 60.dpToPx()
@@ -2114,7 +2208,23 @@ class ReadMenu @JvmOverloads constructor(
         }
     }
 
+    private fun nextBottomTabIndicatorRequestToken(): Int {
+        bottomTabIndicatorRequestToken += 1
+        return bottomTabIndicatorRequestToken
+    }
+
+    private fun isBottomTabIndicatorRequestCurrent(nav: BottomNavigationView, itemId: Int): Boolean {
+        val tab = activeBottomTab ?: return false
+        val expectedNav = if (tab.usesPrimaryNavigation()) {
+            binding.readBottomPrimaryNav
+        } else {
+            binding.readBottomInterfaceNav
+        }
+        return nav === expectedNav && itemId == tab.menuItemId()
+    }
+
     private fun hideBottomTabIndicator() = binding.run {
+        nextBottomTabIndicatorRequestToken()
         bottomTabIndicatorContainer.removeCallbacks(hideBottomTabIndicatorRunnable)
         bottomTabIndicatorContainer.animate().cancel()
         if (!bottomTabIndicatorContainer.isVisible) {

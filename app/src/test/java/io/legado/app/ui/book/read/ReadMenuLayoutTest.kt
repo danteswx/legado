@@ -653,6 +653,87 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun bottomTabSelectionLabelSurvivesClosingAnimation() {
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val hideExpandedPanel = readMenu.substringAfter("private fun hideExpandedPanel(")
+            .substringBefore("private fun handleBackgroundDismiss()")
+        val selectionSync = readMenu.substringAfter("private fun syncBottomNavigationSelection()")
+            .substringBefore("private fun setBottomNavigationSelection")
+        val setSelection = readMenu.substringAfter("private fun setBottomNavigationSelection(")
+            .substringBefore("private fun clearBottomNavigationSelection")
+        val colorBlock = readMenu.substringAfter("private fun applyBottomNavigationColors()")
+            .substringBefore("private fun syncBottomNavigationSelection()")
+
+        assertTrue(readMenu.contains("private var bottomTabSelectionAnchor: BottomTab? = null"))
+        assertTrue(readMenu.contains("bottomTabSelectionAnchor = tab"))
+        assertTrue(hideExpandedPanel.contains("val closingTab = activeBottomTab"))
+        assertTrue(hideExpandedPanel.contains("bottomTabSelectionAnchor = closingTab"))
+        assertTrue(hideExpandedPanel.contains("clearBottomTabSelectionAnchor(closingTab)"))
+        assertTrue(readMenu.contains("private fun clearBottomTabSelectionAnchor(tab: BottomTab?)"))
+        assertTrue(selectionSync.contains("val selectedTab = activeBottomTab ?: bottomTabSelectionAnchor"))
+        assertTrue(colorBlock.contains("val selectedContentColor = if (activeBottomTab == null)"))
+        assertTrue(colorBlock.contains("bottomTabContentColor()"))
+        assertTrue(colorBlock.contains("bottomTabSelectedContentColor()"))
+        assertTrue(colorBlock.contains("val selectedLabelColor = if (activeBottomTab == null)"))
+        assertTrue(colorBlock.contains("bottomTabSelectedLabelColor()"))
+        assertTrue(colorBlock.contains(".setSelectedColor(selectedContentColor)"))
+        assertTrue(colorBlock.contains(".setCheckedColor(selectedContentColor)"))
+        assertTrue(colorBlock.contains(".setSelectedColor(selectedLabelColor)"))
+        assertTrue(colorBlock.contains(".setCheckedColor(selectedLabelColor)"))
+        assertTrue(setSelection.contains("} else {\n                clearBottomNavigationSelection(nav)\n                nav.menu.findItem(itemId)?.isChecked = true"))
+        assertFalse(setSelection.contains("nav.selectedItemId = itemId"))
+    }
+
+    @Test
+    fun bottomTabSelectedLabelAnimatesIconIntoPlace() {
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val setSelection = readMenu.substringAfter("private fun setBottomNavigationSelection(")
+            .substringBefore("private fun clearBottomNavigationSelection")
+        val animationBlock = readMenu.substringAfter("private fun animateBottomNavigationSelectedItem(")
+            .substringBefore("private fun resetBottomNavigationItemAnimations")
+
+        assertTrue(setSelection.contains("val wasSelectedItemId = checkedBottomNavigationItemId(nav)"))
+        assertTrue(setSelection.contains("animateBottomNavigationSelectedItem(nav, itemId, wasSelectedItemId != itemId)"))
+        assertTrue(readMenu.contains("private fun checkedBottomNavigationItemId(nav: BottomNavigationView): Int?"))
+        assertTrue(readMenu.contains("private fun animateBottomNavigationSelectedItem("))
+        assertTrue(readMenu.contains("private fun resetBottomNavigationItemAnimations(nav: BottomNavigationView)"))
+        assertTrue(animationBlock.contains("doOnPreDraw"))
+        assertTrue(animationBlock.contains("com.google.android.material.R.id.navigation_bar_item_content_container"))
+        assertTrue(animationBlock.contains("com.google.android.material.R.id.navigation_bar_item_labels_group"))
+        assertTrue(animationBlock.contains("contentContainer.translationY = startOffset"))
+        assertTrue(animationBlock.contains(".translationY(0f)"))
+        assertTrue(animationBlock.contains("labelsGroup?.animate()"))
+    }
+
+    @Test
+    fun bottomTabIndicatorIgnoresStalePostedRequests() {
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val showIndicator = readMenu.substringAfter("private fun showBottomTabIndicator(")
+            .substringBefore("private fun hideBottomTabIndicator()")
+        val hideIndicator = readMenu.substringAfter("private fun hideBottomTabIndicator()")
+            .substringBefore("private fun fadeBottomTabIndicator()")
+
+        assertTrue(readMenu.contains("private var bottomTabIndicatorRequestToken: Int = 0"))
+        assertTrue(readMenu.contains("private fun nextBottomTabIndicatorRequestToken(): Int"))
+        assertTrue(readMenu.contains("private fun isBottomTabIndicatorRequestCurrent("))
+        assertTrue(showIndicator.contains("val requestToken = nextBottomTabIndicatorRequestToken()"))
+        assertTrue(showIndicator.contains("if (requestToken != bottomTabIndicatorRequestToken ||"))
+        assertTrue(showIndicator.contains("!isBottomTabIndicatorRequestCurrent(nav, itemId)"))
+        assertTrue(showIndicator.contains("return@post"))
+        assertTrue(hideIndicator.contains("nextBottomTabIndicatorRequestToken()"))
+    }
+
+    @Test
+    fun interfaceModeDoesNotKeepPrimaryInterfaceItemSelected() {
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val selectionSync = readMenu.substringAfter("private fun syncBottomNavigationSelection()")
+            .substringBefore("private fun setBottomNavigationSelection")
+
+        assertFalse(selectionSync.contains("null -> if (bottomTabMode == BottomTabMode.Interface)"))
+        assertFalse(selectionSync.contains("R.id.menu_read_interface"))
+    }
+
+    @Test
     fun readMenuTopBarUsesFrostedGlassMenuSurface() {
         val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
         val initBlock = readMenu.substringAfter("private fun initView")
