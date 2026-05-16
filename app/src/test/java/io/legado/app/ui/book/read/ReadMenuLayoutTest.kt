@@ -309,6 +309,26 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun bookshelfStyle1LayoutSwitchSkipsDestroyedChildViews() {
+        val booksFragment = repoFile("app/src/main/java/io/legado/app/ui/main/bookshelf/style1/books/BooksFragment.kt")
+            .readText()
+            .replace("\r\n", "\n")
+        val updateLayout = booksFragment.substringAfter("fun updateBookshelfLayout(layout: Int)")
+            .substringBefore("fun updateBookshelfSpacing(spacing: Int)")
+        val lifecycleGuardIndex = updateLayout.indexOf("if (view == null) return")
+        val layoutManagerIndex = updateLayout.indexOf("updateLayoutManager()")
+
+        assertTrue(
+            "BooksFragment must remember the selected layout before skipping a destroyed view",
+            updateLayout.contains("bookshelfLayout = newLayout\n        if (view == null) return")
+        )
+        assertTrue(
+            "BooksFragment must not access binding/updateLayoutManager after its view is destroyed",
+            lifecycleGuardIndex in 0 until layoutManagerIndex
+        )
+    }
+
+    @Test
     fun bookshelfFolderStyleKeepsLayoutTogglePopupAndPrimaryTextOverflow() {
         val layout = parseXml(repoFile("app/src/main/res/layout/fragment_bookshelf2.xml"))
         val fragment = repoFile("app/src/main/java/io/legado/app/ui/main/bookshelf/style2/BookshelfFragment2.kt").readText()

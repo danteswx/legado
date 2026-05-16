@@ -214,6 +214,7 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
             emptyList()
         }
         bookshelfLayout = newLayout
+        if (view == null) return
         updateTotalRows()
         updateLayoutManager()
         val adapterTypeChanged = oldLayout < 2 || newLayout < 2
