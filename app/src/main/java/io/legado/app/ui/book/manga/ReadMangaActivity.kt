@@ -454,7 +454,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         glassLevel: Float,
         cornerRadius: Float
     ) {
-        button.clipToOutline = true
+        button.clipToOutline = false
         button.background = ReaderBottomGlassStyle.fallbackShell(this, glassLevel, cornerRadius)
         shellOverlay.background = ReaderBottomGlassStyle.shell(this, glassLevel, cornerRadius)
         val shouldBind = !boundMangaMinimapGlassViewIds.contains(glassView.id)

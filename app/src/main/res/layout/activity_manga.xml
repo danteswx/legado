@@ -37,7 +37,7 @@
 
     <LinearLayout
         android:id="@+id/manga_progress_minimap_panel"
-        android:layout_width="56dp"
+        android:layout_width="68dp"
         android:layout_height="wrap_content"
         android:layout_gravity="end|top"
         android:layout_marginEnd="8dp"
@@ -57,7 +57,7 @@
 
         <LinearLayout
             android:id="@+id/manga_progress_minimap_controls"
-            android:layout_width="56dp"
+            android:layout_width="68dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:clipChildren="false"
@@ -67,7 +67,7 @@
 
             <FrameLayout
                 android:id="@+id/btn_manga_minimap_previous"
-                android:layout_width="56dp"
+                android:layout_width="68dp"
                 android:layout_height="32dp"
                 android:clickable="true"
                 android:clipChildren="false"
@@ -97,6 +97,7 @@
                     android:layout_height="match_parent"
                     android:gravity="center"
                     android:includeFontPadding="false"
+                    android:maxLines="1"
                     android:text="@string/previous_chapter"
                     android:textColor="@color/white"
                     android:textSize="12sp" />
@@ -105,7 +106,7 @@
 
             <FrameLayout
                 android:id="@+id/btn_manga_minimap_next"
-                android:layout_width="56dp"
+                android:layout_width="68dp"
                 android:layout_height="32dp"
                 android:layout_marginTop="6dp"
                 android:clickable="true"
@@ -136,6 +137,7 @@
                     android:layout_height="match_parent"
                     android:gravity="center"
                     android:includeFontPadding="false"
+                    android:maxLines="1"
                     android:text="@string/next_chapter"
                     android:textColor="@color/white"
                     android:textSize="12sp" />

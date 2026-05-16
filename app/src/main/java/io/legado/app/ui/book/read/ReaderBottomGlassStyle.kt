@@ -25,26 +25,26 @@ internal object ReaderBottomGlassStyle {
             ColorUtils.blendColors(Color.WHITE, context.accentColor, 0.05f)
         }
         val topAlpha = if (isDark) {
-            0.42f + glassLevel * 0.14f
-        } else {
-            0.22f + glassLevel * 0.12f
-        }
-        val centerAlpha = if (isDark) {
-            0.35f + glassLevel * 0.13f
+            0.34f + glassLevel * 0.12f
         } else {
             0.16f + glassLevel * 0.09f
         }
-        val bottomAlpha = if (isDark) {
-            0.26f + glassLevel * 0.11f
+        val centerAlpha = if (isDark) {
+            0.28f + glassLevel * 0.10f
         } else {
-            0.10f + glassLevel * 0.07f
+            0.11f + glassLevel * 0.07f
+        }
+        val bottomAlpha = if (isDark) {
+            0.20f + glassLevel * 0.08f
+        } else {
+            0.07f + glassLevel * 0.05f
         }
         return GradientDrawable(
             GradientDrawable.Orientation.TOP_BOTTOM,
             intArrayOf(
-                ColorUtils.withAlpha(surfaceColor, topAlpha.coerceAtMost(if (isDark) 0.56f else 0.34f)),
-                ColorUtils.withAlpha(surfaceColor, centerAlpha.coerceAtMost(if (isDark) 0.48f else 0.25f)),
-                ColorUtils.withAlpha(surfaceColor, bottomAlpha.coerceAtMost(if (isDark) 0.37f else 0.17f))
+                ColorUtils.withAlpha(surfaceColor, topAlpha.coerceAtMost(if (isDark) 0.46f else 0.25f)),
+                ColorUtils.withAlpha(surfaceColor, centerAlpha.coerceAtMost(if (isDark) 0.38f else 0.18f)),
+                ColorUtils.withAlpha(surfaceColor, bottomAlpha.coerceAtMost(if (isDark) 0.28f else 0.12f))
             )
         ).apply {
             this.cornerRadius = cornerRadius
@@ -59,13 +59,13 @@ internal object ReaderBottomGlassStyle {
             ColorUtils.blendColors(Color.WHITE, context.accentColor, 0.05f)
         }
         val alpha = if (isDark) {
-            0.46f + glassLevel * 0.14f
+            0.36f + glassLevel * 0.10f
         } else {
-            0.20f + glassLevel * 0.14f
+            0.14f + glassLevel * 0.10f
         }
         return GradientDrawable().apply {
             this.cornerRadius = cornerRadius
-            setColor(ColorUtils.withAlpha(surfaceColor, alpha.coerceAtMost(if (isDark) 0.60f else 0.34f)))
+            setColor(ColorUtils.withAlpha(surfaceColor, alpha.coerceAtMost(if (isDark) 0.46f else 0.24f)))
         }
     }
 
@@ -108,9 +108,9 @@ internal object ReaderBottomGlassStyle {
 
     fun tintAlpha(glassLevel: Float): Float {
         return if (useDarkGlass()) {
-            (0.16f + glassLevel * 0.18f).coerceAtMost(0.34f)
+            (0.12f + glassLevel * 0.14f).coerceAtMost(0.26f)
         } else {
-            (0.08f + glassLevel * 0.14f).coerceAtMost(0.22f)
+            (0.06f + glassLevel * 0.10f).coerceAtMost(0.16f)
         }
     }
 

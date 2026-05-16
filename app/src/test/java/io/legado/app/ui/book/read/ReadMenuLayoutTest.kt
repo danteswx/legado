@@ -1120,7 +1120,7 @@ class ReadMenuLayoutTest {
         val searchMenu = layout.elementById("search_menu")
 
         assertEquals("LinearLayout", minimapPanel.tagName)
-        assertEquals("56dp", minimapPanel.androidAttr("layout_width"))
+        assertEquals("68dp", minimapPanel.androidAttr("layout_width"))
         assertEquals("wrap_content", minimapPanel.androidAttr("layout_height"))
         assertEquals("end|top", minimapPanel.androidAttr("layout_gravity"))
         assertEquals("8dp", minimapPanel.androidAttr("layout_marginEnd"))
@@ -1133,11 +1133,11 @@ class ReadMenuLayoutTest {
         assertTrue(minimap.hasAncestor(minimapPanel))
         assertTrue(minimap.isBefore(minimapControls))
         assertEquals("vertical", minimapControls.androidAttr("orientation"))
-        assertEquals("56dp", minimapControls.androidAttr("layout_width"))
+        assertEquals("68dp", minimapControls.androidAttr("layout_width"))
         assertEquals("wrap_content", minimapControls.androidAttr("layout_height"))
         listOf(previousButton, nextButton).forEach { button ->
             assertEquals("FrameLayout", button.tagName)
-            assertEquals("56dp", button.androidAttr("layout_width"))
+            assertEquals("68dp", button.androidAttr("layout_width"))
             assertEquals("32dp", button.androidAttr("layout_height"))
             assertEquals("true", button.androidAttr("clickable"))
             assertEquals("true", button.androidAttr("focusable"))
@@ -1148,12 +1148,14 @@ class ReadMenuLayoutTest {
         assertEquals("@color/white", previousText.androidAttr("textColor"))
         assertEquals("12sp", previousText.androidAttr("textSize"))
         assertEquals("center", previousText.androidAttr("gravity"))
+        assertEquals("1", previousText.androidAttr("maxLines"))
         assertTrue(previousText.hasAncestor(previousButton))
         assertEquals("@string/next_chapter", nextButton.androidAttr("contentDescription"))
         assertEquals("@string/next_chapter", nextText.androidAttr("text"))
         assertEquals("@color/white", nextText.androidAttr("textColor"))
         assertEquals("12sp", nextText.androidAttr("textSize"))
         assertEquals("center", nextText.androidAttr("gravity"))
+        assertEquals("1", nextText.androidAttr("maxLines"))
         assertTrue(nextText.hasAncestor(nextButton))
         assertTrue(layout.elementById("chapter_minimap_previous_glass_view").hasAncestor(previousButton))
         assertTrue(layout.elementById("chapter_minimap_previous_shell_overlay").hasAncestor(previousButton))
@@ -1300,7 +1302,7 @@ class ReadMenuLayoutTest {
         val loading = layout.elementById("fl_loading")
 
         assertEquals("LinearLayout", minimapPanel.tagName)
-        assertEquals("56dp", minimapPanel.androidAttr("layout_width"))
+        assertEquals("68dp", minimapPanel.androidAttr("layout_width"))
         assertEquals("wrap_content", minimapPanel.androidAttr("layout_height"))
         assertEquals("end|top", minimapPanel.androidAttr("layout_gravity"))
         assertEquals("8dp", minimapPanel.androidAttr("layout_marginEnd"))
@@ -1314,11 +1316,11 @@ class ReadMenuLayoutTest {
         assertTrue(minimap.hasAncestor(minimapPanel))
         assertTrue(minimap.isBefore(minimapControls))
         assertEquals("vertical", minimapControls.androidAttr("orientation"))
-        assertEquals("56dp", minimapControls.androidAttr("layout_width"))
+        assertEquals("68dp", minimapControls.androidAttr("layout_width"))
         assertEquals("wrap_content", minimapControls.androidAttr("layout_height"))
         listOf(previousButton, nextButton).forEach { button ->
             assertEquals("FrameLayout", button.tagName)
-            assertEquals("56dp", button.androidAttr("layout_width"))
+            assertEquals("68dp", button.androidAttr("layout_width"))
             assertEquals("32dp", button.androidAttr("layout_height"))
             assertEquals("true", button.androidAttr("clickable"))
             assertEquals("true", button.androidAttr("focusable"))
@@ -1329,12 +1331,14 @@ class ReadMenuLayoutTest {
         assertEquals("@color/white", previousText.androidAttr("textColor"))
         assertEquals("12sp", previousText.androidAttr("textSize"))
         assertEquals("center", previousText.androidAttr("gravity"))
+        assertEquals("1", previousText.androidAttr("maxLines"))
         assertTrue(previousText.hasAncestor(previousButton))
         assertEquals("@string/next_chapter", nextButton.androidAttr("contentDescription"))
         assertEquals("@string/next_chapter", nextText.androidAttr("text"))
         assertEquals("@color/white", nextText.androidAttr("textColor"))
         assertEquals("12sp", nextText.androidAttr("textSize"))
         assertEquals("center", nextText.androidAttr("gravity"))
+        assertEquals("1", nextText.androidAttr("maxLines"))
         assertTrue(nextText.hasAncestor(nextButton))
         assertTrue(layout.elementById("manga_minimap_previous_glass_view").hasAncestor(previousButton))
         assertTrue(layout.elementById("manga_minimap_previous_shell_overlay").hasAncestor(previousButton))
@@ -1538,6 +1542,10 @@ class ReadMenuLayoutTest {
             assertEquals("false", button.androidAttr("clipToOutline"))
         }
 
+        assertFalse(readActivity.contains("button.clipToOutline = true"))
+        assertFalse(mangaActivity.contains("button.clipToOutline = true"))
+        assertTrue(readActivity.contains("button.clipToOutline = false"))
+        assertTrue(mangaActivity.contains("button.clipToOutline = false"))
         assertTrue(feedback.contains("const val MINIMAP_CHAPTER_BUTTON_PRESSED_SCALE = 1.08f"))
         assertTrue(feedback.contains("fun ViewGroup.setMinimapChapterNavigationClickListener"))
         assertTrue(feedback.contains("setOnTouchListener"))
@@ -2684,20 +2692,29 @@ class ReadMenuLayoutTest {
 
     private fun assertMoreTransparentGlassRecipe(source: String) {
         listOf(
+            "0.34f + glassLevel * 0.12f",
+            "0.16f + glassLevel * 0.09f",
+            "0.28f + glassLevel * 0.10f",
+            "0.11f + glassLevel * 0.07f",
+            "0.20f + glassLevel * 0.08f",
+            "0.07f + glassLevel * 0.05f",
+            "0.36f + glassLevel * 0.10f",
+            "0.14f + glassLevel * 0.10f",
+            "(0.12f + glassLevel * 0.14f).coerceAtMost(0.26f)",
+            "(0.06f + glassLevel * 0.10f).coerceAtMost(0.16f)"
+        ).forEach { expected ->
+            assertTrue("Missing transparent glass recipe value: $expected", source.contains(expected))
+        }
+        listOf(
             "0.42f + glassLevel * 0.14f",
             "0.22f + glassLevel * 0.12f",
             "0.35f + glassLevel * 0.13f",
-            "0.16f + glassLevel * 0.09f",
             "0.26f + glassLevel * 0.11f",
             "0.10f + glassLevel * 0.07f",
             "0.46f + glassLevel * 0.14f",
             "0.20f + glassLevel * 0.14f",
             "(0.16f + glassLevel * 0.18f).coerceAtMost(0.34f)",
-            "(0.08f + glassLevel * 0.14f).coerceAtMost(0.22f)"
-        ).forEach { expected ->
-            assertTrue("Missing transparent glass recipe value: $expected", source.contains(expected))
-        }
-        listOf(
+            "(0.08f + glassLevel * 0.14f).coerceAtMost(0.22f)",
             "0.52f + glassLevel * 0.18f",
             "0.28f + glassLevel * 0.16f",
             "0.44f + glassLevel * 0.16f",
