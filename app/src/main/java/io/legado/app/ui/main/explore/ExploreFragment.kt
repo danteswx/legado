@@ -1107,6 +1107,13 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     }
                 }
                 loadDiscoverKindsAndDefault()
+            } catch (_: CancellationException) {
+                return@launch
+            } catch (e: Throwable) {
+                AppLog.put("发现选项执行失败", e)
+                if (isAdded) {
+                    showDiscoverRuleExecutionError(item.text)
+                }
             } finally {
                 refreshController.finish()
             }
@@ -1164,7 +1171,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             }
             result.onFailure {
                 AppLog.put("发现 URL 脚本执行失败: ${item.text}", it)
-                context?.toastOnUi(it.localizedMessage ?: getString(R.string.unknown_error))
+                showDiscoverRuleExecutionError(item.text)
             }
             } finally {
                 refreshController.finish()
@@ -1184,6 +1191,16 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             }
             else -> null
         }?.takeIf { it.isNotBlank() }
+    }
+
+    private fun showDiscoverRuleExecutionError(label: String) {
+        if (!isAdded) return
+        val safeLabel = label
+            .takeIf { it.isNotBlank() }
+            ?.limitDiscoverText(18)
+            ?: getString(R.string.discovery)
+        binding.tvDiscoverEmpty.text = getString(R.string.discover_rule_error, safeLabel)
+        binding.tvDiscoverEmpty.visible()
     }
 
     private fun handleDiscoverButtonTag(item: DiscoverTagItem) {
@@ -1242,7 +1259,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 applyDiscoverButtonResult(source, action, kinds)
             }.onFailure {
                 AppLog.put("发现标签按钮执行失败", it)
-                context?.toastOnUi(it.localizedMessage ?: getString(R.string.unknown_error))
+                showDiscoverRuleExecutionError(item.text)
             }
             } finally {
                 refreshController.finish()
@@ -1432,7 +1449,13 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     override fun onResume() {
         super.onResume()
-        if (usingModernDiscovery != AppConfig.modernDiscoveryPage || !discoveryModeLoaded) {
+        val modernMode = AppConfig.modernDiscoveryPage
+        val needsViewInitialization = if (modernMode) {
+            !modernModeInitialized
+        } else {
+            !oldModeInitialized
+        }
+        if (usingModernDiscovery != modernMode || !discoveryModeLoaded || needsViewInitialization) {
             applyDiscoveryMode(loadData = true)
             discoveryModeLoaded = true
         }

@@ -994,6 +994,7 @@
     <string name="discovery_settings_title">发现页管理</string>
     <string name="discovery_settings_summary">配置发现页入口与页面样式。</string>
     <string name="discover_grid_columns">每行数量</string>
+    <string name="discover_rule_error">发现规则执行失败：%s</string>
     <string name="subscription_settings_title">订阅页管理</string>
     <string name="subscription_settings_summary">配置订阅页入口与页面样式。</string>
     <string name="discovery_subscription_settings_title">发现与订阅</string>
