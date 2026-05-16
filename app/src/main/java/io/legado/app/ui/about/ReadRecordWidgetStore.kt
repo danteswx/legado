@@ -41,6 +41,10 @@ data class ReadRecordRankItem(
     val readTime: Long
 )
 
+internal fun sanitizeRecentVisualSnapshots(
+    snapshots: List<ReadRecentVisualSnapshot>
+): List<ReadRecentVisualSnapshot> = snapshots.mapNotNull { it.sanitizedOrNull() }
+
 object ReadRecordWidgetStore {
 
     private const val MAX_SNAPSHOTS = 24
@@ -65,7 +69,9 @@ object ReadRecordWidgetStore {
     fun loadRecentSnapshots(): List<ReadRecentVisualSnapshot> {
         val raw = appCtx.getPrefString(PreferKey.readRecordRecentSnapshots).orEmpty()
         if (raw.isBlank()) return emptyList()
-        return GSON.fromJsonArray<ReadRecentVisualSnapshot>(raw).getOrDefault(emptyList())
+        return sanitizeRecentVisualSnapshots(
+            GSON.fromJsonArray<ReadRecentVisualSnapshot>(raw).getOrDefault(emptyList())
+        )
     }
 
     private fun saveRecentSnapshots(items: List<ReadRecentVisualSnapshot>) {
@@ -130,19 +136,46 @@ object ReadRecordWidgetStore {
     }
 
     private fun ReadRecentVisualSnapshot.identityKey(): String {
-        val normalizedName = name.trim()
-        val normalizedAuthor = author.trim()
+        val normalizedName = safeName().trim()
+        val normalizedAuthor = safeAuthor().trim()
         return if (normalizedName.isNotEmpty()) {
             "$normalizedName\n$normalizedAuthor"
         } else {
-            bookUrl
+            safeBookUrl()
         }
     }
 
     private fun ReadRecentVisualSnapshot.sameBook(name: String, author: String?): Boolean {
         val normalizedName = name.trim()
         if (normalizedName.isEmpty()) return false
-        return this.name.trim() == normalizedName &&
-            this.author.trim() == author.orEmpty().trim()
+        return safeName().trim() == normalizedName &&
+            safeAuthor().trim() == author.orEmpty().trim()
     }
+}
+
+private fun ReadRecentVisualSnapshot.sanitizedOrNull(): ReadRecentVisualSnapshot? {
+    val safeBookUrl = safeBookUrl()
+    val safeName = safeName()
+    val safeAuthor = safeAuthor()
+    if (safeBookUrl.isBlank() && safeName.isBlank()) return null
+    return if (bookUrl == safeBookUrl && name == safeName && author == safeAuthor) {
+        this
+    } else {
+        copy(bookUrl = safeBookUrl, name = safeName, author = safeAuthor)
+    }
+}
+
+private fun ReadRecentVisualSnapshot.safeBookUrl(): String {
+    val value: String? = bookUrl
+    return value.orEmpty()
+}
+
+private fun ReadRecentVisualSnapshot.safeName(): String {
+    val value: String? = name
+    return value.orEmpty()
+}
+
+private fun ReadRecentVisualSnapshot.safeAuthor(): String {
+    val value: String? = author
+    return value.orEmpty()
 }
