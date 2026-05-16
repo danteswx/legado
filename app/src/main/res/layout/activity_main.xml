@@ -63,25 +63,11 @@
                 android:layout_height="@dimen/main_bottom_indicator_height"
                 android:layout_gravity="start|center_vertical"
                 android:layout_marginStart="@dimen/main_bottom_indicator_margin_start"
+                android:alpha="0"
+                android:background="@drawable/bg_read_menu_tab_selected"
                 android:clickable="false"
-                android:focusable="false">
-
-                <com.qmdeve.liquidglass.widget.LiquidGlassView
-                    android:id="@+id/bottom_navigation_indicator_glass_view"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:clickable="false"
-                    android:focusable="false" />
-
-                <View
-                    android:id="@+id/bottom_navigation_indicator_overlay"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:background="@drawable/bg_liquid_glass_indicator_overlay"
-                    android:clickable="false"
-                    android:focusable="false" />
-
-            </FrameLayout>
+                android:focusable="false"
+                android:visibility="invisible" />
 
             <io.legado.app.lib.theme.view.ThemeBottomNavigationVIew
                 android:id="@+id/bottom_navigation_view"
@@ -89,10 +75,10 @@
                 android:layout_height="match_parent"
                 android:background="@color/transparent"
                 android:minHeight="@dimen/main_bottom_bar_height"
-                android:paddingStart="@dimen/main_bottom_nav_horizontal_padding"
-                android:paddingEnd="@dimen/main_bottom_nav_horizontal_padding"
-                app:itemIconSize="@dimen/main_bottom_nav_icon_size"
-                app:labelVisibilityMode="unlabeled"
+                android:paddingStart="@dimen/read_bottom_nav_horizontal_padding"
+                android:paddingEnd="@dimen/read_bottom_nav_horizontal_padding"
+                app:itemIconSize="@dimen/read_top_bar_icon_size"
+                app:labelVisibilityMode="selected"
                 app:menu="@menu/main_bnv" />
 
         </FrameLayout>

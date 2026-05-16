@@ -2,8 +2,8 @@
 
 package io.legado.app.ui.main
 
-import android.animation.ValueAnimator
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.drawable.Drawable
@@ -20,7 +20,7 @@ import android.view.ViewConfiguration
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.animation.AccelerateDecelerateInterpolator
-import android.view.animation.OvershootInterpolator
+import android.view.animation.DecelerateInterpolator
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.addCallback
@@ -154,34 +154,14 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         resources.getDimension(R.dimen.main_bottom_bar_corner_radius)
     }
     private val searchButtonCornerRadius by lazy {
-        resources.getDimension(R.dimen.main_bottom_bar_corner_radius)
-    }
-    private val bottomIndicatorCornerRadius by lazy {
-        resources.getDimension(R.dimen.main_bottom_indicator_corner_radius)
-    }
-    private val bottomIndicatorWidth by lazy {
-        resources.getDimensionPixelSize(R.dimen.main_bottom_indicator_width)
-    }
-    private val bottomIndicatorAnimator by lazy {
-        ValueAnimator().apply {
-            duration = 320L
-            interpolator = OvershootInterpolator(0.55f)
-        }
+        resources.getDimension(R.dimen.main_search_button_corner_radius)
     }
     private val bottomGlassPulseInterpolator by lazy { AccelerateDecelerateInterpolator() }
+    private val bottomNavigationIndicatorInterpolator by lazy { DecelerateInterpolator(1.8f) }
     private var liquidGlassReady = false
     private val boundLiquidGlassViewIds = hashSetOf<Int>()
     private var mergedDiscoveryLongClickView: View? = null
     private var sideNavigationOpen = false
-    private val hideBottomIndicatorRunnable = Runnable {
-        binding.bottomNavigationIndicatorContainer.animate()
-            .alpha(0f)
-            .scaleX(0.88f)
-            .scaleY(0.88f)
-            .setDuration(220L)
-            .setInterpolator(bottomGlassPulseInterpolator)
-            .start()
-    }
 
     override fun setupSystemBar() {
         super.setupSystemBar()
@@ -347,7 +327,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         bottomNavigationView.setOnNavigationItemSelectedListener(this@MainActivity)
         bottomNavigationView.setOnNavigationItemReselectedListener(this@MainActivity)
         bindSideNavigationButtons()
-        bottomNavigationView.menu.findItem(getBottomNavigationItemId(initialPage))?.isChecked = true
+        setBottomNavigationSelection(getBottomNavigationItemId(initialPage), animate = false)
         applyBottomNavigationIcons()
         searchButton.setOnClickListener {
             startActivity(Intent(this@MainActivity, SearchActivity::class.java))
@@ -526,7 +506,6 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
                 sideNavigationGravity = AppConfig.bottomBarSidebarGravity
                 sideNavigationLockedGravity = null
             }
-            bottomIndicatorAnimator.cancel()
             bottomNavigationIndicatorContainer.isVisible = false
             sideNavigationScrim.background = createSideNavigationScrimDrawable()
             sideNavigationPanel.background = createSideNavigationPanelDrawable()
@@ -544,7 +523,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             sideNavigationScrim.animate().cancel()
             sideNavigationScrim.visibility = View.GONE
             sideNavigationPanel.visibility = View.GONE
-            bottomNavigationView.menu.findItem(getBottomNavigationItemId(pagePosition))?.isChecked = true
+            setBottomNavigationSelection(getBottomNavigationItemId(pagePosition), animate = false)
         }
     }
 
@@ -930,10 +909,9 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
 
     private fun setupLiquidGlass() {
         binding.run {
+            bottomNavigationIndicatorContainer.background = createBottomNavigationIndicatorBackground()
             if (AppConfig.isEInkMode) {
                 bottomNavigationGlassView.visibility = android.view.View.GONE
-                bottomNavigationIndicatorContainer.visibility = android.view.View.GONE
-                bottomNavigationIndicatorGlassView.visibility = android.view.View.GONE
                 searchButtonGlassView.visibility = android.view.View.GONE
                 bottomNavigationShellOverlay.visibility = android.view.View.VISIBLE
                 searchButtonShellOverlay.visibility = android.view.View.VISIBLE
@@ -953,14 +931,9 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             val effectMode = AppConfig.bottomBarEffectMode
             if (effectMode == "solid") {
                 bottomNavigationGlassView.visibility = android.view.View.GONE
-                bottomNavigationIndicatorGlassView.visibility = android.view.View.GONE
                 searchButtonGlassView.visibility = android.view.View.GONE
                 bottomNavigationShellOverlay.isVisible = true
                 searchButtonShellOverlay.isVisible = true
-                bottomNavigationIndicatorContainer.isVisible = true
-                bottomNavigationIndicatorContainer.alpha = 1f
-                bottomNavigationIndicatorContainer.scaleX = 1f
-                bottomNavigationIndicatorContainer.scaleY = 1f
                 bottomNavigationShellOverlay.background = createSolidBottomShellDrawable(
                     cornerRadius = bottomBarCornerRadius,
                     oval = false
@@ -972,21 +945,14 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
                 bottomNavigationView.setBackgroundColor(Color.TRANSPARENT)
                 searchButton.setBackgroundResource(R.drawable.bg_main_search_button)
                 syncSearchButtonTint()
-                bottomNavigationIndicatorOverlay.background = createSolidBottomIndicatorDrawable()
-                updateBottomNavigationIndicator(animate = false)
                 return
             }
-            bottomNavigationIndicatorContainer.isVisible = true
-            bottomNavigationIndicatorContainer.alpha = 0f
-            bottomNavigationIndicatorContainer.scaleX = 0.82f
-            bottomNavigationIndicatorContainer.scaleY = 0.82f
             bottomNavigationShellOverlay.isVisible = true
             searchButtonShellOverlay.isVisible = true
             bottomNavigationView.setBackgroundColor(Color.TRANSPARENT)
             searchButton.setBackgroundResource(R.drawable.bg_main_search_button)
             syncSearchButtonTint()
             bottomNavigationGlassView.visibility = android.view.View.VISIBLE
-            bottomNavigationIndicatorGlassView.visibility = android.view.View.VISIBLE
             searchButtonGlassView.visibility = android.view.View.VISIBLE
             if (!liquidGlassReady || !contentContainer.isLaidOut || !bottomControls.isLaidOut) {
                 contentContainer.doOnPreDraw {
@@ -1020,11 +986,6 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             } else {
                 dispersion
             }
-            val indicatorDispersion = if (frostedMode) {
-                (dispersion + 0.08f).coerceAtMost(1f)
-            } else {
-                dispersion
-            }
             val refractionHeight = if (frostedMode) {
                 (12f + glassLevel * 10f).dpToPx()
             } else {
@@ -1046,12 +1007,6 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
                 cornerRadius = searchButtonCornerRadius,
                 oval = true,
                 selected = false
-            )
-            bottomNavigationIndicatorOverlay.background = createLiquidGlassShellDrawable(
-                glassLevel = glassLevel,
-                cornerRadius = bottomIndicatorCornerRadius,
-                oval = false,
-                selected = true
             )
             setupLiquidGlassView(
                 liquidGlassView = bottomNavigationGlassView,
@@ -1075,17 +1030,14 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
                 elasticEnabled = true,
                 touchEffectEnabled = true
             )
-            setupLiquidGlassView(
-                liquidGlassView = bottomNavigationIndicatorGlassView,
-                cornerRadius = bottomIndicatorCornerRadius,
-                refractionHeight = (refractionHeight * 0.9f).coerceAtLeast(16f.dpToPx()),
-                refractionOffset = (refractionOffset * 0.72f).coerceAtLeast(46f.dpToPx()),
-                blurRadius = (blurRadius * 0.78f).coerceAtLeast(5f.dpToPx()),
-                dispersion = indicatorDispersion,
-                tintAlpha = (tintAlpha + 0.05f).coerceAtMost(0.28f),
-                elasticEnabled = true,
-                touchEffectEnabled = true
-            )
+        }
+    }
+
+    private fun createBottomNavigationIndicatorBackground(): GradientDrawable {
+        return GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = resources.getDimension(R.dimen.main_bottom_indicator_corner_radius)
+            setColor(primaryColor)
         }
     }
 
@@ -1101,6 +1053,8 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             bottomNavigationView.restoreThemeIconTint()
         }
         updateSideNavigationItems()
+        bottomNavigationView.itemIconTintList = ColorStateList.valueOf(Color.WHITE)
+        bottomNavigationView.itemTextColor = ColorStateList.valueOf(Color.WHITE)
         syncSearchButtonTint()
     }
 
@@ -1135,14 +1089,6 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             }
             setColor(baseColor)
             setStroke(1.dpToPx(), AppColorUtils.withAlpha(Color.BLACK, 0.42f))
-        }
-    }
-
-    private fun createSolidBottomIndicatorDrawable(): GradientDrawable {
-        return GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = bottomIndicatorCornerRadius
-            setColor(primaryColor)
         }
     }
 
@@ -1340,75 +1286,44 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
 
     private fun updateBottomNavigationIndicator(animate: Boolean) {
         if (isSidebarMode()) return
-        if (AppConfig.isEInkMode) return
         val menuView = binding.bottomNavigationView.getChildAt(0) as? ViewGroup ?: return
         val itemView = findBottomNavigationItemView(menuView, getBottomNavigationItemId(pagePosition))
             ?: return
         val indicator = binding.bottomNavigationIndicatorContainer
+        val maxWidth = 60.dpToPx()
+        val minWidth = 48.dpToPx()
         val targetWidth = minOf(
-            bottomIndicatorWidth,
-            (itemView.width - 16.dpToPx()).coerceAtLeast(42.dpToPx())
+            maxWidth,
+            (itemView.width - 12.dpToPx()).coerceAtLeast(minWidth)
         )
         if (indicator.layoutParams.width != targetWidth) {
             indicator.layoutParams = indicator.layoutParams.apply {
                 width = targetWidth
             }
         }
-        val baseX = binding.bottomNavigationView.x + menuView.x + itemView.x
-        val targetX = baseX + (itemView.width - targetWidth) / 2f
-        if (!animate || !indicator.isLaidOut) {
+        val targetX = binding.bottomNavigationView.x +
+                menuView.x +
+                itemView.x +
+                (itemView.width - targetWidth) / 2f
+        val firstPlacement = indicator.alpha <= 0f || !indicator.isVisible
+        binding.bottomNavigationIndicatorContainer.isVisible = true
+        if (!animate || firstPlacement || AppConfig.isEInkMode) {
+            indicator.animate().cancel()
             indicator.x = targetX
-            playBottomNavigationIndicatorAnimation(animate = false)
-            return
-        }
-        val startX = indicator.x
-        bottomIndicatorAnimator.cancel()
-        bottomIndicatorAnimator.removeAllUpdateListeners()
-        bottomIndicatorAnimator.setFloatValues(startX, targetX)
-        bottomIndicatorAnimator.addUpdateListener { animator ->
-            indicator.x = animator.animatedValue as Float
-        }
-        bottomIndicatorAnimator.start()
-        playBottomNavigationIndicatorAnimation(animate = true)
-    }
-
-    private fun playBottomNavigationIndicatorAnimation(animate: Boolean) {
-        if (isSidebarMode()) return
-        if (AppConfig.isEInkMode) return
-        val indicator = binding.bottomNavigationIndicatorContainer
-        indicator.removeCallbacks(hideBottomIndicatorRunnable)
-        indicator.animate().cancel()
-        indicator.isVisible = true
-        if (!animate) {
             indicator.alpha = 1f
             indicator.scaleX = 1f
             indicator.scaleY = 1f
-        } else {
-            indicator.alpha = 0.94f
-            indicator.scaleX = 0.90f
-            indicator.scaleY = 1.08f
-            indicator.animate()
-                .alpha(1f)
-                .scaleX(1f)
-                .scaleY(1f)
-                .setDuration(280L)
-                .setInterpolator(OvershootInterpolator(0.78f))
-                .start()
-            binding.bottomNavigationGlass.animate()
-                .scaleX(1.01f)
-                .scaleY(1.02f)
-                .setDuration(120L)
-                .withEndAction {
-                    binding.bottomNavigationGlass.animate()
-                        .scaleX(1f)
-                        .scaleY(1f)
-                        .setDuration(220L)
-                        .setInterpolator(bottomGlassPulseInterpolator)
-                        .start()
-                }
-                .start()
+            return
         }
-        indicator.postDelayed(hideBottomIndicatorRunnable, 780L)
+        indicator.animate().cancel()
+        indicator.animate()
+            .x(targetX)
+            .alpha(1f)
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(180L)
+            .setInterpolator(bottomGlassPulseInterpolator)
+            .start()
     }
 
     private fun findBottomNavigationItemView(menuView: ViewGroup, itemId: Int): View? {
@@ -1427,6 +1342,84 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
             }
         }
         return null
+    }
+
+    private fun setBottomNavigationSelection(itemId: Int, animate: Boolean) {
+        val nav = binding.bottomNavigationView
+        val wasSelectedItemId = checkedBottomNavigationItemId(nav)
+        nav.menu.findItem(itemId)?.isChecked = true
+        animateBottomNavigationSelectedItem(nav, itemId, animate && wasSelectedItemId != itemId)
+        if (!animate) {
+            resetBottomNavigationItemAnimations(nav)
+        }
+    }
+
+    private fun checkedBottomNavigationItemId(nav: BottomNavigationView): Int? {
+        for (index in 0 until nav.menu.size()) {
+            val item = nav.menu.getItem(index)
+            if (item.isChecked) {
+                return item.itemId
+            }
+        }
+        return null
+    }
+
+    private fun findBottomNavigationItemView(nav: BottomNavigationView, itemId: Int): View? {
+        val menuView = nav.getChildAt(0) as? ViewGroup ?: return null
+        return findBottomNavigationItemView(menuView, itemId)
+    }
+
+    private fun animateBottomNavigationSelectedItem(
+        nav: BottomNavigationView,
+        itemId: Int,
+        changed: Boolean
+    ) {
+        if (!changed || AppConfig.isEInkMode) return
+        val itemView = findBottomNavigationItemView(nav, itemId) ?: return
+        val contentContainer = itemView.findViewById<View>(
+            com.google.android.material.R.id.navigation_bar_item_content_container
+        ) ?: return
+        val labelsGroup = itemView.findViewById<View>(
+            com.google.android.material.R.id.navigation_bar_item_labels_group
+        )
+        itemView.doOnPreDraw {
+            val labelHeight = labelsGroup?.height?.takeIf { it > 0 } ?: 0
+            val startOffset = (labelHeight * 0.46f)
+                .coerceIn(8.dpToPx().toFloat(), 18.dpToPx().toFloat())
+            contentContainer.animate().cancel()
+            contentContainer.translationY = startOffset
+            contentContainer.animate()
+                .translationY(0f)
+                .setDuration(180L)
+                .setInterpolator(bottomNavigationIndicatorInterpolator)
+                .start()
+            labelsGroup?.animate()?.cancel()
+            labelsGroup?.alpha = 0f
+            labelsGroup?.animate()
+                ?.alpha(1f)
+                ?.setDuration(120L)
+                ?.setInterpolator(bottomGlassPulseInterpolator)
+                ?.start()
+        }
+    }
+
+    private fun resetBottomNavigationItemAnimations(nav: BottomNavigationView) {
+        val menuView = nav.getChildAt(0) as? ViewGroup ?: return
+        for (index in 0 until menuView.childCount) {
+            val itemView = menuView.getChildAt(index)
+            itemView.findViewById<View>(
+                com.google.android.material.R.id.navigation_bar_item_content_container
+            )?.run {
+                animate().cancel()
+                translationY = 0f
+            }
+            itemView.findViewById<View>(
+                com.google.android.material.R.id.navigation_bar_item_labels_group
+            )?.run {
+                animate().cancel()
+                alpha = 1f
+            }
+        }
     }
 
     private fun getBottomNavigationItemId(position: Int): Int {
@@ -1702,6 +1695,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         applyMergedDiscoveryIcon()
         binding.bottomNavigationView.post {
             bindMergedDiscoveryLongClick()
+            setBottomNavigationSelection(getBottomNavigationItemId(pagePosition), animate = false)
             updateSideNavigationItems()
             updateBottomNavigationIndicator(animate = false)
         }
@@ -1755,7 +1749,7 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
 
         override fun onPageSelected(position: Int) {
             pagePosition = position
-            binding.bottomNavigationView.menu.findItem(getBottomNavigationItemId(position))?.isChecked = true
+            setBottomNavigationSelection(getBottomNavigationItemId(position), animate = true)
             updateSideNavigationItems()
             updateBottomNavigationIndicator(animate = true)
         }

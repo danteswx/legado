@@ -22,35 +22,96 @@ class ReadMenuLayoutTest {
     }
 
     @Test
-    fun discoverTopActionButtonsUseReaderToolbarScale() {
-        val layout = parseXml(repoFile("app/src/main/res/layout/fragment_explore.xml"))
+    fun mainBottomNavigationMatchesReaderIslandStyleAndKeepsSearchSeparate() {
+        val mainLayout = parseXml(repoFile("app/src/main/res/layout/activity_main.xml"))
         val dimens = repoFile("app/src/main/res/values/dimens.xml").readText()
         val readMenu = parseXml(repoFile("app/src/main/res/layout/view_read_menu.xml"))
+        val mainActivity = repoFile("app/src/main/java/io/legado/app/ui/main/MainActivity.kt").readText()
+        val bottomNavigationGlass = mainLayout.elementById("bottom_navigation_glass")
+        val searchButtonContainer = mainLayout.elementById("search_button_container")
+        val bottomNavigation = mainLayout.elementById("bottom_navigation_view")
+        val indicatorContainer = mainLayout.elementById("bottom_navigation_indicator_container")
+        val readerNavigation = readMenu.elementById("read_bottom_primary_nav")
+        val readerIndicator = readMenu.elementById("bottom_tab_indicator_container")
+        val updateIndicator = mainActivity.substringAfter("private fun updateBottomNavigationIndicator(")
+            .substringBefore("private fun findBottomNavigationItemView")
 
-        listOf(
-            "btn_discover_source_search",
-            "btn_discover_layout_toggle",
-            "btn_discover_tag_filter",
-            "btn_discover_more"
-        ).forEach { id ->
-            val button = layout.elementById(id)
-            assertEquals("@dimen/discover_top_action_button_size", button.androidAttr("layout_width"))
-            assertEquals("@dimen/discover_top_action_button_size", button.androidAttr("layout_height"))
-            assertEquals("@dimen/discover_top_action_button_padding", button.androidAttr("padding"))
-            assertEquals("centerInside", button.androidAttr("scaleType"))
-        }
-        assertEquals(
-            "@dimen/read_top_bar_icon_size",
-            readMenu.elementById("read_bottom_primary_nav").appAttr("itemIconSize")
-        )
-        assertEquals(
-            "@dimen/read_top_bar_icon_size",
-            readMenu.elementById("read_bottom_interface_nav").appAttr("itemIconSize")
-        )
-        assertTrue(dimens.contains("<dimen name=\"read_top_bar_icon_size\">22dp</dimen>"))
-        assertTrue(dimens.contains("<dimen name=\"read_top_bar_icon_padding\">13dp</dimen>"))
-        assertTrue(dimens.contains("<dimen name=\"discover_top_action_button_size\">48dp</dimen>"))
-        assertTrue(dimens.contains("<dimen name=\"discover_top_action_button_padding\">13dp</dimen>"))
+        assertEquals("@id/search_button_container", bottomNavigationGlass.appAttr("layout_constraintEnd_toStartOf"))
+        assertEquals("@dimen/main_bottom_bar_gap", bottomNavigationGlass.androidAttr("layout_marginEnd"))
+        assertEquals("@dimen/main_search_button_size", searchButtonContainer.androidAttr("layout_width"))
+        assertEquals("@dimen/main_search_button_size", searchButtonContainer.androidAttr("layout_height"))
+        assertFalse(searchButtonContainer.hasAncestor(bottomNavigationGlass))
+        assertFalse(bottomNavigationGlass.hasAncestor(searchButtonContainer))
+
+        assertEquals("@dimen/main_bottom_bar_height", bottomNavigationGlass.androidAttr("layout_height"))
+        assertEquals("@dimen/main_bottom_bar_height", bottomNavigation.androidAttr("minHeight"))
+        assertTrue(dimens.contains("<dimen name=\"main_bottom_bar_height\">56dp</dimen>"))
+        assertTrue(dimens.contains("<dimen name=\"main_search_button_size\">56dp</dimen>"))
+        assertTrue(dimens.contains("<dimen name=\"main_bottom_bar_corner_radius\">28dp</dimen>"))
+        assertTrue(dimens.contains("<dimen name=\"main_search_button_corner_radius\">28dp</dimen>"))
+        assertEquals(readerNavigation.appAttr("itemIconSize"), bottomNavigation.appAttr("itemIconSize"))
+        assertEquals(readerNavigation.androidAttr("paddingStart"), bottomNavigation.androidAttr("paddingStart"))
+        assertEquals(readerNavigation.androidAttr("paddingEnd"), bottomNavigation.androidAttr("paddingEnd"))
+        assertEquals("selected", bottomNavigation.appAttr("labelVisibilityMode"))
+
+        assertEquals("@dimen/main_bottom_indicator_width", indicatorContainer.androidAttr("layout_width"))
+        assertEquals("@dimen/main_bottom_indicator_height", indicatorContainer.androidAttr("layout_height"))
+        assertEquals("60dp", readerIndicator.androidAttr("layout_width"))
+        assertTrue(dimens.contains("<dimen name=\"main_bottom_indicator_width\">60dp</dimen>"))
+        assertEquals(readerIndicator.androidAttr("layout_height"), "48dp")
+        assertTrue(dimens.contains("<dimen name=\"main_bottom_indicator_height\">48dp</dimen>"))
+        assertEquals(readerIndicator.androidAttr("background"), indicatorContainer.androidAttr("background"))
+        assertEquals("invisible", indicatorContainer.androidAttr("visibility"))
+        assertTrue(updateIndicator.contains("bottomNavigationIndicatorContainer.isVisible = true"))
+        assertTrue(updateIndicator.contains("val maxWidth = 60.dpToPx()"))
+        assertTrue(updateIndicator.contains("val minWidth = 48.dpToPx()"))
+        assertFalse(updateIndicator.contains("bottomNavigationIndicatorContainer.isVisible = false"))
+        assertTrue(mainActivity.contains("bottomNavigationIndicatorContainer.background = createBottomNavigationIndicatorBackground()"))
+        assertTrue(mainActivity.contains("cornerRadius = resources.getDimension(R.dimen.main_bottom_indicator_corner_radius)"))
+        assertTrue(mainActivity.contains("setColor(primaryColor)"))
+        assertTrue(mainActivity.contains("bottomNavigationView.itemIconTintList = ColorStateList.valueOf(Color.WHITE)"))
+        assertFalse(mainActivity.contains("bottomNavigationIndicatorGlassView"))
+    }
+
+    @Test
+    fun mainBottomNavigationSelectionKeepsOutlineIconAndUsesReaderLabelAnimation() {
+        val mainLayout = parseXml(repoFile("app/src/main/res/layout/activity_main.xml"))
+        val mainActivity = repoFile("app/src/main/java/io/legado/app/ui/main/MainActivity.kt").readText()
+        val navConfig = repoFile("app/src/main/java/io/legado/app/help/config/NavigationBarIconConfig.kt").readText()
+        val bottomNavigation = mainLayout.elementById("bottom_navigation_view")
+        val pageSelected = mainActivity.substringAfter("override fun onPageSelected(position: Int)")
+            .substringBefore("\n        }\n\n    }")
+        val animationBlock = mainActivity.substringAfter("private fun animateBottomNavigationSelectedItem(")
+            .substringBefore("private fun resetBottomNavigationItemAnimations")
+        val menuDrawableBlock = navConfig.substringAfter("private fun createMenuDrawable(")
+            .substringBefore("private fun iconPath")
+
+        assertEquals("selected", bottomNavigation.appAttr("labelVisibilityMode"))
+        assertTrue(mainActivity.contains("private fun setBottomNavigationSelection(itemId: Int, animate: Boolean)"))
+        assertTrue(mainActivity.contains("val wasSelectedItemId = checkedBottomNavigationItemId(nav)"))
+        assertTrue(mainActivity.contains("animateBottomNavigationSelectedItem(nav, itemId, animate && wasSelectedItemId != itemId)"))
+        assertTrue(mainActivity.contains("private fun checkedBottomNavigationItemId(nav: BottomNavigationView): Int?"))
+        assertTrue(mainActivity.contains("private fun resetBottomNavigationItemAnimations(nav: BottomNavigationView)"))
+        assertTrue(pageSelected.contains("setBottomNavigationSelection(getBottomNavigationItemId(position), animate = true)"))
+        assertTrue(animationBlock.contains("doOnPreDraw"))
+        assertTrue(animationBlock.contains("com.google.android.material.R.id.navigation_bar_item_content_container"))
+        assertTrue(animationBlock.contains("com.google.android.material.R.id.navigation_bar_item_labels_group"))
+        assertTrue(animationBlock.contains("contentContainer.translationY = startOffset"))
+        assertTrue(animationBlock.contains(".translationY(0f)"))
+        assertTrue(animationBlock.contains("labelsGroup?.animate()"))
+        assertFalse(menuDrawableBlock.contains("STATE_SELECTED"))
+    }
+
+    @Test
+    fun mainBottomNavigationMyTabUsesGearIcon() {
+        val mainMenu = parseXml(repoFile("app/src/main/res/menu/main_bnv.xml"))
+        val navConfig = repoFile("app/src/main/java/io/legado/app/help/config/NavigationBarIconConfig.kt").readText()
+        val myItem = mainMenu.elementById("menu_my_config")
+
+        assertEquals("@drawable/ic_lucide_settings", myItem.androidAttr("icon"))
+        assertTrue(navConfig.contains(
+            "NavItem(\"my\", R.string.my, R.id.menu_my_config, R.drawable.ic_lucide_settings)"
+        ))
     }
 
     @Test
