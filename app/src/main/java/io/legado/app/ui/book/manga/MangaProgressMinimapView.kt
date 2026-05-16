@@ -15,6 +15,7 @@ import com.bumptech.glide.Glide
 import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
 import io.legado.app.model.BookCover
+import io.legado.app.ui.book.ProgressMinimapDragCalculator
 import io.legado.app.utils.dpToPx
 import kotlin.math.roundToInt
 
@@ -217,21 +218,26 @@ class MangaProgressMinimapView @JvmOverloads constructor(
         val travel = (trackRect.height() - thumbHeight).coerceAtLeast(0f)
         val initialRatio = dragRatio ?: pinnedProgressRatio ?: progressRatio()
         val thumbTop = trackRect.top + travel * initialRatio.coerceIn(0f, 1f)
-        if (!isTouchInsideThumb(y, thumbTop, thumbHeight)) {
-            return false
-        }
-        dragThumbTouchOffset = (y - thumbTop).coerceIn(0f, thumbHeight)
+        val touchInsideThumb = isTouchInsideThumb(y, thumbTop, thumbHeight)
+        dragThumbTouchOffset = ProgressMinimapDragCalculator.dragTouchOffset(
+            touchInsideThumb,
+            y,
+            thumbTop,
+            thumbHeight
+        )
         dragStartY = y
-        hasDragged = false
+        hasDragged = !touchInsideThumb
         pinnedProgressRatio = null
-        dragRatio = initialRatio
+        dragRatio = if (touchInsideThumb) initialRatio else ratioForY(y)
         invalidate()
+        if (!touchInsideThumb) {
+            onProgressChanging?.invoke(dragRatio ?: progressRatio())
+        }
         return true
     }
 
     private fun isTouchInsideThumb(y: Float, thumbTop: Float, thumbHeight: Float): Boolean {
-        val hitSlop = 10f.dpToPx()
-        return y >= thumbTop - hitSlop && y <= thumbTop + thumbHeight + hitSlop
+        return y >= thumbTop && y <= thumbTop + thumbHeight
     }
 
     private fun updateDragFromY(y: Float) {
@@ -261,9 +267,13 @@ class MangaProgressMinimapView @JvmOverloads constructor(
             return 0f
         }
         val thumbHeight = thumbHeight(trackRect.height())
-        val travel = (trackRect.height() - thumbHeight).coerceAtLeast(1f)
-        val thumbTop = (y - dragThumbTouchOffset).coerceIn(trackRect.top, trackRect.bottom - thumbHeight)
-        return ((thumbTop - trackRect.top) / travel).coerceIn(0f, 1f)
+        return ProgressMinimapDragCalculator.ratioForY(
+            y,
+            dragThumbTouchOffset,
+            trackRect.top,
+            trackRect.bottom,
+            thumbHeight
+        )
     }
 
     private fun pageForRatio(ratio: Float): Int {
