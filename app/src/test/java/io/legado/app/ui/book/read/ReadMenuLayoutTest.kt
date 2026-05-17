@@ -179,6 +179,33 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun textChapterPagesUseSnapshotForMinimapReads() {
+        val textChapter =
+            repoFile("app/src/main/java/io/legado/app/ui/book/read/page/entities/TextChapter.kt")
+                .readText()
+        val textChapterLayout =
+            repoFile("app/src/main/java/io/legado/app/ui/book/read/page/provider/TextChapterLayout.kt")
+                .readText()
+        val getContentBlock = textChapter.substringAfter("fun getContent(): String")
+            .substringBefore("fun getUnRead")
+        val onPageCompletedBlock = textChapterLayout.substringAfter("private fun onPageCompleted()")
+            .substringBefore("private fun onCompleted()")
+
+        assertTrue(textChapter.contains("private val textPagesLock = Any()"))
+        assertTrue(textChapter.contains("val pages: List<TextPage> get() = pageSnapshot()"))
+        assertTrue(textChapter.contains("private fun pageSnapshot(): List<TextPage> = synchronized(textPagesLock)"))
+        assertTrue(textChapter.contains("fun appendPage(page: TextPage): Int = synchronized(textPagesLock)"))
+        assertTrue(textChapter.contains("fun nextPageIndex(): Int = synchronized(textPagesLock)"))
+        assertTrue(textChapter.contains("fun lastPageForLayout(): TextPage? = synchronized(textPagesLock)"))
+        assertTrue(getContentBlock.contains("pageSnapshot().forEach"))
+        assertTrue(onPageCompletedBlock.contains("textPage.index = textChapter.nextPageIndex()"))
+        assertTrue(onPageCompletedBlock.contains("?: textChapter.lastPageForLayout()?.let"))
+        assertTrue(onPageCompletedBlock.contains("val pageIndex = textChapter.appendPage(textPage)"))
+        assertTrue(onPageCompletedBlock.contains("listener?.onLayoutPageCompleted(pageIndex, textPage)"))
+        assertFalse(onPageCompletedBlock.contains("textPages.add(textPage)"))
+    }
+
+    @Test
     fun discoverTopActionLayoutToggleUsesLucideIconsBetweenSearchAndMenu() {
         val layout = parseXml(repoFile("app/src/main/res/layout/fragment_explore.xml"))
         val toggle = layout.elementById("btn_discover_layout_toggle")

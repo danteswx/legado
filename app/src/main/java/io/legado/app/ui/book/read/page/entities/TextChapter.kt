@@ -32,7 +32,25 @@ data class TextChapter(
 ) : LayoutProgressListener {
 
     private val textPages = arrayListOf<TextPage>()
-    val pages: List<TextPage> get() = textPages
+    private val textPagesLock = Any()
+    val pages: List<TextPage> get() = pageSnapshot()
+
+    private fun pageSnapshot(): List<TextPage> = synchronized(textPagesLock) {
+        textPages.toList()
+    }
+
+    fun nextPageIndex(): Int = synchronized(textPagesLock) {
+        textPages.size
+    }
+
+    fun lastPageForLayout(): TextPage? = synchronized(textPagesLock) {
+        textPages.lastOrNull()
+    }
+
+    fun appendPage(page: TextPage): Int = synchronized(textPagesLock) {
+        textPages.add(page)
+        textPages.lastIndex
+    }
 
     private var layout: TextChapterLayout? = null
 
@@ -153,7 +171,7 @@ data class TextChapter(
      */
     fun getContent(): String {
         val stringBuilder = StringBuilder()
-        pages.forEach {
+        pageSnapshot().forEach {
             stringBuilder.append(it.text)
         }
         return stringBuilder.toString()

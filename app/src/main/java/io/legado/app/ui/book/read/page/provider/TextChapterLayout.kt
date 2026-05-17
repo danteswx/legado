@@ -187,14 +187,14 @@ class TextChapterLayout(
         ) {
             return
         }
-        textPage.index = textPages.size
+        textPage.index = textChapter.nextPageIndex()
         textPage.chapterIndex = bookChapter.index
         textPage.chapterSize = chaptersSize
         textPage.title = displayTitle
         textPage.doublePage = doublePage
         textPage.paddingTop = paddingTop
         textPage.fallbackChapterPosition = textPage.lines.firstOrNull()?.chapterPosition
-            ?: textPages.lastOrNull()?.let { lastPage ->
+            ?: textChapter.lastPageForLayout()?.let { lastPage ->
                 lastPage.chapterPosition + lastPage.charSize
             } ?: 0
         textPage.isCompleted = true
@@ -204,10 +204,10 @@ class TextChapterLayout(
         }
         textPage.upLinesPosition()
         textPage.upRenderHeight()
-        textPages.add(textPage)
+        val pageIndex = textChapter.appendPage(textPage)
         channel.trySend(textPage)
         try {
-            listener?.onLayoutPageCompleted(textPages.lastIndex, textPage)
+            listener?.onLayoutPageCompleted(pageIndex, textPage)
         } catch (e: Exception) {
             e.printStackTrace()
             AppLog.put("调用布局进度监听回调出错\n${e.localizedMessage}", e)
