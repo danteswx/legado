@@ -329,6 +329,50 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun bookshelfLayoutSwitchPreservesGridColumnsAndSpacingPreferences() {
+        val style1Fragment = repoFile("app/src/main/java/io/legado/app/ui/main/bookshelf/style1/BookshelfFragment1.kt")
+            .readText()
+            .replace("\r\n", "\n")
+        val style2Fragment = repoFile("app/src/main/java/io/legado/app/ui/main/bookshelf/style2/BookshelfFragment2.kt")
+            .readText()
+            .replace("\r\n", "\n")
+        val appConfig = repoFile("app/src/main/java/io/legado/app/help/config/AppConfig.kt")
+            .readText()
+            .replace("\r\n", "\n")
+        val preferKey = repoFile("app/src/main/java/io/legado/app/constant/PreferKey.kt").readText()
+
+        assertTrue(preferKey.contains("const val bookshelfGridColumns = \"bookshelfGridColumns\""))
+        assertTrue(appConfig.contains("var bookshelfGridColumns: Int"))
+        assertTrue(
+            appConfig.contains(
+                "get() = appCtx.getPrefInt(\n" +
+                    "            PreferKey.bookshelfGridColumns,\n" +
+                    "            appCtx.getPrefInt(PreferKey.bookshelfLayout, 2).coerceAtLeast(2)\n" +
+                    "        ).coerceIn(2, 7)"
+            )
+        )
+        assertTrue(appConfig.contains("set(value) = appCtx.putPrefInt(PreferKey.bookshelfGridColumns, value.coerceIn(2, 7))"))
+
+        listOf(style1Fragment, style2Fragment).forEach { fragment ->
+            val switchBlock = fragment.substringAfter("private fun switchBookshelfLayout()")
+                .substringBefore("private fun showBookshelfGridColumnsPopup")
+            val columnsBlock = fragment.substringAfter("private fun setBookshelfGridColumns(columns: Int)")
+                .substringBefore("private fun setBookshelfGridSpacing")
+            val spacingBlock = fragment.substringAfter("private fun setBookshelfGridSpacing(spacing: Int)")
+                .substringBefore("private fun updateBookshelfLayoutToggleIcon")
+
+            assertTrue(switchBlock.contains("val currentLayout = AppConfig.bookshelfLayout"))
+            assertTrue(switchBlock.contains("AppConfig.bookshelfGridColumns = currentLayout"))
+            assertTrue(switchBlock.contains("else AppConfig.bookshelfGridColumns"))
+            assertFalse(switchBlock.contains("else 2"))
+            assertTrue(fragment.contains("initialColumns = AppConfig.bookshelfGridColumns"))
+            assertTrue(columnsBlock.contains("AppConfig.bookshelfGridColumns = gridColumns"))
+            assertTrue(columnsBlock.contains("AppConfig.bookshelfLayout = gridColumns"))
+            assertTrue(spacingBlock.contains("AppConfig.bookshelfMargin = gridSpacing"))
+        }
+    }
+
+    @Test
     fun bookshelfFolderStyleKeepsLayoutTogglePopupAndPrimaryTextOverflow() {
         val layout = parseXml(repoFile("app/src/main/res/layout/fragment_bookshelf2.xml"))
         val fragment = repoFile("app/src/main/java/io/legado/app/ui/main/bookshelf/style2/BookshelfFragment2.kt").readText()

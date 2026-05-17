@@ -185,8 +185,12 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
     }
 
     private fun switchBookshelfLayout() {
-        val targetLayout = if (AppConfig.bookshelfLayout >= 2) 0 else 2
-        if (AppConfig.bookshelfLayout == targetLayout) return
+        val currentLayout = AppConfig.bookshelfLayout
+        val targetLayout = if (currentLayout >= 2) {
+            AppConfig.bookshelfGridColumns = currentLayout
+            0
+        } else AppConfig.bookshelfGridColumns
+        if (currentLayout == targetLayout) return
         AppConfig.bookshelfLayout = targetLayout
         updateBookshelfLayoutToggleIcon()
         fragmentMap.values.forEach { fragment ->
@@ -200,7 +204,7 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
             titleRes = R.string.discover_grid_columns,
             minColumns = BOOKSHELF_GRID_COLUMNS_MIN,
             maxColumns = BOOKSHELF_GRID_COLUMNS_MAX,
-            initialColumns = AppConfig.bookshelfLayout.coerceAtLeast(BOOKSHELF_GRID_COLUMNS_MIN),
+            initialColumns = AppConfig.bookshelfGridColumns,
             previousPopup = gridColumnsPopup,
             onColumnsChanging = ::setBookshelfGridColumns,
             onColumnsChanged = ::setBookshelfGridColumns,
@@ -215,6 +219,7 @@ class BookshelfFragment1() : BaseBookshelfFragment(R.layout.fragment_bookshelf1)
 
     private fun setBookshelfGridColumns(columns: Int) {
         val gridColumns = columns.coerceIn(BOOKSHELF_GRID_COLUMNS_MIN, BOOKSHELF_GRID_COLUMNS_MAX)
+        AppConfig.bookshelfGridColumns = gridColumns
         if (AppConfig.bookshelfLayout == gridColumns) return
         AppConfig.bookshelfLayout = gridColumns
         updateBookshelfLayoutToggleIcon()

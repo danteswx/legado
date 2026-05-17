@@ -266,7 +266,17 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         get() = appCtx.getPrefInt(PreferKey.bookshelfLayout, 0)
         set(value) {
             appCtx.putPrefInt(PreferKey.bookshelfLayout, value)
+            if (value >= 2) {
+                appCtx.putPrefInt(PreferKey.bookshelfGridColumns, value.coerceIn(2, 7))
+            }
         }
+
+    var bookshelfGridColumns: Int
+        get() = appCtx.getPrefInt(
+            PreferKey.bookshelfGridColumns,
+            appCtx.getPrefInt(PreferKey.bookshelfLayout, 2).coerceAtLeast(2)
+        ).coerceIn(2, 7)
+        set(value) = appCtx.putPrefInt(PreferKey.bookshelfGridColumns, value.coerceIn(2, 7))
 
     var saveTabPosition: Int
         get() = appCtx.getPrefInt(PreferKey.saveTabPosition, 0)
