@@ -151,6 +151,34 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun bookInfoTopBarOpensBookUrlAndUsesThemeTint() {
+        val bookInfoMenu = parseXml(repoFile("app/src/main/res/menu/book_info.xml"))
+        val bookInfoActivity =
+            repoFile("app/src/main/java/io/legado/app/ui/book/info/BookInfoActivity.kt").readText()
+        val openBookUrl = bookInfoMenu.elementById("menu_open_book_url")
+        val openCurrentBookUrlBlock = bookInfoActivity
+            .substringAfter("private fun openCurrentBookUrl()")
+            .substringBefore("override fun observeLiveBus()")
+
+        assertEquals("@drawable/ic_lucide_link_2", openBookUrl.androidAttr("icon"))
+        assertEquals("@string/open_in_browser", openBookUrl.androidAttr("title"))
+        assertEquals("always", openBookUrl.appAttr("showAsAction"))
+        assertTrue(repoFile("app/src/main/res/drawable/ic_lucide_link_2.xml").isFile)
+
+        assertTrue(bookInfoActivity.contains("toolBarTheme = Theme.Auto"))
+        assertFalse(bookInfoActivity.contains("toolBarTheme = Theme.Dark"))
+        assertTrue(bookInfoActivity.contains("private fun applyTitleBarColor()"))
+        assertTrue(bookInfoActivity.contains("binding.titleBar.setColorFilter(primaryTextColor)"))
+        assertTrue(bookInfoActivity.contains("binding.titleBar.setTextColor(primaryTextColor)"))
+        assertTrue(bookInfoActivity.contains("applyTitleBarColor()"))
+
+        assertTrue(bookInfoActivity.contains("R.id.menu_open_book_url -> openCurrentBookUrl()"))
+        assertTrue(openCurrentBookUrlBlock.contains("viewModel.getBook()?.bookUrl"))
+        assertTrue(openCurrentBookUrlBlock.contains(".takeIf { it.isNotBlank() }"))
+        assertTrue(openCurrentBookUrlBlock.contains(".let(::openUrl)"))
+    }
+
+    @Test
     fun discoverTopActionLayoutToggleUsesLucideIconsBetweenSearchAndMenu() {
         val layout = parseXml(repoFile("app/src/main/res/layout/fragment_explore.xml"))
         val toggle = layout.elementById("btn_discover_layout_toggle")

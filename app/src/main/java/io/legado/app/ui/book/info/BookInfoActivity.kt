@@ -137,7 +137,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class BookInfoActivity :
-    VMBaseActivity<ActivityBookInfoBinding, BookInfoViewModel>(toolBarTheme = Theme.Dark, showOpenMenuIcon = false),
+    VMBaseActivity<ActivityBookInfoBinding, BookInfoViewModel>(toolBarTheme = Theme.Auto, showOpenMenuIcon = false),
     GroupSelectDialog.CallBack,
     ChangeBookSourceDialog.CallBack,
     ChangeCoverDialog.CallBack,
@@ -279,6 +279,7 @@ class BookInfoActivity :
     @SuppressLint("PrivateResource")
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         binding.titleBar.setBackgroundResource(R.color.transparent)
+        applyTitleBarColor()
         binding.refreshLayout?.setColorSchemeColors(accentColor)
         binding.arcView?.setBgColor(backgroundColor)
         binding.llInfo.setBackgroundResource(R.color.transparent)
@@ -308,6 +309,11 @@ class BookInfoActivity :
         showTocLoading(true)
         viewModel.initData(intent)
         initViewEvent()
+    }
+
+    private fun applyTitleBarColor() {
+        binding.titleBar.setTextColor(primaryTextColor)
+        binding.titleBar.setColorFilter(primaryTextColor)
     }
 
     private fun applyUiCorners() = binding.run {
@@ -420,6 +426,8 @@ class BookInfoActivity :
                 }
             }
 
+            R.id.menu_open_book_url -> openCurrentBookUrl()
+
             R.id.menu_refresh -> {
                 refreshBook()
             }
@@ -504,6 +512,12 @@ class BookInfoActivity :
             }
         }
         return super.onCompatOptionsItemSelected(item)
+    }
+
+    private fun openCurrentBookUrl() {
+        viewModel.getBook()?.bookUrl
+            ?.takeIf { it.isNotBlank() }
+            ?.let(::openUrl)
     }
 
     override fun observeLiveBus() {

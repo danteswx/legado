@@ -15,6 +15,12 @@
         app:showAsAction="ifRoom" />
 
     <item
+        android:id="@+id/menu_open_book_url"
+        android:icon="@drawable/ic_lucide_link_2"
+        android:title="@string/open_in_browser"
+        app:showAsAction="always" />
+
+    <item
         android:id="@+id/menu_share_it"
         android:icon="@drawable/ic_share"
         android:title="@string/share"
