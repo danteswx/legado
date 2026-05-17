@@ -412,7 +412,7 @@
                             android:layout_width="@dimen/main_sidebar_item_icon_size"
                             android:layout_height="@dimen/main_sidebar_item_icon_size"
                             android:background="@drawable/bg_more_icon_button_clear"
-                            android:contentDescription="@string/my"
+                            android:contentDescription="@string/setting"
                             android:padding="@dimen/main_sidebar_item_icon_padding"
                             android:scaleType="centerInside" />
 
@@ -424,7 +424,7 @@
                             android:layout_weight="1"
                             android:ellipsize="end"
                             android:singleLine="true"
-                            android:text="@string/my"
+                            android:text="@string/setting"
                             android:textColor="@color/primaryText"
                             android:textSize="18sp"
                             android:textStyle="bold" />

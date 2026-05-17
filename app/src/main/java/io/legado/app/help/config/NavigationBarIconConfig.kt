@@ -112,7 +112,7 @@ object NavigationBarIconConfig {
         NavItem("discovery", R.string.discovery, R.id.menu_discovery, R.drawable.ic_lucide_compass),
         NavItem("rss", R.string.rss, R.id.menu_rss, R.drawable.ic_lucide_rss),
         NavItem("readRecord", R.string.side_nav_stats, R.id.menu_read_record, R.drawable.ic_lucide_chart_bar),
-        NavItem("my", R.string.my, R.id.menu_my_config, R.drawable.ic_lucide_settings),
+        NavItem("my", R.string.setting, R.id.menu_my_config, R.drawable.ic_lucide_settings),
         NavItem("ai", R.string.side_nav_assistant, R.id.menu_ai, R.drawable.ic_bottom_ai_assistant)
     )
 

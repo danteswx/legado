@@ -105,12 +105,21 @@ class ReadMenuLayoutTest {
     @Test
     fun mainBottomNavigationMyTabUsesGearIcon() {
         val mainMenu = parseXml(repoFile("app/src/main/res/menu/main_bnv.xml"))
+        val mainLayout = parseXml(repoFile("app/src/main/res/layout/activity_main.xml"))
+        val myFragmentLayout = parseXml(repoFile("app/src/main/res/layout/fragment_my_config.xml"))
         val navConfig = repoFile("app/src/main/java/io/legado/app/help/config/NavigationBarIconConfig.kt").readText()
         val myItem = mainMenu.elementById("menu_my_config")
+        val sideNavMyConfig = mainLayout.elementById("side_nav_my_config")
+        val sideNavMyConfigText = mainLayout.elementById("side_nav_my_config_text")
+        val myTitleBar = myFragmentLayout.elementById("title_bar")
 
         assertEquals("@drawable/ic_lucide_settings", myItem.androidAttr("icon"))
+        assertEquals("@string/setting", myItem.androidAttr("title"))
+        assertEquals("@string/setting", sideNavMyConfig.androidAttr("contentDescription"))
+        assertEquals("@string/setting", sideNavMyConfigText.androidAttr("text"))
+        assertEquals("@string/setting", myTitleBar.appAttr("title"))
         assertTrue(navConfig.contains(
-            "NavItem(\"my\", R.string.my, R.id.menu_my_config, R.drawable.ic_lucide_settings)"
+            "NavItem(\"my\", R.string.setting, R.id.menu_my_config, R.drawable.ic_lucide_settings)"
         ))
     }
 
@@ -162,9 +171,10 @@ class ReadMenuLayoutTest {
         assertEquals("@drawable/ic_lucide_layout_grid", toggle.androidAttr("src"))
         assertEquals("@drawable/ic_lucide_settings", settings.androidAttr("src"))
         assertEquals(
-            "@drawable/ic_lucide_link_2",
+            "@drawable/ic_lucide_log_in",
             layout.elementById("btn_discover_more").androidAttr("src")
         )
+        assertTrue(repoFile("app/src/main/res/drawable/ic_lucide_log_in.xml").exists())
         assertTrue(repoFile("app/src/main/res/drawable/ic_lucide_layout_grid.xml").exists())
         assertTrue(repoFile("app/src/main/res/drawable/ic_lucide_layout_list.xml").exists())
     }
