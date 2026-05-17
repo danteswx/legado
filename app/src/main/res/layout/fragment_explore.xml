@@ -143,7 +143,7 @@
                         android:contentDescription="@string/login"
                         android:padding="@dimen/discover_top_action_button_padding"
                         android:scaleType="centerInside"
-                        android:src="@drawable/ic_lucide_log_in"
+                        android:src="@drawable/ic_lucide_user"
                         android:tint="@color/primaryText" />
 
                 </LinearLayout>

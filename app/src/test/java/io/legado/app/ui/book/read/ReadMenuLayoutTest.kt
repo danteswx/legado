@@ -226,10 +226,10 @@ class ReadMenuLayoutTest {
         assertEquals("@drawable/ic_lucide_layout_grid", toggle.androidAttr("src"))
         assertEquals("@drawable/ic_lucide_settings", settings.androidAttr("src"))
         assertEquals(
-            "@drawable/ic_lucide_log_in",
+            "@drawable/ic_lucide_user",
             layout.elementById("btn_discover_more").androidAttr("src")
         )
-        assertTrue(repoFile("app/src/main/res/drawable/ic_lucide_log_in.xml").exists())
+        assertTrue(repoFile("app/src/main/res/drawable/ic_lucide_user.xml").exists())
         assertTrue(repoFile("app/src/main/res/drawable/ic_lucide_layout_grid.xml").exists())
         assertTrue(repoFile("app/src/main/res/drawable/ic_lucide_layout_list.xml").exists())
     }
