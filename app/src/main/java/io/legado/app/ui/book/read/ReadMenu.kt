@@ -3343,6 +3343,7 @@ class ReadMenu @JvmOverloads constructor(
     private fun applyPageAnimSample(anim: Int?) {
         val pageAnim = anim ?: PageAnim.coverPageAnim
         ReadBookConfig.pageAnim = pageAnim
+        ReadBookConfig.save()
         ReadBook.book?.setPageAnim(null)
         ReadBook.saveRead()
         ReadBook.callBack?.upPageAnim(true)

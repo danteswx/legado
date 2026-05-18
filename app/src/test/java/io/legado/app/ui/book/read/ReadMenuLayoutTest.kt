@@ -1185,8 +1185,22 @@ class ReadMenuLayoutTest {
             .substringAfter("private fun applyPageAnimSample(anim: Int?) {")
             .substringBefore("\n    private fun updateThemeControlsFromConfig")
 
-        assertTrue(applyPageAnimSample.contains("ReadBook.book?.setPageAnim(anim ?: -1)"))
+        assertTrue(applyPageAnimSample.contains("ReadBookConfig.pageAnim = pageAnim"))
+        assertTrue(applyPageAnimSample.contains("ReadBookConfig.save()"))
+        assertTrue(applyPageAnimSample.contains("ReadBook.book?.setPageAnim(null)"))
+        assertTrue(applyPageAnimSample.contains("ReadBook.saveRead()"))
         assertTrue(applyPageAnimSample.contains("ReadBook.callBack?.upPageAnim(true)"))
+    }
+
+    @Test
+    fun legacyPageAnimSelectorPersistsBookOverrideImmediately() {
+        val activity = repoFile("app/src/main/java/io/legado/app/ui/book/read/BaseReadBookActivity.kt").readText()
+        val selectorBlock = activity.substringAfter("fun showPageAnimConfig(success: () -> Unit) {")
+            .substringBefore("\n    fun isPrevKey")
+
+        assertTrue(selectorBlock.contains("ReadBook.book?.setPageAnim(items.getOrNull(i)?.second ?: -1)"))
+        assertTrue(selectorBlock.contains("ReadBook.saveRead()"))
+        assertTrue(selectorBlock.contains("success()"))
     }
 
     @Test

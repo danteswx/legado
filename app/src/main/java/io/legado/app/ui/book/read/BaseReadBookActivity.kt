@@ -387,6 +387,7 @@ abstract class BaseReadBookActivity :
         )
         selector(R.string.page_anim, items.map { it.first }) { _, i ->
             ReadBook.book?.setPageAnim(items.getOrNull(i)?.second ?: -1)
+            ReadBook.saveRead()
             success()
         }
     }
