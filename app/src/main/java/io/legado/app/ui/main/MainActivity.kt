@@ -1293,11 +1293,12 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         val itemView = findBottomNavigationItemView(menuView, getBottomNavigationItemId(pagePosition))
             ?: return
         val indicator = binding.bottomNavigationIndicatorContainer
-        val maxWidth = 60.dpToPx()
+        val maxWidth = 68.dpToPx()
         val minWidth = 48.dpToPx()
+        val horizontalInset = 4.dpToPx()
         val targetWidth = minOf(
             maxWidth,
-            (itemView.width - 12.dpToPx()).coerceAtLeast(minWidth)
+            (itemView.width - horizontalInset).coerceAtLeast(minWidth)
         )
         if (indicator.layoutParams.width != targetWidth) {
             indicator.layoutParams = indicator.layoutParams.apply {

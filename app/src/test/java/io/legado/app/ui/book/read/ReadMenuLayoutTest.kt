@@ -56,14 +56,15 @@ class ReadMenuLayoutTest {
 
         assertEquals("@dimen/main_bottom_indicator_width", indicatorContainer.androidAttr("layout_width"))
         assertEquals("@dimen/main_bottom_indicator_height", indicatorContainer.androidAttr("layout_height"))
-        assertEquals("60dp", readerIndicator.androidAttr("layout_width"))
-        assertTrue(dimens.contains("<dimen name=\"main_bottom_indicator_width\">60dp</dimen>"))
+        assertEquals("68dp", readerIndicator.androidAttr("layout_width"))
+        assertTrue(dimens.contains("<dimen name=\"main_bottom_indicator_width\">68dp</dimen>"))
         assertEquals(readerIndicator.androidAttr("layout_height"), "48dp")
         assertTrue(dimens.contains("<dimen name=\"main_bottom_indicator_height\">48dp</dimen>"))
         assertEquals(readerIndicator.androidAttr("background"), indicatorContainer.androidAttr("background"))
         assertEquals("invisible", indicatorContainer.androidAttr("visibility"))
         assertTrue(updateIndicator.contains("bottomNavigationIndicatorContainer.isVisible = true"))
-        assertTrue(updateIndicator.contains("val maxWidth = 60.dpToPx()"))
+        assertTrue(updateIndicator.contains("val maxWidth = 68.dpToPx()"))
+        assertTrue(updateIndicator.contains("val horizontalInset = 4.dpToPx()"))
         assertTrue(updateIndicator.contains("val minWidth = 48.dpToPx()"))
         assertFalse(updateIndicator.contains("bottomNavigationIndicatorContainer.isVisible = false"))
         assertTrue(mainActivity.contains("bottomNavigationIndicatorContainer.background = createBottomNavigationIndicatorBackground()"))
@@ -961,6 +962,8 @@ class ReadMenuLayoutTest {
         assertTrue(showIndicator.contains("if (requestToken != bottomTabIndicatorRequestToken ||"))
         assertTrue(showIndicator.contains("!isBottomTabIndicatorRequestCurrent(nav, itemId)"))
         assertTrue(showIndicator.contains("return@post"))
+        assertTrue(showIndicator.contains("val maxWidth = 68.dpToPx()"))
+        assertTrue(showIndicator.contains("val horizontalInset = 4.dpToPx()"))
         assertTrue(hideIndicator.contains("nextBottomTabIndicatorRequestToken()"))
     }
 

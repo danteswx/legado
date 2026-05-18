@@ -2169,11 +2169,12 @@ class ReadMenu @JvmOverloads constructor(
             }
             val itemView = findBottomNavigationItemView(nav, itemId) ?: return@post
             val menuView = nav.getChildAt(0) as? ViewGroup ?: return@post
-            val maxWidth = 60.dpToPx()
+            val maxWidth = 68.dpToPx()
             val minWidth = 48.dpToPx()
+            val horizontalInset = 4.dpToPx()
             val targetWidth = minOf(
                 maxWidth,
-                (itemView.width - 12.dpToPx()).coerceAtLeast(minWidth)
+                (itemView.width - horizontalInset).coerceAtLeast(minWidth)
             )
             bottomTabIndicatorContainer.updateLayoutParams<FrameLayout.LayoutParams> {
                 width = targetWidth
