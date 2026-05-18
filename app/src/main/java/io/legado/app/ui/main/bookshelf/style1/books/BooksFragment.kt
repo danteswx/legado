@@ -235,6 +235,7 @@ class BooksFragment() : BaseFragment(R.layout.fragment_books),
         val newSpacing = spacing.coerceIn(0, 60)
         if (bookshelfMargin == newSpacing) return
         bookshelfMargin = newSpacing
+        if (view == null) return
         binding.rvBookshelf.invalidateItemDecorations()
     }
 

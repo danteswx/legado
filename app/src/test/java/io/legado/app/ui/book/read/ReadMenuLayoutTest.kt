@@ -380,8 +380,12 @@ class ReadMenuLayoutTest {
             .replace("\r\n", "\n")
         val updateLayout = booksFragment.substringAfter("fun updateBookshelfLayout(layout: Int)")
             .substringBefore("fun updateBookshelfSpacing(spacing: Int)")
+        val updateSpacing = booksFragment.substringAfter("fun updateBookshelfSpacing(spacing: Int)")
+            .substringBefore("private fun upFastScrollerBar")
         val lifecycleGuardIndex = updateLayout.indexOf("if (view == null) return")
         val layoutManagerIndex = updateLayout.indexOf("updateLayoutManager()")
+        val spacingLifecycleGuardIndex = updateSpacing.indexOf("if (view == null) return")
+        val invalidateDecorationsIndex = updateSpacing.indexOf("binding.rvBookshelf.invalidateItemDecorations()")
 
         assertTrue(
             "BooksFragment must remember the selected layout before skipping a destroyed view",
@@ -390,6 +394,14 @@ class ReadMenuLayoutTest {
         assertTrue(
             "BooksFragment must not access binding/updateLayoutManager after its view is destroyed",
             lifecycleGuardIndex in 0 until layoutManagerIndex
+        )
+        assertTrue(
+            "BooksFragment must remember the selected spacing before skipping a destroyed view",
+            updateSpacing.contains("bookshelfMargin = newSpacing\n        if (view == null) return")
+        )
+        assertTrue(
+            "BooksFragment must not access binding/invalidateItemDecorations after its view is destroyed",
+            spacingLifecycleGuardIndex in 0 until invalidateDecorationsIndex
         )
     }
 
