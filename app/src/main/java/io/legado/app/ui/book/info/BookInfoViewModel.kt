@@ -59,6 +59,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     var hasCustomBtn = false
     var bookSource: BookSource? = null
     private var changeSourceCoroutine: Coroutine<*>? = null
+    private var intentCoverUrl: String? = null
     val waitDialogData = MutableLiveData<Boolean>()
     val actionLive = MutableLiveData<String>()
 
@@ -70,6 +71,7 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             val origin = intent.getStringExtra("origin") ?: ""
             val originName = intent.getStringExtra("originName") ?: ""
             val coverUrl = intent.getStringExtra("coverUrl")
+            intentCoverUrl = coverUrl
             appDb.bookDao.getBook(name, author)?.let { book ->
                 inBookshelf = !book.isNotShelf
                 upBook(applyIntentCover(book, coverUrl))
@@ -110,11 +112,19 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
-    private fun applyIntentCover(book: Book, coverUrl: String?): Book {
-        if (!coverUrl.isNullOrBlank() && book.coverUrl.isNullOrBlank()) {
+    private fun applyIntentCover(book: Book, coverUrl: String? = intentCoverUrl): Book {
+        if (coverUrl.isUsableCover() && (!book.coverUrl.isUsableCover() || !inBookshelf)) {
             book.coverUrl = coverUrl
         }
         return book
+    }
+
+    private fun String?.isUsableCover(): Boolean {
+        val cover = this?.trim().orEmpty()
+        if (cover.isEmpty()) return false
+        return !cover.startsWith("data:image", ignoreCase = true) &&
+                !Regex("placeholder|loading|blank|default", RegexOption.IGNORE_CASE)
+                    .containsMatchIn(cover)
     }
 
     fun upBook(intent: Intent) {
@@ -225,24 +235,25 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             }
             WebBook.getBookInfo(scope, bookSource, book, canReName = canReName)
                 .onSuccess(IO) {
-                    val dbBook = appDb.bookDao.getBook(book.name, book.author)
+                    val loadedBook = applyIntentCover(it)
+                    val dbBook = appDb.bookDao.getBook(loadedBook.name, loadedBook.author)
                     if (!inBookshelf && dbBook != null && !dbBook.isNotShelf && dbBook.origin == book.origin) {
                         /**
                          * book 来自搜索时(inBookshelf == false)，搜索的书名不存在于书架，但是加载详情后，书名更新，存在同名书籍
                          * 此时 book 的数据会与数据库中的不同，需要更新 #3652 #4619
                          * book 加载详情后虽然书名作者相同，但是又可能不是数据库中(书源不同)的那本书 #3149
                          */
-                        dbBook.updateTo(it)
+                        dbBook.updateTo(loadedBook)
                         inBookshelf = true
                     }
-                    bookData.postValue(it)
+                    bookData.postValue(loadedBook)
                     if (inBookshelf) {
-                        it.save()
+                        loadedBook.save()
                     }
-                    if (it.isWebFile) {
-                        loadWebFile(it)
+                    if (loadedBook.isWebFile) {
+                        loadWebFile(loadedBook)
                     } else {
-                        loadChapter(it, runPreUpdateJs, isFromBookInfo = true)
+                        loadChapter(loadedBook, runPreUpdateJs, isFromBookInfo = true)
                     }
                 }.onError {
                     AppLog.put("获取书籍信息失败\n${it.localizedMessage}", it)
