@@ -24,6 +24,25 @@ class GithubWorkflowSigningTest {
         assertStableCiSigningFallback(workflow)
     }
 
+    @Test
+    fun releaseWorkflowWritesGeneratedChangelogIntoBundledUpdateLogBeforeBuild() {
+        val workflow = repoFile(".github/workflows/release.yml").readText()
+        val buildJob = workflow.substringAfter("  build:")
+            .substringBefore("  publish:")
+        val publishJob = workflow.substringAfter("  publish:")
+
+        assertTrue(buildJob.contains("echo \"## Legado \${VERSION}\" > release_notes.md"))
+        assertTrue(buildJob.contains("python3 .github/scripts/generate_changelog.py >> release_notes.md"))
+        assertTrue(buildJob.contains("cp release_notes.md app/src/main/assets/updateLog.md"))
+        assertTrue(buildJob.indexOf("cp release_notes.md app/src/main/assets/updateLog.md") <
+                buildJob.indexOf("- name: Build release APK"))
+        assertTrue(buildJob.contains("name: legado.release-notes"))
+        assertTrue(publishJob.contains("name: legado.release-notes"))
+        assertTrue(publishJob.contains("path: ."))
+        assertTrue(publishJob.contains("body_path: release_notes.md"))
+        assertFalse(publishJob.contains("python3 .github/scripts/generate_changelog.py >> release_notes.md"))
+    }
+
     private fun assertStableCiSigningFallback(script: String) {
         assertTrue(script.contains("RELEASE_STORE_FILE=./ci-debug.keystore"))
         assertTrue(script.contains("RELEASE_KEY_ALIAS=legado-ci-debug"))

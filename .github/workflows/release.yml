@@ -97,6 +97,21 @@ jobs:
         run: |
           echo "" > "$GITHUB_WORKSPACE/app/src/main/assets/18PlusList.txt"
 
+      - name: Generate changelog
+        run: |
+          echo "## Legado ${VERSION}" > release_notes.md
+          echo "" >> release_notes.md
+          echo "### Download" >> release_notes.md
+          echo "- [legado_app_${VERSION}.apk](https://github.com/${{ github.repository }}/releases/download/${VERSION}/legado_app_${VERSION}.apk)" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Changes" >> release_notes.md
+          echo "" >> release_notes.md
+          python3 .github/scripts/generate_changelog.py >> release_notes.md
+          echo "" >> release_notes.md
+          echo "---" >> release_notes.md
+          echo "Automated release build." >> release_notes.md
+          cp release_notes.md app/src/main/assets/updateLog.md
+
       - name: Configure release signing key
         shell: bash
         run: |
@@ -177,6 +192,13 @@ jobs:
           if-no-files-found: error
           path: ${{ github.workspace }}/apk/*.apk
 
+      - name: Upload release notes artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: legado.release-notes
+          if-no-files-found: error
+          path: release_notes.md
+
       - name: Upload mapping artifact
         uses: actions/upload-artifact@v4
         with:
@@ -210,19 +232,10 @@ jobs:
           name: legado.app
           path: apk
 
-      - name: Generate changelog
-        run: |
-          echo "## Legado ${VERSION}" > release_notes.md
-          echo "" >> release_notes.md
-          echo "### Download" >> release_notes.md
-          echo "- [legado_app_${VERSION}.apk](https://github.com/${{ github.repository }}/releases/download/${VERSION}/legado_app_${VERSION}.apk)" >> release_notes.md
-          echo "" >> release_notes.md
-          echo "### Changes" >> release_notes.md
-          echo "" >> release_notes.md
-          python3 .github/scripts/generate_changelog.py >> release_notes.md
-          echo "" >> release_notes.md
-          echo "---" >> release_notes.md
-          echo "Automated release build." >> release_notes.md
+      - uses: actions/download-artifact@v4
+        with:
+          name: legado.release-notes
+          path: .
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
