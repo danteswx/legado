@@ -94,6 +94,7 @@ object ReadBookConfig {
         (configs?.takeIf { it.size == 1 } ?: defaultConfigs).let {
             configList.clear()
             configList.addAll(it)
+            configList.forEach(::normalizeDefaultTipSlots)
         }
         if (configList.size == 1) {
             appCtx.putPrefInt(PreferKey.readStyleSelect, 0)
@@ -101,6 +102,22 @@ object ReadBookConfig {
             if (useBundledDefault) {
                 appCtx.putPrefBoolean(PreferKey.shareLayout, false)
             }
+        }
+    }
+
+    private fun normalizeDefaultTipSlots(config: Config) {
+        if (
+            config.tipHeaderLeft == ReadTipConfig.chapterTitle &&
+            config.tipHeaderMiddle == ReadTipConfig.none &&
+            config.tipHeaderRight == ReadTipConfig.time &&
+            config.tipFooterLeft == ReadTipConfig.bookName &&
+            config.tipFooterMiddle == ReadTipConfig.none &&
+            config.tipFooterRight == ReadTipConfig.pageAndTotal
+        ) {
+            config.tipHeaderLeft = ReadTipConfig.time
+            config.tipHeaderRight = ReadTipConfig.battery
+            config.tipFooterLeft = ReadTipConfig.chapterTitle
+            config.tipFooterRight = ReadTipConfig.totalProgress
         }
     }
 
@@ -116,6 +133,7 @@ object ReadBookConfig {
             }
         }
         shareConfig = c ?: configList.firstOrNull() ?: Config()
+        normalizeDefaultTipSlots(shareConfig)
     }
 
     fun upBg(width: Int, height: Int) {
@@ -657,7 +675,7 @@ object ReadBookConfig {
         var tipHeaderRight: Int = ReadTipConfig.battery,
         var tipFooterLeft: Int = ReadTipConfig.chapterTitle,
         var tipFooterMiddle: Int = ReadTipConfig.none,
-        var tipFooterRight: Int = ReadTipConfig.pageAndTotal,
+        var tipFooterRight: Int = ReadTipConfig.totalProgress,
         var tipColor: Int = 0,
         var tipDividerColor: Int = -1,
         var headerMode: Int = 0,

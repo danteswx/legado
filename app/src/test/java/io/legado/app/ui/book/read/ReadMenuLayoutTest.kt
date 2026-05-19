@@ -2628,6 +2628,54 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun readTipDefaultsPutChapterTitleAndPercentInFooter() {
+        val readBookConfig = repoFile("app/src/main/java/io/legado/app/help/config/ReadBookConfig.kt").readText()
+        val bundledConfig = repoFile("app/src/main/assets/defaultData/readConfig.json").readText()
+
+        assertTrue(readBookConfig.contains("var tipHeaderLeft: Int = ReadTipConfig.time"))
+        assertTrue(readBookConfig.contains("var tipHeaderRight: Int = ReadTipConfig.battery"))
+        assertTrue(readBookConfig.contains("var tipFooterLeft: Int = ReadTipConfig.chapterTitle"))
+        assertTrue(readBookConfig.contains("var tipFooterRight: Int = ReadTipConfig.totalProgress"))
+        assertTrue(readBookConfig.contains("private fun normalizeDefaultTipSlots(config: Config)"))
+        assertTrue(readBookConfig.contains("config.tipFooterLeft == ReadTipConfig.bookName"))
+        assertTrue(readBookConfig.contains("config.tipFooterRight == ReadTipConfig.pageAndTotal"))
+        assertTrue(readBookConfig.contains("config.tipFooterRight = ReadTipConfig.totalProgress"))
+        assertTrue(bundledConfig.contains("\"tipHeaderLeft\": 2"))
+        assertTrue(bundledConfig.contains("\"tipHeaderRight\": 3"))
+        assertTrue(bundledConfig.contains("\"tipFooterLeft\": 1"))
+        assertTrue(bundledConfig.contains("\"tipFooterRight\": 5"))
+        assertFalse(bundledConfig.contains("\"tipFooterRight\": 6"))
+    }
+
+    @Test
+    fun headerTipItemsCanBeCustomizedFromCurrentReadMenu() {
+        val layout = readMenuLayout()
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val headerControls = layout.elementById("layout_tip_header_controls")
+
+        assertTrue(layout.elementById("layout_header_tip_items").hasAncestor(headerControls))
+        assertEquals(
+            "@string/read_menu_header_items",
+            layout.elementById("tv_layout_header_tip_items_title").androidAttr("text")
+        )
+        listOf(
+            "ll_layout_header_tip_left",
+            "ll_layout_header_tip_middle",
+            "ll_layout_header_tip_right",
+            "tv_layout_header_tip_left_value",
+            "tv_layout_header_tip_middle_value",
+            "tv_layout_header_tip_right_value"
+        ).forEach { id ->
+            assertTrue(layout.elementById(id).hasAncestor(layout.elementById("layout_header_tip_items")))
+        }
+        assertTrue(readMenu.contains("showHeaderTipItemSelector"))
+        assertTrue(readMenu.contains("ReadTipConfig.tipHeaderLeft = value"))
+        assertTrue(readMenu.contains("ReadTipConfig.tipHeaderMiddle = value"))
+        assertTrue(readMenu.contains("ReadTipConfig.tipHeaderRight = value"))
+        assertTrue(readMenu.contains("postEvent(EventBus.UP_CONFIG, arrayListOf(2, 6))"))
+    }
+
+    @Test
     fun layoutPanelUsesCompactReferenceSizing() {
         val layout = readMenuLayout()
 

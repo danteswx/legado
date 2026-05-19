@@ -1831,6 +1831,7 @@
     <string name="read_menu_title_settings">正文标题</string>
     <string name="read_menu_add_custom_font">添加字体</string>
     <string name="read_menu_header_display">页眉显示</string>
+    <string name="read_menu_header_items">页眉内容</string>
     <string name="read_menu_footer_display">页脚显示</string>
     <string name="read_menu_display_auto">自动</string>
     <string name="read_menu_display_always">始终显示</string>

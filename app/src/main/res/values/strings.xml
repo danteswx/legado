@@ -1937,6 +1937,7 @@ Selected text or question:
     <string name="read_menu_title_settings">Title</string>
     <string name="read_menu_add_custom_font">Add font</string>
     <string name="read_menu_header_display">Header display</string>
+    <string name="read_menu_header_items">Header items</string>
     <string name="read_menu_footer_display">Footer display</string>
     <string name="read_menu_display_auto">Auto</string>
     <string name="read_menu_display_always">Always show</string>

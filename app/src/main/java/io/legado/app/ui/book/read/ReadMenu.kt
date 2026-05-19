@@ -3193,8 +3193,17 @@ class ReadMenu @JvmOverloads constructor(
             1.dpToPx(),
             ColorUtils.adjustAlpha(textColor, 0.18f)
         )
+        tvLayoutHeaderTipLeftValue.text = tipName(ReadTipConfig.tipHeaderLeft)
+        tvLayoutHeaderTipMiddleValue.text = tipName(ReadTipConfig.tipHeaderMiddle)
+        tvLayoutHeaderTipRightValue.text = tipName(ReadTipConfig.tipHeaderRight)
         renderTipDisplayCards()
         renderTipDividerControls()
+    }
+
+    private fun tipName(tip: Int): String {
+        val names = ReadTipConfig.tipNames
+        val index = ReadTipConfig.tipValues.indexOf(tip)
+        return names.getOrElse(index) { names.getOrElse(ReadTipConfig.none) { "" } }
     }
 
     private fun renderTipDisplayCards() = binding.run {
@@ -4081,6 +4090,41 @@ class ReadMenu @JvmOverloads constructor(
         updateTipSettingValues()
         postEvent(EventBus.UP_CONFIG, arrayListOf(2))
         persistActiveThemeSuiteChange()
+    }
+
+    private fun showHeaderTipItemSelector(titleSource: Int, setter: (Int) -> Unit) {
+        context.selector(titleSource, ReadTipConfig.tipNames) { _, i ->
+            val value = ReadTipConfig.tipValues[i]
+            clearRepeatTipItem(value)
+            setter(value)
+            ReadBookConfig.save()
+            updateTipSettingValues()
+            postEvent(EventBus.UP_CONFIG, arrayListOf(2, 6))
+            persistActiveThemeSuiteChange()
+        }
+    }
+
+    private fun clearRepeatTipItem(repeat: Int) = ReadTipConfig.apply {
+        if (repeat != none) {
+            if (tipHeaderLeft == repeat) {
+                tipHeaderLeft = none
+            }
+            if (tipHeaderMiddle == repeat) {
+                tipHeaderMiddle = none
+            }
+            if (tipHeaderRight == repeat) {
+                tipHeaderRight = none
+            }
+            if (tipFooterLeft == repeat) {
+                tipFooterLeft = none
+            }
+            if (tipFooterMiddle == repeat) {
+                tipFooterMiddle = none
+            }
+            if (tipFooterRight == repeat) {
+                tipFooterRight = none
+            }
+        }
     }
 
     private fun setHeaderDividerVisible(visible: Boolean) {
@@ -5001,6 +5045,21 @@ class ReadMenu @JvmOverloads constructor(
         layoutHeaderDisplayAutoCard.setOnClickListener { setHeaderDisplayMode(0) }
         layoutHeaderDisplayShowCard.setOnClickListener { setHeaderDisplayMode(1) }
         taggedView("layout_header_display_hide_card").setOnClickListener { setHeaderDisplayMode(2) }
+        llLayoutHeaderTipLeft.setOnClickListener {
+            showHeaderTipItemSelector(R.string.left) { value ->
+                ReadTipConfig.tipHeaderLeft = value
+            }
+        }
+        llLayoutHeaderTipMiddle.setOnClickListener {
+            showHeaderTipItemSelector(R.string.middle) { value ->
+                ReadTipConfig.tipHeaderMiddle = value
+            }
+        }
+        llLayoutHeaderTipRight.setOnClickListener {
+            showHeaderTipItemSelector(R.string.right) { value ->
+                ReadTipConfig.tipHeaderRight = value
+            }
+        }
         taggedView("layout_footer_display_auto_card").setOnClickListener { setFooterDisplayMode(2) }
         layoutFooterDisplayShowCard.setOnClickListener { setFooterDisplayMode(0) }
         layoutFooterDisplayHideCard.setOnClickListener { setFooterDisplayMode(1) }

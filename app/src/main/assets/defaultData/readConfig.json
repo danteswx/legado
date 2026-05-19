@@ -52,12 +52,12 @@
     "footerPaddingLeft": 16,
     "footerPaddingRight": 16,
     "showFooterLine": false,
-    "tipHeaderLeft": 1,
+    "tipHeaderLeft": 2,
     "tipHeaderMiddle": 0,
-    "tipHeaderRight": 2,
-    "tipFooterLeft": 7,
+    "tipHeaderRight": 3,
+    "tipFooterLeft": 1,
     "tipFooterMiddle": 0,
-    "tipFooterRight": 6,
+    "tipFooterRight": 5,
     "tipColor": 0,
     "tipDividerColor": -1
   }
