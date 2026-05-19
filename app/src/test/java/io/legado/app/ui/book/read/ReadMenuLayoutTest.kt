@@ -11,6 +11,17 @@ import javax.xml.parsers.DocumentBuilderFactory
 class ReadMenuLayoutTest {
 
     @Test
+    fun readMenuViewBindingIdCountStaysBelowJavaParameterLimit() {
+        val layoutXml = repoFile("app/src/main/res/layout/view_read_menu.xml").readText()
+        val bindingIdCount = Regex("android:id=\"@\\+id/").findAll(layoutXml).count()
+
+        assertTrue(
+            "view_read_menu.xml has $bindingIdCount binding IDs; keep it below the generated Java constructor limit",
+            bindingIdCount <= 245
+        )
+    }
+
+    @Test
     fun debugBuildUsesWanjuanBranding() {
         val zhDebugStrings = repoFile("app/src/debug/res/values-zh/strings.xml").readText()
         val defaultDebugStrings = repoFile("app/src/debug/res/values/strings.xml").readText()

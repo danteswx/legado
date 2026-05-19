@@ -180,7 +180,6 @@
                 android:paddingBottom="12dp">
 
             <LinearLayout
-                android:id="@+id/layout_margin_adjust_header"
                 android:layout_width="match_parent"
                 android:layout_height="36dp"
                 android:gravity="center_vertical"
@@ -1843,7 +1842,6 @@
                 android:visibility="gone">
 
                 <LinearLayout
-                    android:id="@+id/search_header"
                     android:layout_width="match_parent"
                     android:layout_height="40dp"
                     android:gravity="center_vertical"
@@ -2380,7 +2378,6 @@
                     android:verticalScrollbarPosition="right">
 
                 <LinearLayout
-                    android:id="@+id/panel_layout_content"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
@@ -2412,7 +2409,6 @@
                             android:textSize="14sp" />
 
                         <HorizontalScrollView
-                            android:id="@+id/hsv_font_samples"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="6dp"
@@ -2566,7 +2562,6 @@
                         </LinearLayout>
 
                         <LinearLayout
-                            android:id="@+id/layout_header_margin_control_row"
                             android:layout_width="match_parent"
                             android:layout_height="44dp"
                             android:layout_marginTop="6dp"
@@ -2616,7 +2611,6 @@
                         </LinearLayout>
 
                         <LinearLayout
-                            android:id="@+id/layout_footer_margin_control_row"
                             android:layout_width="match_parent"
                             android:layout_height="44dp"
                             android:layout_marginTop="6dp"
@@ -2666,7 +2660,6 @@
                         </LinearLayout>
 
                         <LinearLayout
-                            android:id="@+id/layout_hidden_body_margin_seeks"
                             android:layout_width="0dp"
                             android:layout_height="0dp"
                             android:visibility="gone">
@@ -2790,7 +2783,6 @@
                         </LinearLayout>
 
                         <LinearLayout
-                            android:id="@+id/ll_layout_title_mode"
                             android:layout_width="match_parent"
                             android:layout_height="36dp"
                             android:gravity="center_vertical"
@@ -2976,7 +2968,6 @@
                     android:textStyle="bold" />
 
                 <HorizontalScrollView
-                    android:id="@+id/hsv_background_images"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
