@@ -597,18 +597,37 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
 
     private fun commitMangaProgressMinimap(ratio: Float) {
         scrollToMangaProgress(ratio, commit = true)
+        reloadCommittedMangaProgressPage(ratio)
         updateMangaProgressMinimap(show = true)
         binding.mangaProgressMinimap.pinProgressRatio(ratio)
     }
 
     private fun scrollToMangaProgress(ratio: Float, commit: Boolean) {
+        val targetPage = targetMangaPageForProgress(ratio) ?: return
+        scrollToMangaPage(targetPage, commit)
+    }
+
+    private fun targetMangaPageForProgress(ratio: Float): Int? {
         val pageCount = currentMangaPageCount()
         if (pageCount <= 0) {
-            return
+            return null
         }
         val maxPage = (pageCount - 1).coerceAtLeast(0)
-        val targetPage = (ratio.coerceIn(0f, 1f) * maxPage).toInt().coerceIn(0, maxPage)
-        scrollToMangaPage(targetPage, commit)
+        return (ratio.coerceIn(0f, 1f) * maxPage).toInt().coerceIn(0, maxPage)
+    }
+
+    private fun reloadCommittedMangaProgressPage(ratio: Float) {
+        val targetPage = targetMangaPageForProgress(ratio) ?: return
+        val targetChapterIndex = ReadManga.durChapterIndex
+        binding.recyclerView.post {
+            if (ReadManga.durChapterIndex != targetChapterIndex || ReadManga.durChapterPos != targetPage) {
+                return@post
+            }
+            val itemPos = adapterPositionForMangaPage(targetPage)
+            if (itemPos > -1 && mAdapter.getItem(itemPos) is MangaPage) {
+                mAdapter.notifyItemChanged(itemPos)
+            }
+        }
     }
 
     private fun scrollToMangaPage(index: Int, commit: Boolean) {

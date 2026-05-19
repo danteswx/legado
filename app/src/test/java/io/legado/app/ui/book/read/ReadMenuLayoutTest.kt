@@ -1751,6 +1751,31 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun mangaProgressMinimapCommitReloadsTargetPageAfterPreviewScroll() {
+        val mangaActivity = repoFile("app/src/main/java/io/legado/app/ui/book/manga/ReadMangaActivity.kt").readText()
+        val commitBody = mangaActivity.substringAfter("private fun commitMangaProgressMinimap(ratio: Float)")
+            .substringBefore("private fun scrollToMangaProgress")
+
+        assertTrue(commitBody.contains("scrollToMangaProgress(ratio, commit = true)"))
+        assertTrue(commitBody.contains("reloadCommittedMangaProgressPage(ratio)"))
+        assertTrue(mangaActivity.contains("private fun reloadCommittedMangaProgressPage(ratio: Float)"))
+        assertTrue(mangaActivity.contains("private fun targetMangaPageForProgress(ratio: Float): Int?"))
+        assertTrue(mangaActivity.contains("val targetPage = targetMangaPageForProgress(ratio) ?: return"))
+        assertTrue(mangaActivity.contains("val targetChapterIndex = ReadManga.durChapterIndex"))
+        assertTrue(
+            mangaActivity.contains(
+                "binding.recyclerView.post {\n" +
+                        "            if (ReadManga.durChapterIndex != targetChapterIndex || ReadManga.durChapterPos != targetPage) {\n" +
+                        "                return@post\n" +
+                        "            }\n" +
+                        "            val itemPos = adapterPositionForMangaPage(targetPage)"
+            )
+        )
+        assertTrue(mangaActivity.contains("if (itemPos > -1 && mAdapter.getItem(itemPos) is MangaPage)"))
+        assertTrue(mangaActivity.contains("mAdapter.notifyItemChanged(itemPos)"))
+    }
+
+    @Test
     fun expandedReaderPanelHidesChapterProgressMinimapUntilDismissed() {
         val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
         val readActivity = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt").readText()
