@@ -36,6 +36,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.get
 import androidx.core.view.marginBottom
 import androidx.core.view.updateLayoutParams
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager.widget.ViewPager
 import io.legado.app.help.GlideImageGetter
@@ -492,8 +493,24 @@ private class MainBottomBarSpaceDecoration(var bottomSpace: Int) : RecyclerView.
         state: RecyclerView.State
     ) {
         val position = parent.getChildAdapterPosition(view)
-        if (position != RecyclerView.NO_POSITION && position == state.itemCount - 1) {
-            outRect.bottom = bottomSpace
+        val itemCount = state.itemCount
+        if (position == RecyclerView.NO_POSITION || itemCount <= 0) {
+            return
+        }
+        outRect.bottom = when (val layoutManager = parent.layoutManager as? GridLayoutManager) {
+            null -> if (position == itemCount - 1) bottomSpace else 0
+            else -> {
+                val spanCount = layoutManager.spanCount.coerceAtLeast(1)
+                val lastRowIndex = layoutManager.spanSizeLookup.getSpanGroupIndex(
+                    itemCount - 1,
+                    spanCount
+                )
+                val rowIndex = layoutManager.spanSizeLookup.getSpanGroupIndex(position, spanCount)
+                when {
+                    rowIndex == lastRowIndex -> bottomSpace
+                    else -> 0
+                }
+            }
         }
     }
 }
