@@ -296,10 +296,7 @@ object CacheBook {
         private fun onFinally() {
             if (waitDownloadSet.isEmpty() && onDownloadSet.isEmpty()) {
                 kotlin.runCatching {
-                    CacheManifestHelper.write(
-                        book,
-                        appDb.bookChapterDao.getChapterList(book.bookUrl)
-                    ) { chapter -> BookHelp.hasContent(book, chapter) }
+                    CacheManifestHelper.refresh(book)
                 }
                 cacheBookMap.remove(book.bookUrl)
             }

@@ -75,6 +75,16 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
 
     private fun startSearch() {
         val precision = appCtx.getPrefBoolean(PreferKey.precisionSearch)
+        val matchKey = searchKey
+            .let {
+                if (it.length >= 2 && it[0].isLetter() && (it[1] == ':' || it[1] == '：')) {
+                    it.substring(2)
+                } else {
+                    it
+                }
+            }
+            .substringBeforeLast("@")
+            .trim()
         var hasMore = false
         searchJob = scope.launch(searchPool!!) {
             flow {
@@ -91,9 +101,9 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                     WebBook.searchBookAwait(
                         it, searchKey, searchPage,
                         filter = { name, author, kind ->
-                            !precision || name.contains(searchKey) ||
-                                    author.contains(searchKey) ||
-                                    kind?.contains(searchKey) == true
+                            !precision || name.contains(matchKey) ||
+                                    author.contains(matchKey) ||
+                                    kind?.contains(matchKey) == true
                         })
                 }
             }.onEach { items ->
@@ -102,7 +112,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                 }
                 hasMore = hasMore || items.isNotEmpty()
                 appDb.searchBookDao.insert(*items.toTypedArray())
-                mergeItems(items, precision)
+                mergeItems(items, precision, matchKey)
                 currentCoroutineContext().ensureActive()
                 callBack.onSearchSuccess(searchBooks)
             }.onCompletion {
@@ -113,7 +123,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
         }
     }
 
-    private suspend fun mergeItems(newDataS: List<SearchBook>, precision: Boolean) {
+    private suspend fun mergeItems(newDataS: List<SearchBook>, precision: Boolean, matchKey: String) {
         if (newDataS.isNotEmpty()) {
             val copyData = ArrayList(searchBooks)
             val equalData = arrayListOf<SearchBook>()
@@ -122,11 +132,11 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
             val otherData = arrayListOf<SearchBook>()
             copyData.forEach {
                 currentCoroutineContext().ensureActive()
-                if (it.name == searchKey || it.author == searchKey) {
+                if (it.name == matchKey || it.author == matchKey) {
                     equalData.add(it)
-                } else if (it.kind?.contains(searchKey) == true) {
+                } else if (it.kind?.contains(matchKey) == true) {
                     tagsData.add(it)
-                } else if (it.name.contains(searchKey) || it.author.contains(searchKey)) {
+                } else if (it.name.contains(matchKey) || it.author.contains(matchKey)) {
                     containsData.add(it)
                 } else {
                     otherData.add(it)
@@ -134,7 +144,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
             }
             newDataS.forEach { nBook ->
                 currentCoroutineContext().ensureActive()
-                if (nBook.name == searchKey || nBook.author == searchKey) {
+                if (nBook.name == matchKey || nBook.author == matchKey) {
                     var hasSame = false
                     equalData.forEach { pBook ->
                         currentCoroutineContext().ensureActive()
@@ -146,7 +156,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                     if (!hasSame) {
                         equalData.add(nBook)
                     }
-                } else if (nBook.kind?.contains(searchKey) == true) {
+                } else if (nBook.kind?.contains(matchKey) == true) {
                     var hasSame = false
                     tagsData.forEach { pBook ->
                         currentCoroutineContext().ensureActive()
@@ -158,7 +168,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                     if (!hasSame) {
                         tagsData.add(nBook)
                     }
-                } else if (nBook.name.contains(searchKey) || nBook.author.contains(searchKey)) {
+                } else if (nBook.name.contains(matchKey) || nBook.author.contains(matchKey)) {
                     var hasSame = false
                     containsData.forEach { pBook ->
                         currentCoroutineContext().ensureActive()

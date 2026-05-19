@@ -201,10 +201,36 @@ fun Context.putPrefString(key: String, value: String?) =
 fun Context.getPrefStringSet(
     key: String,
     defValue: MutableSet<String>? = null,
-): MutableSet<String>? = defaultSharedPreferences.getStringSet(key, defValue)
+): MutableSet<String>? {
+    return try {
+        defaultSharedPreferences.getStringSet(key, defValue)?.toMutableSet()
+    } catch (_: ClassCastException) {
+        val value = when (val raw = defaultSharedPreferences.all[key]) {
+            is Set<*> -> raw.filterIsInstance<String>().toMutableSet()
+            is String -> raw.toPrefStringSet()
+            else -> null
+        } ?: return defValue
+        defaultSharedPreferences.edit { putStringSet(key, value) }
+        value
+    }
+}
 
 fun Context.putPrefStringSet(key: String, value: MutableSet<String>) =
     defaultSharedPreferences.edit { putStringSet(key, value) }
+
+private fun String.toPrefStringSet(): MutableSet<String>? {
+    val value = trim()
+    if (value.isEmpty()) {
+        return null
+    }
+    return value
+        .removeSurrounding("[", "]")
+        .split(',', '\n', ';')
+        .map { it.trim().trim('"', '\'') }
+        .filter { it.isNotEmpty() }
+        .toMutableSet()
+        .takeIf { it.isNotEmpty() }
+}
 
 fun Context.removePref(key: String) =
     defaultSharedPreferences.edit { remove(key) }

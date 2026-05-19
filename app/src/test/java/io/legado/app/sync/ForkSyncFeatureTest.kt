@@ -120,6 +120,40 @@ class ForkSyncFeatureTest {
         assertTrue(nonTranslat.contains("https://github.com/Nowaterisenough/legado/graphs/contributors"))
     }
 
+    @Test
+    fun refgdRecommendedSyncKeepsSmallBehaviorFixes() {
+        val searchModel = repoFile("app/src/main/java/io/legado/app/model/webBook/SearchModel.kt").readText()
+        val cacheManifest = repoFile("app/src/main/java/io/legado/app/help/book/CacheManifestHelper.kt").readText()
+        val cacheBook = repoFile("app/src/main/java/io/legado/app/model/CacheBook.kt").readText()
+        val bookInfoActivity = repoFile("app/src/main/java/io/legado/app/ui/book/info/BookInfoActivity.kt").readText()
+        val bookInfoViewModel = repoFile("app/src/main/java/io/legado/app/ui/book/info/BookInfoViewModel.kt").readText()
+        val contextExtensions = repoFile("app/src/main/java/io/legado/app/utils/ContextExtensions.kt").readText()
+        val fragmentExtensions = repoFile("app/src/main/java/io/legado/app/utils/FragmentExtensions.kt").readText()
+        val baseSource = repoFile("app/src/main/java/io/legado/app/data/entities/BaseSource.kt").readText()
+        val loginJsExtensions = repoFile("app/src/main/java/io/legado/app/ui/login/SourceLoginJsExtensions.kt").readText()
+
+        assertTrue(searchModel.contains("val matchKey = searchKey"))
+        assertTrue(searchModel.contains("""substringBeforeLast("@")"""))
+        assertTrue(searchModel.contains("mergeItems(items, precision, matchKey)"))
+        assertTrue(searchModel.contains("name.contains(matchKey)"))
+
+        assertTrue(cacheManifest.contains("fun refresh("))
+        assertTrue(cacheManifest.contains("ExoPlayerHelper.isMediaCached"))
+        assertTrue(cacheBook.contains("CacheManifestHelper.refresh(book)"))
+
+        assertTrue(bookInfoActivity.contains("relinkLocalBookAfterFolderSelect"))
+        assertTrue(bookInfoActivity.contains("selectLocalBookDir"))
+        assertTrue(bookInfoViewModel.contains("FileNotFoundException"))
+        assertTrue(bookInfoViewModel.contains("""actionLive.postValue("selectLocalBookDir")"""))
+        assertTrue(contextExtensions.contains("ClassCastException"))
+        assertTrue(contextExtensions.contains("toPrefStringSet"))
+        assertTrue(fragmentExtensions.contains("requireContext().getPrefStringSet"))
+
+        assertTrue(baseSource.contains("if (json.isBlank())"))
+        assertTrue(loginJsExtensions.contains("activity.runOnUiThread"))
+        assertTrue(loginJsExtensions.contains("activity.isFinishing || activity.isDestroyed"))
+    }
+
     private fun repoFile(relativePath: String): File {
         return generateSequence(File("").absoluteFile) { it.parentFile }
             .map { File(it, relativePath) }

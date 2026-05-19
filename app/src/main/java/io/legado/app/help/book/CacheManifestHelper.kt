@@ -1,7 +1,10 @@
 package io.legado.app.help.book
 
+import io.legado.app.constant.AppLog
+import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
+import io.legado.app.help.exoplayer.ExoPlayerHelper
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 import java.io.File
@@ -105,6 +108,32 @@ object CacheManifestHelper {
         )
         file.writeText(GSON.toJson(manifest))
         return manifest
+    }
+
+    fun refresh(
+        book: Book,
+        chapters: List<BookChapter> = appDb.bookChapterDao.getChapterList(book.bookUrl)
+    ): CacheBookManifest? {
+        return runCatching {
+            if (chapters.isEmpty()) {
+                delete(book)
+                return@runCatching null
+            }
+            val cacheNames = if (book.isAudio || book.isVideo) {
+                emptySet()
+            } else {
+                BookHelp.getCacheDir(book).list()?.toSet().orEmpty()
+            }
+            write(book, chapters) { chapter ->
+                when {
+                    book.isLocal -> false
+                    book.isAudio || book.isVideo -> ExoPlayerHelper.isMediaCached(chapter.resourceUrl)
+                    else -> BookHelp.getChapterCacheFileNames(book, chapter).any(cacheNames::contains)
+                }
+            }
+        }.onFailure {
+            AppLog.put("刷新缓存清单失败 ${book.name}\n${it.localizedMessage}", it)
+        }.getOrNull()
     }
 
     fun delete(book: Book) {

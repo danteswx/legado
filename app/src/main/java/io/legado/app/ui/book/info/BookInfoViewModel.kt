@@ -48,6 +48,7 @@ import io.legado.app.utils.postEvent
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers.IO
+import java.io.FileNotFoundException
 
 class BookInfoViewModel(application: Application) : BaseViewModel(application) {
     val bookData = MutableLiveData<Book>()
@@ -282,7 +283,15 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                     chapterListData.postValue(it)
                 }
             }.onError {
-                context.toastOnUi("LoadTocError:${it.localizedMessage}")
+                when (it) {
+                    is SecurityException, is FileNotFoundException -> {
+                        actionLive.postValue("selectLocalBookDir")
+                    }
+
+                    else -> {
+                        context.toastOnUi("LoadTocError:${it.localizedMessage}")
+                    }
+                }
             }.onFinally {
                 chapterLoadingData.postValue(false)
             }

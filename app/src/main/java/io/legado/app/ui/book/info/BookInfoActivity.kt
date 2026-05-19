@@ -113,6 +113,7 @@ import io.legado.app.utils.GSON
 import io.legado.app.utils.StartActivityContract
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.dpToPx
+import io.legado.app.utils.find
 import io.legado.app.utils.gone
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.longSnackbar
@@ -156,6 +157,7 @@ class BookInfoActivity :
     private var tocPreviewChapters: List<BookChapter> = emptyList()
     private var tocRenderedCount = 0
     private var detailPanelLastHeight = -1
+    private var relinkLocalBookAfterFolderSelect = false
 
     private val tocActivityResult = registerForActivityResult(TocActivityResult()) {
         it?.let {
@@ -185,6 +187,15 @@ class BookInfoActivity :
     private val localBookTreeSelect = registerForActivityResult(HandleFileContract()) {
         it.uri?.let { treeUri ->
             AppConfig.defaultBookTreeUri = treeUri.toString()
+            if (!relinkLocalBookAfterFolderSelect) return@let
+            relinkLocalBookAfterFolderSelect = false
+            book?.takeIf { it.isLocal }?.let { book ->
+                FileDoc.fromUri(treeUri, true).find(book.originName)?.let { doc ->
+                    book.bookUrl = doc.uri.toString()
+                    book.save()
+                    viewModel.loadChapter(book, isFromBookInfo = true)
+                } ?: toastOnUi("找不到文件")
+            }
         }
     }
     private val readBookResult = registerForActivityResult(
@@ -524,7 +535,14 @@ class BookInfoActivity :
         viewModel.actionLive.observe(this) {
             when (it) {
                 "selectBooksDir" -> localBookTreeSelect.launch {
+                    relinkLocalBookAfterFolderSelect = false
                     title = getString(R.string.select_book_folder)
+                }
+
+                "selectLocalBookDir" -> localBookTreeSelect.launch {
+                    relinkLocalBookAfterFolderSelect = true
+                    mode = HandleFileContract.DIR_SYS
+                    title = "选择书籍所在文件夹"
                 }
             }
         }

@@ -112,6 +112,9 @@ interface BaseSource : JsExtensions {
 
                     else -> it
                 }
+                if (json.isBlank()) {
+                    return@let
+                }
                 GSONStrict.fromJsonObject<Map<String, String>>(json).getOrNull()?.let { map ->
                     putAll(map)
                 } ?: GSON.fromJsonObject<Map<String, String>>(json).getOrNull()?.let { map ->
