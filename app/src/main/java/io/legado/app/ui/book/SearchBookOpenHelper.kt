@@ -19,6 +19,7 @@ object SearchBookOpenHelper {
             putExtra("bookUrl", book.bookUrl)
             putExtra("origin", book.origin)
             putExtra("originName", book.originName)
+            putExtra("coverUrl", book.coverUrl)
             if (isVideo) {
                 putExtra(VideoPlayerActivity.EXTRA_PREPARE_BOOK_INFO, true)
             }

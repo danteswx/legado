@@ -69,24 +69,25 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             val bookUrl = intent.getStringExtra("bookUrl") ?: ""
             val origin = intent.getStringExtra("origin") ?: ""
             val originName = intent.getStringExtra("originName") ?: ""
-            appDb.bookDao.getBook(name, author)?.let {
-                inBookshelf = !it.isNotShelf
-                upBook(it)
+            val coverUrl = intent.getStringExtra("coverUrl")
+            appDb.bookDao.getBook(name, author)?.let { book ->
+                inBookshelf = !book.isNotShelf
+                upBook(applyIntentCover(book, coverUrl))
                 return@execute
             }
             if (bookUrl.isNotBlank()) {
-                appDb.bookDao.getBook(bookUrl)?.let {
-                    inBookshelf = !it.isNotShelf
-                    upBook(it)
+                appDb.bookDao.getBook(bookUrl)?.let { book ->
+                    inBookshelf = !book.isNotShelf
+                    upBook(applyIntentCover(book, coverUrl))
                     return@execute
                 }
-                appDb.searchBookDao.getSearchBook(bookUrl)?.toBook()?.let {
-                    upBook(it)
+                appDb.searchBookDao.getSearchBook(bookUrl)?.toBook()?.let { book ->
+                    upBook(applyIntentCover(book, coverUrl))
                     return@execute
                 }
             }
-            appDb.searchBookDao.getFirstByNameAuthor(name, author)?.toBook()?.let {
-                upBook(it)
+            appDb.searchBookDao.getFirstByNameAuthor(name, author)?.toBook()?.let { book ->
+                upBook(applyIntentCover(book, coverUrl))
                 return@execute
             }
             if (bookUrl.isNotBlank() && origin.isNotBlank()) {
@@ -96,7 +97,8 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                         author = author,
                         bookUrl = bookUrl,
                         origin = origin,
-                        originName = originName
+                        originName = originName,
+                        coverUrl = coverUrl
                     )
                 )
                 return@execute
@@ -106,6 +108,13 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             AppLog.put(it.localizedMessage, it)
             context.toastOnUi(it.localizedMessage)
         }
+    }
+
+    private fun applyIntentCover(book: Book, coverUrl: String?): Book {
+        if (!coverUrl.isNullOrBlank() && book.coverUrl.isNullOrBlank()) {
+            book.coverUrl = coverUrl
+        }
+        return book
     }
 
     fun upBook(intent: Intent) {
