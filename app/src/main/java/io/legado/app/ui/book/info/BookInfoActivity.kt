@@ -66,6 +66,7 @@ import io.legado.app.help.book.isWebFile
 import io.legado.app.help.book.removeType
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.LocalConfig
+import io.legado.app.help.source.getSourceType
 import io.legado.app.help.webView.PooledWebView
 import io.legado.app.help.webView.WebJsExtensions
 import io.legado.app.help.webView.WebJsExtensions.Companion.getInjectionString
@@ -98,6 +99,7 @@ import io.legado.app.ui.book.read.ReadBookActivity.Companion.RESULT_DELETED
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.model.SourceCallBack
 import io.legado.app.ui.association.OnLineImportActivity
+import io.legado.app.ui.browser.WebViewActivity
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
 import io.legado.app.ui.book.toc.BookTocLoadingActivity
 import io.legado.app.ui.book.toc.TocActivityResult
@@ -526,9 +528,18 @@ class BookInfoActivity :
     }
 
     private fun openCurrentBookUrl() {
-        viewModel.getBook()?.bookUrl
-            ?.takeIf { it.isNotBlank() }
-            ?.let(::openUrl)
+        val book = viewModel.getBook() ?: return
+        val url = book.bookUrl.takeIf { it.isNotBlank() } ?: return
+        val source = viewModel.bookSource
+        startActivity<WebViewActivity> {
+            putExtra("title", book.name.ifBlank { getString(R.string.book_info) })
+            putExtra("url", url)
+            putExtra("sourceOrigin", source?.bookSourceUrl)
+            putExtra("sourceName", source?.bookSourceName)
+            putExtra("sourceType", source?.getSourceType())
+            putExtra("sourceVerificationEnable", source != null)
+            putExtra("refetchAfterSuccess", false)
+        }
     }
 
     override fun observeLiveBus() {

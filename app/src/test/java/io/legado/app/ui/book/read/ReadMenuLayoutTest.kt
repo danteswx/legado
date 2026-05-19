@@ -152,7 +152,7 @@ class ReadMenuLayoutTest {
     }
 
     @Test
-    fun bookInfoTopBarOpensBookUrlAndUsesThemeTint() {
+    fun bookInfoTopBarOpensBookUrlInAppWebViewAndUsesThemeTint() {
         val bookInfoMenu = parseXml(repoFile("app/src/main/res/menu/book_info.xml"))
         val bookInfoActivity =
             repoFile("app/src/main/java/io/legado/app/ui/book/info/BookInfoActivity.kt").readText()
@@ -162,7 +162,7 @@ class ReadMenuLayoutTest {
             .substringBefore("override fun observeLiveBus()")
 
         assertEquals("@drawable/ic_lucide_link_2", openBookUrl.androidAttr("icon"))
-        assertEquals("@string/open_in_browser", openBookUrl.androidAttr("title"))
+        assertEquals("@string/open_in_app_webview", openBookUrl.androidAttr("title"))
         assertEquals("always", openBookUrl.appAttr("showAsAction"))
         assertTrue(repoFile("app/src/main/res/drawable/ic_lucide_link_2.xml").isFile)
 
@@ -174,9 +174,16 @@ class ReadMenuLayoutTest {
         assertTrue(bookInfoActivity.contains("applyTitleBarColor()"))
 
         assertTrue(bookInfoActivity.contains("R.id.menu_open_book_url -> openCurrentBookUrl()"))
-        assertTrue(openCurrentBookUrlBlock.contains("viewModel.getBook()?.bookUrl"))
-        assertTrue(openCurrentBookUrlBlock.contains(".takeIf { it.isNotBlank() }"))
-        assertTrue(openCurrentBookUrlBlock.contains(".let(::openUrl)"))
+        assertTrue(openCurrentBookUrlBlock.contains("val book = viewModel.getBook() ?: return"))
+        assertTrue(openCurrentBookUrlBlock.contains("val url = book.bookUrl.takeIf { it.isNotBlank() } ?: return"))
+        assertTrue(openCurrentBookUrlBlock.contains("startActivity<WebViewActivity>"))
+        assertTrue(openCurrentBookUrlBlock.contains("putExtra(\"url\", url)"))
+        assertTrue(openCurrentBookUrlBlock.contains("putExtra(\"sourceOrigin\", source?.bookSourceUrl)"))
+        assertTrue(openCurrentBookUrlBlock.contains("putExtra(\"sourceName\", source?.bookSourceName)"))
+        assertTrue(openCurrentBookUrlBlock.contains("putExtra(\"sourceType\", source?.getSourceType())"))
+        assertTrue(openCurrentBookUrlBlock.contains("putExtra(\"sourceVerificationEnable\", source != null)"))
+        assertTrue(openCurrentBookUrlBlock.contains("putExtra(\"refetchAfterSuccess\", false)"))
+        assertFalse(openCurrentBookUrlBlock.contains(".let(::openUrl)"))
     }
 
     @Test
