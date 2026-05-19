@@ -158,6 +158,12 @@ class BadgeView @JvmOverloads constructor(
         }
     }
 
+    fun setUpdateError() {
+        text = "!"
+        setBackgroundColor(context.getCompatColor(R.color.error))
+        setTextColor(Color.WHITE)
+    }
+
     fun setBadgeMargin(dipMargin: Int) {
         setBadgeMargin(dipMargin, dipMargin, dipMargin, dipMargin)
     }

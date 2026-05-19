@@ -8,6 +8,7 @@ import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.data.entities.Book
 import io.legado.app.databinding.ItemBookshelfGrid2Binding
 import io.legado.app.databinding.ItemBookshelfGridBinding
+import io.legado.app.help.book.isUpError
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.config.AppConfig
 import io.legado.app.utils.gone
@@ -93,7 +94,9 @@ class BooksAdapterGrid(context: Context, private val callBack: CallBack) :
                     rlLoading.visible()
                 } else {
                     rlLoading.inVisible()
-                    if (AppConfig.showUnread) {
+                    if (item.isUpError) {
+                        bvUnread.setUpdateError()
+                    } else if (AppConfig.showUnread) {
                         bvUnread.setBadgeCount(item.getUnreadChapterNum())
                         bvUnread.setHighlight(item.lastCheckCount > 0)
                     } else {
@@ -107,7 +110,9 @@ class BooksAdapterGrid(context: Context, private val callBack: CallBack) :
                     rlLoading.visible()
                 } else {
                     rlLoading.inVisible()
-                    if (AppConfig.showUnread) {
+                    if (item.isUpError) {
+                        bvUnread.setUpdateError()
+                    } else if (AppConfig.showUnread) {
                         bvUnread.setBadgeCount(item.getUnreadChapterNum())
                         bvUnread.setHighlight(item.lastCheckCount > 0)
                     } else {

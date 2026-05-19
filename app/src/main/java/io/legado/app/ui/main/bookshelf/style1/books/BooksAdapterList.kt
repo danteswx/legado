@@ -8,6 +8,7 @@ import androidx.lifecycle.Lifecycle
 import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.data.entities.Book
 import io.legado.app.databinding.ItemBookshelfListBinding
+import io.legado.app.help.book.isUpError
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.config.AppConfig
 import io.legado.app.utils.invisible
@@ -69,7 +70,9 @@ class BooksAdapterList(
             binding.rlLoading.visible()
         } else {
             binding.rlLoading.gone()
-            if (AppConfig.showUnread) {
+            if (item.isUpError) {
+                binding.bvUnread.setUpdateError()
+            } else if (AppConfig.showUnread) {
                 binding.bvUnread.setHighlight(item.lastCheckCount > 0)
                 binding.bvUnread.setBadgeCount(item.getUnreadChapterNum())
             } else {

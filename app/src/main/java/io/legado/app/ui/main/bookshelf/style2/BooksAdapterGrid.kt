@@ -10,6 +10,7 @@ import io.legado.app.databinding.ItemBookshelfGrid2Binding
 import io.legado.app.databinding.ItemBookshelfGridBinding
 import io.legado.app.databinding.ItemBookshelfGridGroup2Binding
 import io.legado.app.databinding.ItemBookshelfGridGroupBinding
+import io.legado.app.help.book.isUpError
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.config.AppConfig
 import io.legado.app.utils.gone
@@ -120,7 +121,9 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                 binding.rlLoading.visible()
             } else {
                 binding.rlLoading.inVisible()
-                if (AppConfig.showUnread) {
+                if (item.isUpError) {
+                    binding.bvUnread.setUpdateError()
+                } else if (AppConfig.showUnread) {
                     binding.bvUnread.setBadgeCount(item.getUnreadChapterNum())
                     binding.bvUnread.setHighlight(item.lastCheckCount > 0)
                 } else {
@@ -176,7 +179,9 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                 binding.rlLoading.visible()
             } else {
                 binding.rlLoading.inVisible()
-                if (AppConfig.showUnread) {
+                if (item.isUpError) {
+                    binding.bvUnread.setUpdateError()
+                } else if (AppConfig.showUnread) {
                     binding.bvUnread.setBadgeCount(item.getUnreadChapterNum())
                     binding.bvUnread.setHighlight(item.lastCheckCount > 0)
                 } else {

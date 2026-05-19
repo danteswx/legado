@@ -9,6 +9,7 @@ import io.legado.app.data.entities.BookGroup
 import io.legado.app.databinding.ItemBookshelfList2Binding
 import io.legado.app.databinding.ItemBookshelfListBinding
 import io.legado.app.databinding.ItemBookshelfListGroupBinding
+import io.legado.app.help.book.isUpError
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.config.AppConfig
 import io.legado.app.utils.gone
@@ -109,7 +110,9 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                 binding.rlLoading.visible()
             } else {
                 binding.rlLoading.gone()
-                if (AppConfig.showUnread) {
+                if (item.isUpError) {
+                    binding.bvUnread.setUpdateError()
+                } else if (AppConfig.showUnread) {
                     binding.bvUnread.setHighlight(item.lastCheckCount > 0)
                     binding.bvUnread.setBadgeCount(item.getUnreadChapterNum())
                 } else {
@@ -177,7 +180,9 @@ class BooksAdapterList(context: Context, callBack: CallBack) :
                 binding.rlLoading.visible()
             } else {
                 binding.rlLoading.gone()
-                if (AppConfig.showUnread) {
+                if (item.isUpError) {
+                    binding.bvUnread.setUpdateError()
+                } else if (AppConfig.showUnread) {
                     binding.bvUnread.setHighlight(item.lastCheckCount > 0)
                     binding.bvUnread.setBadgeCount(item.getUnreadChapterNum())
                 } else {
