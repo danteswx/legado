@@ -323,6 +323,7 @@ class BookSourceEditActivity :
             add(EditEntity("header", bs.header, R.string.source_http_header))
             add(EditEntity("variableComment", bs.variableComment, R.string.variable_comment))
             add(EditEntity("concurrentRate", bs.concurrentRate, R.string.concurrent_rate))
+            add(EditEntity("preDownloadNum", bs.preDownloadNum?.toString(), R.string.source_pre_download_num))
             add(EditEntity("jsLib", bs.jsLib, "jsLib"))
         }
         // 搜索
@@ -456,6 +457,8 @@ class BookSourceEditActivity :
                 "header" -> source.header = it.value
                 "bookSourceComment" -> source.bookSourceComment = it.value
                 "concurrentRate" -> source.concurrentRate = it.value
+                "preDownloadNum" -> source.preDownloadNum = it.value?.toIntOrNull()
+                    ?.takeIf { num -> num >= 0 }
                 "variableComment" -> source.variableComment = it.value
                 "jsLib" -> source.jsLib = it.value
             }

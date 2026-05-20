@@ -20,8 +20,14 @@ object DatabaseMigrations {
             migration_31_32, migration_32_33, migration_33_34, migration_34_35,
             migration_35_36, migration_36_37, migration_37_38, migration_38_39,
             migration_39_40, migration_40_41, migration_41_42, migration_42_43,
-            migration_90_91,
+            migration_90_91, migration_91_92,
         )
+    }
+
+    private val migration_91_92 = object : Migration(91, 92) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `book_sources` ADD `preDownloadNum` INTEGER")
+        }
     }
 
     private val migration_90_91 = object : Migration(90, 91) {

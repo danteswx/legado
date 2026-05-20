@@ -234,10 +234,11 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
 
     @Synchronized
     private fun addDownload(source: BookSource, book: Book) {
-        if (AppConfig.preDownloadNum == 0) return
+        val preDownloadNum = source.effectivePreDownloadNum(AppConfig.preDownloadNum)
+        if (preDownloadNum == 0) return
         val endIndex = min(
             book.totalChapterNum - 1,
-            book.durChapterIndex.plus(AppConfig.preDownloadNum)
+            book.durChapterIndex.plus(preDownloadNum)
         )
         val cacheBook = CacheBook.getOrCreate(source, book)
         cacheBook.addDownload(book.durChapterIndex, endIndex)
@@ -252,7 +253,6 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
             SourceCallBack.callBackSource(viewModelScope, SourceCallBack.END_SHELF_REFRESH, it.first)
         }
         eventListenerSource.clear()
-        if (AppConfig.preDownloadNum == 0) return
         cacheBookJob?.cancel()
         cacheBookJob = viewModelScope.launch(upTocPool) {
             launch {

@@ -1073,7 +1073,9 @@ object ReadBook : CoroutineScope by MainScope() {
     private fun preDownload() {
         if (book?.isLocal == true) return
         executor.execute {
-            if (AppConfig.preDownloadNum < 2) {
+            val preDownloadNum = bookSource?.effectivePreDownloadNum(AppConfig.preDownloadNum)
+                ?: AppConfig.preDownloadNum
+            if (preDownloadNum < 2) {
                 upToc()
                 return@execute
             }
@@ -1082,7 +1084,7 @@ object ReadBook : CoroutineScope by MainScope() {
                 //预下载
                 launch {
                     val maxChapterIndex =
-                        min(durChapterIndex + AppConfig.preDownloadNum, chapterSize)
+                        min(durChapterIndex + preDownloadNum, chapterSize)
                     for (i in durChapterIndex.plus(2)..maxChapterIndex) {
                         if (downloadedChapters.contains(i)) continue
                         if ((downloadFailChapters[i] ?: 0) >= 3) continue
@@ -1090,7 +1092,7 @@ object ReadBook : CoroutineScope by MainScope() {
                     }
                 }
                 launch {
-                    val minChapterIndex = durChapterIndex - min(5, AppConfig.preDownloadNum)
+                    val minChapterIndex = durChapterIndex - min(5, preDownloadNum)
                     for (i in durChapterIndex.minus(2) downTo minChapterIndex) {
                         if (downloadedChapters.contains(i)) continue
                         if ((downloadFailChapters[i] ?: 0) >= 3) continue

@@ -137,8 +137,11 @@ object BookHelp {
             return
         }
         //向前保留设定数量，向后保留预下载数量
+        val preDownloadNum = appDb.bookSourceDao.getBookSource(book.origin)
+            ?.effectivePreDownloadNum(AppConfig.preDownloadNum)
+            ?: AppConfig.preDownloadNum
         val startIndex = book.durChapterIndex - AppConfig.imageRetainNum
-        val endIndex = book.durChapterIndex + AppConfig.preDownloadNum
+        val endIndex = book.durChapterIndex + preDownloadNum
         val chapterList = appDb.bookChapterDao.getChapterList(book.bookUrl, startIndex, endIndex)
         val imgNames = hashSetOf<String>()
         //获取需要保留章节的图片信息

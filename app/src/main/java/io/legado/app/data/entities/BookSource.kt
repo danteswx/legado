@@ -78,6 +78,7 @@ data class BookSource(
     var respondTime: Long = 180000L,
     // 智能排序的权重
     var weight: Int = 0,
+    var preDownloadNum: Int? = null,
     // 发现url
     var exploreUrl: String? = null,
     // 发现筛选规则
@@ -183,6 +184,10 @@ data class BookSource(
             bookSourceGroup = TextUtils.join(",", it)
         }
         return this
+    }
+
+    fun effectivePreDownloadNum(globalNum: Int): Int {
+        return preDownloadNum?.takeIf { it >= 0 } ?: globalNum
     }
 
     fun hasGroup(group: String): Boolean {
