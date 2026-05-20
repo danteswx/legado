@@ -254,6 +254,39 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun discoverSettingsButtonOnlyShowsWhenSettingsExist() {
+        val exploreFragment =
+            repoFile("app/src/main/java/io/legado/app/ui/main/explore/ExploreFragment.kt").readText()
+        val updateButtonBlock = exploreFragment
+            .substringAfter("private fun updateDiscoverTagFilterButtonState()")
+            .substringBefore("private fun buildDiscoverSettingItems()")
+
+        assertTrue(updateButtonBlock.contains("val enabled = discoverSettingItems.isNotEmpty()"))
+        assertFalse(updateButtonBlock.contains("normalizeDiscoverBookLayout(AppConfig.modernDiscoveryLayout) == DISCOVER_LAYOUT_GRID"))
+    }
+
+    @Test
+    fun discoverLoginActionFallsBackToInAppWebViewForSourcesWithoutLoginUrl() {
+        val exploreFragment =
+            repoFile("app/src/main/java/io/legado/app/ui/main/explore/ExploreFragment.kt").readText()
+        val openLoginBlock = exploreFragment
+            .substringAfter("private fun openSelectedSourceLogin()")
+            .substringBefore("private fun updateDiscoverLoginButtonState()")
+        val updateButtonBlock = exploreFragment
+            .substringAfter("private fun updateDiscoverLoginButtonState()")
+            .substringBefore("private fun switchDiscoverBookLayout()")
+
+        assertTrue(openLoginBlock.contains("openSelectedDiscoverPageInWebView(source)"))
+        assertFalse(openLoginBlock.contains("toastOnUi(R.string.source_no_login)"))
+        assertTrue(updateButtonBlock.contains("setImageResource("))
+        assertTrue(updateButtonBlock.contains("R.drawable.ic_lucide_link_2"))
+        assertTrue(updateButtonBlock.contains("R.drawable.ic_lucide_user"))
+        assertTrue(exploreFragment.contains("startActivity<WebViewActivity>"))
+        assertTrue(exploreFragment.contains("putExtra(\"sourceOrigin\", source.bookSourceUrl)"))
+        assertTrue(exploreFragment.contains("putExtra(\"sourceType\", SourceType.book)"))
+    }
+
+    @Test
     fun readerTopBarsUseLucideIconsAndSharedIconMetrics() {
         val bookReadMenu = parseXml(repoFile("app/src/main/res/menu/book_read.xml"))
         val bookMangaMenu = parseXml(repoFile("app/src/main/res/menu/book_manga.xml"))

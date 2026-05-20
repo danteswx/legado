@@ -41,6 +41,26 @@ class BookSourceConfigTest {
         assertTrue(coverUrlRule.contains("coverUrl"))
     }
 
+    @Test
+    fun javdbVideoSourceIncludesLoginAndDiscoverCategories() {
+        val sourceText = repoFile("tests/shareBookSource.json").readText()
+        val javdbSource = sourceObject(sourceText, """"bookSourceUrl": "https://javdb.com/"""")
+        val exploreUrl = fieldValue(javdbSource, "exploreUrl")
+        val loginUrl = fieldValue(javdbSource, "loginUrl")
+
+        assertTrue("JavDB source should exist", javdbSource.isNotBlank())
+        assertTrue(loginUrl.contains("login"))
+        listOf("热播", "全部", "有码", "无码", "欧美", "FC2", "动漫").forEach {
+            assertTrue("Missing JavDB primary category: $it", exploreUrl.contains(it))
+        }
+        listOf("大封面", "小封面", "可播放", "中字可播放", "含磁链", "含字幕", "含短评", "更新时间排序", "发布日期排序").forEach {
+            assertTrue("Missing JavDB secondary category: $it", exploreUrl.contains(it))
+        }
+        listOf("LUXU", "VR", "肛交", "连裤袜", "无码流出", "jur", "snos", "熟女", "巨乳", "洗脑", "mida", "角色扮演", "麻豆", "媚药").forEach {
+            assertTrue("Missing JavDB tag: $it", exploreUrl.contains(it))
+        }
+    }
+
     private fun repoFile(relativePath: String): File {
         return generateSequence(File("").absoluteFile) { it.parentFile }
             .map { File(it, relativePath) }
@@ -61,7 +81,7 @@ class BookSourceConfigTest {
 
     private fun fieldValue(sourceText: String, fieldName: String): String {
         return Regex(
-            """"$fieldName"\s*:\s*"(.*?)",""",
+            """"$fieldName"\s*:\s*"((?:\\.|[^"\\])*)",""",
             RegexOption.DOT_MATCHES_ALL
         ).find(sourceText)?.groupValues?.get(1).orEmpty()
     }

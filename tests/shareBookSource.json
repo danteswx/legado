@@ -7224,5 +7224,108 @@
     },
     "searchUrl": "/spa/search?query={{key}}&page={{page}}",
     "weight": 50
+  },
+  {
+    "bookSourceGroup": "R18视频",
+    "bookSourceName": "好色TV",
+    "bookSourceType": 0,
+    "bookSourceUrl": "https://hsex.icu/",
+    "customButton": false,
+    "customOrder": 126,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "enabledExplore": true,
+    "eventListener": false,
+    "exploreUrl": "@js:\nlet list = [];\nconst push = (title, url, size) => list.push({\n    \"title\": title,\n    \"url\": url,\n    \"style\": {\n        \"layout_flexGrow\": 1,\n        \"layout_flexBasisPercent\": size\n    }\n});\n\npush(\"最新\", \"list-{{page}}.htm?sort=new\", 0.3);\npush(\"最热\", \"hot_list-{{page}}.htm\", 0.3);\npush(\"周榜\", \"top7_list-{{page}}.htm\", 0.3);\npush(\"月榜\", \"top_list-{{page}}.htm\", 0.3);\npush(\"5分钟+\", \"5min_list-{{page}}.htm\", 0.3);\npush(\"10分钟+\", \"long_list-{{page}}.htm\", 0.3);\n\nJSON.stringify(list);",
+    "header": "{\"User-Agent\":\"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Mobile Safari/537.36\"}",
+    "lastUpdateTime": 1779280624913,
+    "respondTime": 180000,
+    "ruleBookInfo": {
+      "author": "//meta[@property=\"og:video:actor\"]/@content",
+      "coverUrl": "//video[@id=\"video-play\"]/@poster",
+      "intro": "//meta[@name=\"description\"]/@content",
+      "kind": "//meta[@name=\"keywords\"]/@content",
+      "name": "//meta[@property=\"og:title\"]/@content"
+    },
+    "ruleContent": {
+      "content": "@js:\nlet html = String(result);\nlet m3u8 = \"\";\nlet m = html.match(/<source[^>]+id=[\"']video-source[\"'][^>]+src=[\"']([^\"']+)/i) || html.match(/<source[^>]+src=[\"']([^\"']+\\.m3u8[^\"']*)/i);\nif (m) {\n    m3u8 = m[1].replace(/&amp;/g, \"&\");\n    if (m3u8.startsWith(\"//\")) {\n        m3u8 = \"https:\" + m3u8;\n    } else if (m3u8.startsWith(\"/\")) {\n        m3u8 = source.getKey().replace(/\\/$/, \"\") + m3u8;\n    }\n}\n\nconst nxvav = \"https://api.nxvav.cn/api/m3u8/?url=\";\nif (m3u8) {\n    try {\n        java.startBrowserAwait(`${nxvav}${java.encodeURI(m3u8)}`, book.name);\n    } catch (err) {\n        m3u8;\n    }\n} else {\n    \"未获取到视频地址\";\n}"
+    },
+    "ruleExplore": {
+      "author": ".info a@text",
+      "bookList": "class.thumbnail",
+      "bookUrl": "tag.a.0@href",
+      "coverUrl": ".image@style##.*url\\('([^']+)'\\).*##$1",
+      "kind": ".duration@text",
+      "name": ".image@title"
+    },
+    "ruleSearch": {
+      "author": ".info a@text",
+      "bookList": "class.thumbnail",
+      "bookUrl": "tag.a.0@href",
+      "checkKeyWord": "test",
+      "coverUrl": ".image@style##.*url\\('([^']+)'\\).*##$1",
+      "kind": ".duration@text",
+      "name": ".image@title"
+    },
+    "ruleToc": {
+      "chapterList": "@js: [{\"title\": \"立即播放\", \"url\": baseUrl}]",
+      "chapterName": "title",
+      "chapterUrl": "url"
+    },
+    "searchUrl": "search.htm?search={{key}}&sort=new",
+    "weight": 0
+  },
+  {
+    "bookSourceComment": "JavDB 受 Cloudflare 保护，列表、搜索、详情均使用 WebView 加载；详情优先解析预览视频，未获取到视频时返回磁力链接。",
+    "bookSourceGroup": "R18视频",
+    "bookSourceName": "JavDB",
+    "bookSourceType": 0,
+    "bookSourceUrl": "https://javdb.com/",
+    "customButton": false,
+    "customOrder": 127,
+    "enabled": true,
+    "enabledCookieJar": true,
+    "enabledExplore": true,
+    "eventListener": false,
+    "exploreUrl": "@js:\nlet list = [];\nconst style = (size) => ({\n    \"layout_flexGrow\": 1,\n    \"layout_flexBasisPercent\": size\n});\nconst web = (url) => url ? url + ',{\"webView\":true}' : '';\nconst push = (title, url, size) => list.push({\n    \"title\": title,\n    \"url\": web(url),\n    \"style\": style(size)\n});\nconst heading = (title) => list.push({\n    \"title\": title,\n    \"url\": \"\",\n    \"style\": style(1)\n});\n\nheading(\"入口\");\npush(\"热播\", \"?page={{page}}\", 0.3);\npush(\"最新\", \"?page={{page}}\", 0.3);\npush(\"日榜\", \"rankings/movies?period=daily&page={{page}}\", 0.3);\npush(\"周榜\", \"rankings/movies?period=weekly&page={{page}}\", 0.3);\npush(\"月榜\", \"rankings/movies?period=monthly&page={{page}}\", 0.3);\npush(\"总榜\", \"rankings/movies?period=forever&page={{page}}\", 0.3);\n\nheading(\"一级分类\");\n[\n    [\"全部\", \"?page={{page}}\"],\n    [\"有码\", \"censored?page={{page}}\"],\n    [\"无码\", \"uncensored?page={{page}}\"],\n    [\"欧美\", \"western?page={{page}}\"],\n    [\"FC2\", \"fc2?page={{page}}\"],\n    [\"动漫\", \"anime?page={{page}}\"]\n].forEach(([title, url]) => push(title, url, 0.3));\n\nheading(\"二级筛选\");\n[\n    [\"大封面\", \"?view=cover&page={{page}}\"],\n    [\"小封面\", \"?view=small&page={{page}}\"],\n    [\"可播放\", \"?f=playable&page={{page}}\"],\n    [\"中字可播放\", \"?f=playable_cnsub&page={{page}}\"],\n    [\"含磁链\", \"?f=download&page={{page}}\"],\n    [\"含字幕\", \"?f=cnsub&page={{page}}\"],\n    [\"含短评\", \"?f=review&page={{page}}\"],\n    [\"全部\", \"?f=all&page={{page}}\"],\n    [\"更新时间排序\", \"?sort=updated_at&page={{page}}\"],\n    [\"发布日期排序\", \"?sort=released_at&page={{page}}\"]\n].forEach(([title, url]) => push(title, url, 0.3));\n\nheading(\"热门 Tag\");\n[\n    \"LUXU\", \"VR\", \"肛交\", \"连裤袜\", \"无码流出\", \"jur\", \"snos\", \"熟女\", \"巨乳\", \"洗脑\", \"mida\", \"角色扮演\", \"麻豆\", \"媚药\"\n].forEach((tag) => push(tag, `search?q=${encodeURIComponent(tag)}&f=all&page={{page}}`, 0.23));\n\nJSON.stringify(list);",
+    "header": "{\"User-Agent\":\"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Mobile Safari/537.36\",\"Accept-Language\":\"zh-CN,zh;q=0.9,en;q=0.8\"}",
+    "lastUpdateTime": 1779281442556,
+    "loginUrl": "https://javdb.com/login",
+    "respondTime": 180000,
+    "ruleBookInfo": {
+      "author": "@js:\nlet doc = org.jsoup.Jsoup.parse(result);\nlet blocks = doc.select('.movie-panel-info .panel-block, .video-meta-panel .panel-block, .panel .panel-block');\nlet text = '';\nfor (let i = 0; i < blocks.size(); i++) {\n    let el = blocks.get(i);\n    let label = el.select('strong').text();\n    if (/演員|演员|Actor/i.test(label)) {\n        text = el.select('a').text() || el.text().replace(label, '').trim();\n        break;\n    }\n}\ntext;",
+      "coverUrl": ".column-video-cover img@src||.video-cover img@src||.cover img@src",
+      "intro": ".movie-introduction@text||.video-introduction@text||.message-body@text",
+      "kind": "@js:\nlet doc = org.jsoup.Jsoup.parse(result);\nlet tags = [];\nlet items = doc.select('.movie-panel-info .panel-block, .video-meta-panel .panel-block, .panel .panel-block');\nfor (let i = 0; i < items.size(); i++) {\n    let el = items.get(i);\n    let label = el.select('strong').text();\n    if (/類別|类别|分類|分类|Genre/i.test(label)) {\n        let links = el.select('a');\n        for (let k = 0; k < links.size(); k++) tags.push(links.get(k).text());\n    }\n}\ntags.join(',');",
+      "lastChapter": ".score .value@text||.score@text",
+      "name": ".title.is-4@text||h2.title@text||meta[property=og:title]@content"
+    },
+    "ruleContent": {
+      "content": "@js:\nlet html = String(result);\nlet cleanUrl = String(baseUrl || '').replace(/#.*$/, '').replace(/,\\{[\\s\\S]*\\}$/, '');\nlet media = '';\nlet m = html.match(/<video[\\s\\S]*?<source[^>]+src=[\"']([^\"']+)/i) || html.match(/<source[^>]+src=[\"']([^\"']+\\.(?:m3u8|mp4)[^\"']*)/i) || html.match(/data-video-url=[\"']([^\"']+)/i);\nif (m) {\n    media = m[1].replace(/&amp;/g, '&');\n    if (media.startsWith('//')) {\n        media = 'https:' + media;\n    } else if (media.startsWith('/')) {\n        media = source.getKey().replace(/\\/$/, '') + media;\n    }\n}\n\nif (media) {\n    try {\n        java.startBrowserAwait(media, book.name);\n    } catch (err) {\n        media;\n    }\n} else {\n    let magnets = [];\n    let reg = /(?:data-clipboard-text|href)=[\"'](magnet:\\?xt=[^\"']+)/ig;\n    let r;\n    while ((r = reg.exec(html)) !== null) {\n        let u = r[1].replace(/&amp;/g, '&');\n        if (magnets.indexOf(u) < 0) magnets.push(u);\n    }\n    if (magnets.length > 0) {\n        magnets.join('\\n\\n');\n    } else {\n        try {\n            java.startBrowserAwait(cleanUrl || source.getKey(), book.name);\n        } catch (err) {\n            cleanUrl || '未获取到视频地址';\n        }\n    }\n}"
+    },
+    "ruleExplore": {
+      "author": ".meta@text",
+      "bookList": ".movie-list .item||.movie-list-item||.item",
+      "bookUrl": "a@href@js:result + ',{\"webView\":true}'",
+      "coverUrl": "img@src||img@data-src",
+      "kind": ".score@text",
+      "name": ".video-title@text||.title@text||img@title"
+    },
+    "ruleSearch": {
+      "author": ".meta@text",
+      "bookList": ".movie-list .item||.movie-list-item||.item",
+      "bookUrl": "a@href@js:result + ',{\"webView\":true}'",
+      "checkKeyWord": "SSIS",
+      "coverUrl": "img@src||img@data-src",
+      "kind": ".score@text",
+      "name": ".video-title@text||.title@text||img@title"
+    },
+    "ruleToc": {
+      "chapterList": "@js: [{\"title\": \"预览/磁力/详情\", \"url\": baseUrl}]",
+      "chapterName": "title",
+      "chapterUrl": "url"
+    },
+    "searchUrl": "search?q={{key}}&f=all&page={{page}},{\"webView\":true}",
+    "weight": 0
   }
 ]

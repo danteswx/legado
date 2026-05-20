@@ -27,6 +27,7 @@ import com.script.rhino.runScriptWithContext
 import io.legado.app.R
 import io.legado.app.base.VMBaseFragment
 import io.legado.app.constant.AppLog
+import io.legado.app.constant.SourceType
 import io.legado.app.data.AppDatabase
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
@@ -49,6 +50,7 @@ import io.legado.app.ui.book.explore.ExploreShowActivity
 import io.legado.app.ui.book.SearchBookOpenHelper
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
+import io.legado.app.ui.browser.WebViewActivity
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.login.SourceLoginJsExtensions
 import io.legado.app.ui.main.MainFragmentInterface
@@ -64,6 +66,7 @@ import io.legado.app.utils.dpToPx
 import io.legado.app.utils.flowWithLifecycleAndDatabaseChange
 import io.legado.app.utils.gone
 import io.legado.app.utils.InfoMap
+import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.toastOnUi
@@ -503,7 +506,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     private fun openSelectedSourceLogin() {
         val source = selectedDiscoverSourcePart ?: return
         if (!source.hasLoginUrl) {
-            context?.toastOnUi(R.string.source_no_login)
+            openSelectedDiscoverPageInWebView(source)
             return
         }
         startActivity<SourceLoginActivity> {
@@ -512,7 +515,34 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         }
     }
 
+    private fun openSelectedDiscoverPageInWebView(source: BookSourcePart) {
+        val currentUrl = discoverCurrentUrl
+            ?.takeIf { it.isNotBlank() }
+            ?: discoverTagItems.getOrNull(selectedDiscoverUrlIndex)
+                ?.kind
+                ?.url
+                ?.takeIf { it.isNotBlank() }
+            ?: source.bookSourceUrl
+        val url = currentUrl.replace(Regex(""",\s*\{[\s\S]*\}\s*$"""), "")
+        val absoluteUrl = NetworkUtils.getAbsoluteURL(source.bookSourceUrl, url)
+        startActivity<WebViewActivity> {
+            putExtra("url", absoluteUrl)
+            putExtra("title", source.bookSourceName)
+            putExtra("sourceName", source.bookSourceName)
+            putExtra("sourceOrigin", source.bookSourceUrl)
+            putExtra("sourceType", SourceType.book)
+            putExtra("refetchAfterSuccess", false)
+        }
+    }
+
     private fun updateDiscoverLoginButtonState() {
+        val hasLoginUrl = selectedDiscoverSourcePart?.hasLoginUrl == true
+        binding.btnDiscoverMore.setImageResource(
+            if (hasLoginUrl) R.drawable.ic_lucide_user else R.drawable.ic_lucide_link_2
+        )
+        binding.btnDiscoverMore.contentDescription = getString(
+            if (hasLoginUrl) R.string.login else R.string.open_in_app_webview
+        )
         binding.btnDiscoverMore.alpha = 1f
         binding.llDiscoverSourceRow.post(::updateDiscoverSourceNameWidth)
     }
@@ -916,7 +946,6 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     private fun updateDiscoverTagFilterButtonState() {
         val enabled = discoverSettingItems.isNotEmpty()
-                || normalizeDiscoverBookLayout(AppConfig.modernDiscoveryLayout) == DISCOVER_LAYOUT_GRID
         binding.btnDiscoverTagFilter.isVisible = enabled
         binding.btnDiscoverTagFilter.isEnabled = enabled
         binding.btnDiscoverTagFilter.alpha = if (enabled) 1f else 0.45f
