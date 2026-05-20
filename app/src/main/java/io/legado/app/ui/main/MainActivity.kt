@@ -3,7 +3,6 @@
 package io.legado.app.ui.main
 
 import android.content.Intent
-import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.drawable.Drawable
@@ -1052,12 +1051,11 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
         )
         if (hasCustom) {
             bottomNavigationView.itemIconTintList = null
+            bottomNavigationView.itemTextColor = bottomNavigationView.createThemeColorStateList()
         } else {
             bottomNavigationView.restoreThemeIconTint()
         }
         updateSideNavigationItems()
-        bottomNavigationView.itemIconTintList = ColorStateList.valueOf(Color.WHITE)
-        bottomNavigationView.itemTextColor = ColorStateList.valueOf(Color.WHITE)
         syncSearchButtonTint()
     }
 

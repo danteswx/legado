@@ -81,7 +81,9 @@ class ReadMenuLayoutTest {
         assertTrue(mainActivity.contains("bottomNavigationIndicatorContainer.background = createBottomNavigationIndicatorBackground()"))
         assertTrue(mainActivity.contains("cornerRadius = resources.getDimension(R.dimen.main_bottom_indicator_corner_radius)"))
         assertTrue(mainActivity.contains("setColor(primaryColor)"))
-        assertTrue(mainActivity.contains("bottomNavigationView.itemIconTintList = ColorStateList.valueOf(Color.WHITE)"))
+        assertTrue(mainActivity.contains("bottomNavigationView.restoreThemeIconTint()"))
+        assertFalse(mainActivity.contains("bottomNavigationView.itemIconTintList = ColorStateList.valueOf(Color.WHITE)"))
+        assertFalse(mainActivity.contains("bottomNavigationView.itemTextColor = ColorStateList.valueOf(Color.WHITE)"))
         assertFalse(mainActivity.contains("bottomNavigationIndicatorGlassView"))
     }
 
