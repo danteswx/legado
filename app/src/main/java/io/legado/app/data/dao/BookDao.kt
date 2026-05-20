@@ -11,6 +11,7 @@ import io.legado.app.constant.BookType
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.BookSourceShelfStats
 import io.legado.app.help.book.isNotShelf
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -103,6 +104,17 @@ interface BookDao {
         where origin == bookSourceUrl and origin not like '${BookType.localTag}%' 
         and origin not like '${BookType.webDavTag}%'""")
     fun getAllUseBookSource(): List<BookSource>
+
+    @Query(
+        """select trim(origin) as origin, count(bookUrl) as shelfCount, max(durChapterTime) as lastReadTime
+        from books
+        where type & ${BookType.notShelf} = 0
+        and trim(origin) <> ''
+        and trim(origin) not like '${BookType.localTag}%'
+        and trim(origin) not like '${BookType.webDavTag}%'
+        group by trim(origin)"""
+    )
+    fun getBookSourceShelfStats(): List<BookSourceShelfStats>
 
     @Query("SELECT * FROM books WHERE name = :name and origin = :origin")
     fun getBookByOrigin(name: String, origin: String): Book?

@@ -43,6 +43,23 @@ class ExploreFragmentLifecycleTest {
         assertFalse(buttonBlock.contains("toastOnUi(it.localizedMessage"))
     }
 
+    @Test
+    fun discoverySourcesUseSmartSortAndRecordUsage() {
+        val viewModel = repoFile("app/src/main/java/io/legado/app/ui/main/explore/ExploreViewModel.kt").readText()
+        val fragment = repoFile("app/src/main/java/io/legado/app/ui/main/explore/ExploreFragment.kt").readText()
+        val adapter = repoFile("app/src/main/java/io/legado/app/ui/main/explore/ExploreAdapter.kt").readText()
+
+        assertTrue(viewModel.contains("suspend fun sortDiscoverSources"))
+        assertTrue(viewModel.contains("DiscoverSourceSorter.sort"))
+        assertTrue(viewModel.contains("DiscoverSourceUseConfig.addUse"))
+        assertTrue(fragment.contains("val sortedList = viewModel.sortDiscoverSources(list)"))
+        assertTrue(fragment.contains("val sortedList = viewModel.sortDiscoverSources(it)"))
+        assertTrue(fragment.contains("recordDiscoverSourceUse(sourceUrl, increment = 2)"))
+        assertTrue(fragment.contains("increment = 3"))
+        assertTrue(adapter.contains("fun recordSourceUse(source: BookSourcePart, increment: Int = 1)"))
+        assertTrue(adapter.contains("callBack.recordSourceUse(it)"))
+    }
+
     private fun repoFile(relativePath: String): File {
         return generateSequence(File("").absoluteFile) { it.parentFile }
             .map { File(it, relativePath) }

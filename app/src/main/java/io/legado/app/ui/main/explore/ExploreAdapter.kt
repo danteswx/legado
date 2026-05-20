@@ -595,6 +595,7 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
                 if (exIndex != -1) {
                     scrollTo = position
                     callBack.scrollTo(position)
+                    getItem(position)?.let { callBack.recordSourceUse(it) }
                     notifyItemChanged(position, false)
                 }
             }
@@ -676,6 +677,7 @@ class ExploreAdapter(context: Context, val callBack: CallBack) :
         fun openExplore(sourceUrl: String, title: String, exploreUrl: String?)
         fun editSource(sourceUrl: String)
         fun toTop(source: BookSourcePart)
+        fun recordSourceUse(source: BookSourcePart, increment: Int = 1)
         fun deleteSource(source: BookSourcePart)
         fun searchBook(bookSource: BookSourcePart)
     }

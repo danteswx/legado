@@ -7,7 +7,10 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.SearchBook
+import io.legado.app.help.config.DiscoverSourceUseConfig
 import io.legado.app.help.source.SourceHelp
+import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.withContext
 
 class ExploreViewModel(application: Application) : BaseViewModel(application) {
 
@@ -42,6 +45,27 @@ class ExploreViewModel(application: Application) : BaseViewModel(application) {
     fun deleteSource(source: BookSourcePart) {
         execute {
             SourceHelp.deleteBookSource(source.bookSourceUrl)
+        }
+    }
+
+    suspend fun sortDiscoverSources(list: List<BookSourcePart>): List<BookSourcePart> {
+        if (list.size <= 1) {
+            return list
+        }
+        return withContext(IO) {
+            runCatching {
+                val shelfStats = appDb.bookDao.getBookSourceShelfStats()
+                val useStats = DiscoverSourceUseConfig.getUseStats(list.map { it.bookSourceUrl })
+                DiscoverSourceSorter.sort(list, shelfStats, useStats.values, System.currentTimeMillis())
+            }.getOrElse {
+                list
+            }
+        }
+    }
+
+    fun recordDiscoverSourceUse(sourceUrl: String?, increment: Int = 1) {
+        execute {
+            DiscoverSourceUseConfig.addUse(sourceUrl, increment)
         }
     }
 

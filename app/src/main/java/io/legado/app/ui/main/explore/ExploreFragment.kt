@@ -425,7 +425,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 handleDiscoverButtonTag(item)
                 return@setOnTagClickListener
             }
-            selectDiscoverTag(index, item, selectTab = true)
+            selectDiscoverTag(index, item, selectTab = true, recordUse = true)
         }
         binding.rvDiscoverSelects.setOnTagClickListener { index ->
             val group = discoverMajorGroups.getOrNull(index) ?: return@setOnTagClickListener
@@ -619,8 +619,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 .conflate()
                 .distinctUntilChanged()
                 .collect { list ->
+                    val sortedList = viewModel.sortDiscoverSources(list)
                     discoverSources.clear()
-                    discoverSources.addAll(list)
+                    discoverSources.addAll(sortedList)
                     if (discoverSources.isEmpty()) {
                         selectedDiscoverSourcePart = null
                         selectedDiscoverSource = null
@@ -701,8 +702,13 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             },
             itemKey = { it.bookSourceUrl }
         ) {
+            recordDiscoverSourceUse(it.bookSourceUrl)
             selectDiscoverSource(it)
         }
+    }
+
+    private fun recordDiscoverSourceUse(sourceUrl: String?, increment: Int = 1) {
+        viewModel.recordDiscoverSourceUse(sourceUrl, increment)
     }
 
     private fun selectDiscoverSource(source: BookSourcePart) {
@@ -1125,7 +1131,12 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         binding.rvDiscoverTags.setSelectedIndex(index, smooth)
     }
 
-    private fun selectDiscoverTag(index: Int, item: DiscoverTagItem, selectTab: Boolean) {
+    private fun selectDiscoverTag(
+        index: Int,
+        item: DiscoverTagItem,
+        selectTab: Boolean,
+        recordUse: Boolean = false
+    ) {
         val url = item.kind.url?.takeIf { it.isNotBlank() } ?: return
         if (executeDiscoverUrlScriptIfNeeded(item, url)) {
             return
@@ -1139,6 +1150,9 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             return
         }
         discoverCurrentUrl = url
+        if (recordUse) {
+            recordDiscoverSourceUse(selectedDiscoverSource?.bookSourceUrl)
+        }
         loadDiscoverBooks(reset = true)
     }
 
@@ -1439,9 +1453,11 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             ).catch {
                 AppLog.put("发现界面更新数据出错", it)
             }.conflate().flowOn(IO).collect {
+                val sortedList = viewModel.sortDiscoverSources(it)
                 binding.swipeRefreshLayout.isRefreshing = false
-                binding.tvEmptyMsg.isGone = it.isNotEmpty() || (searchView?.query?.isNotEmpty() == true)
-                adapter.setItems(it, diffItemCallBack)
+                binding.tvEmptyMsg.isGone =
+                    sortedList.isNotEmpty() || (searchView?.query?.isNotEmpty() == true)
+                adapter.setItems(sortedList, diffItemCallBack)
                 delay(500)
             }
         }
@@ -1545,6 +1561,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     override fun openExplore(sourceUrl: String, title: String, exploreUrl: String?) {
         if (exploreUrl.isNullOrBlank()) return
+        recordDiscoverSourceUse(sourceUrl, increment = 2)
         startActivity<ExploreShowActivity> {
             putExtra("exploreName", title)
             putExtra("sourceUrl", sourceUrl)
@@ -1560,6 +1577,10 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     override fun toTop(source: BookSourcePart) {
         viewModel.topSource(source)
+    }
+
+    override fun recordSourceUse(source: BookSourcePart, increment: Int) {
+        recordDiscoverSourceUse(source.bookSourceUrl, increment)
     }
 
     override fun deleteSource(source: BookSourcePart) {
@@ -1582,6 +1603,12 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     }
 
     override fun showBookInfo(book: SearchBook) {
+        recordDiscoverSourceUse(
+            book.origin.takeIf { it.isNotBlank() }
+                ?: selectedDiscoverSource?.bookSourceUrl
+                ?: selectedDiscoverSourcePart?.bookSourceUrl,
+            increment = 3
+        )
         viewLifecycleOwner.lifecycleScope.launch {
             withContext(IO) {
                 appDb.searchBookDao.insert(book)
