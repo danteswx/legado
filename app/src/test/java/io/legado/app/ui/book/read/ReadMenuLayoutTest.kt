@@ -1820,6 +1820,23 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun mangaProgressMinimapPreviewScrollsBodySmoothlyWhileCommitSnapsAndSavesProgress() {
+        val mangaActivity = repoFile("app/src/main/java/io/legado/app/ui/book/manga/ReadMangaActivity.kt").readText()
+        val mangaLayoutManager = repoFile("app/src/main/java/io/legado/app/ui/book/manga/recyclerview/MangaLayoutManager.kt").readText()
+        val scrollBody = mangaActivity.substringAfter("private fun scrollToMangaPage(index: Int, commit: Boolean)")
+            .substringBefore("private fun adapterPositionForMangaPage")
+
+        assertTrue(mangaLayoutManager.contains("fun smoothScrollToPositionWithOffset(position: Int, offset: Int)"))
+        assertTrue(mangaLayoutManager.contains("LinearSmoothScroller"))
+        assertTrue(scrollBody.contains("if (commit) {"))
+        assertTrue(scrollBody.contains("binding.recyclerView.stopScroll()"))
+        assertTrue(scrollBody.contains("mLayoutManager.scrollToPositionWithOffset(itemPos, 0)"))
+        assertTrue(scrollBody.contains("} else {\n            mLayoutManager.smoothScrollToPositionWithOffset(itemPos, 0)\n        }"))
+        assertTrue(scrollBody.indexOf("ReadManga.curPageChanged()") > scrollBody.indexOf("if (commit) {"))
+        assertTrue(scrollBody.indexOf("ReadManga.saveRead(true)") > scrollBody.indexOf("if (commit) {"))
+    }
+
+    @Test
     fun mangaProgressMinimapReloadsCurrentPageWhenThumbnailFinishesLoading() {
         val mangaActivity = repoFile("app/src/main/java/io/legado/app/ui/book/manga/ReadMangaActivity.kt").readText()
         val minimapView = repoFile("app/src/main/java/io/legado/app/ui/book/manga/MangaProgressMinimapView.kt").readText()

@@ -662,7 +662,12 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         if (itemPos <= -1) {
             return
         }
-        mLayoutManager.scrollToPositionWithOffset(itemPos, 0)
+        if (commit) {
+            binding.recyclerView.stopScroll()
+            mLayoutManager.scrollToPositionWithOffset(itemPos, 0)
+        } else {
+            mLayoutManager.smoothScrollToPositionWithOffset(itemPos, 0)
+        }
         upInfoBar(mAdapter.getItem(itemPos))
         ReadManga.durChapterPos = targetIndex
         updateMangaProgressMinimap()
