@@ -50,15 +50,54 @@ class BookSourceConfigTest {
 
         assertTrue("JavDB source should exist", javdbSource.isNotBlank())
         assertTrue(loginUrl.contains("login"))
-        listOf("热播", "全部", "有码", "无码", "欧美", "FC2", "动漫").forEach {
+        listOf("censored", "uncensored", "western", "FC2", "anime").forEach {
             assertTrue("Missing JavDB primary category: $it", exploreUrl.contains(it))
         }
-        listOf("大封面", "小封面", "可播放", "中字可播放", "含磁链", "含字幕", "含短评", "更新时间排序", "发布日期排序").forEach {
-            assertTrue("Missing JavDB secondary category: $it", exploreUrl.contains(it))
+        listOf("vft=4&vst=3", "vft=5&vst=3", "vft=1", "vft=2", "vft=3").forEach {
+            assertTrue("Missing JavDB secondary filter: $it", exploreUrl.contains(it))
         }
-        listOf("LUXU", "VR", "肛交", "连裤袜", "无码流出", "jur", "snos", "熟女", "巨乳", "洗脑", "mida", "角色扮演", "麻豆", "媚药").forEach {
+        listOf("LUXU", "VR", "jur", "snos", "mida", "start", "ipzz", "ntr", "abf").forEach {
             assertTrue("Missing JavDB tag: $it", exploreUrl.contains(it))
         }
+    }
+
+    @Test
+    fun javdbVideoSourceUsesCurrentFilterRoutesAndExpandedTags() {
+        val sourceText = repoFile("tests/shareBookSource.json").readText()
+        val javdbSource = sourceObject(sourceText, """"bookSourceUrl": "https://javdb.com/"""")
+        val exploreUrl = fieldValue(javdbSource, "exploreUrl")
+
+        assertTrue("JavDB source should exist", javdbSource.isNotBlank())
+        listOf("censored", "uncensored", "western", "fc2", "anime").forEach {
+            assertTrue("Missing JavDB primary category route: $it", exploreUrl.contains(it))
+        }
+        listOf("vft=0", "vft=4&vst=3", "vft=5&vst=3", "vft=1", "vft=2", "vft=3").forEach {
+            assertTrue("Missing JavDB current filter route: $it", exploreUrl.contains(it))
+        }
+        assertTrue(exploreUrl.contains("categories.filter"))
+        assertTrue(exploreUrl.contains("filters.forEach"))
+        listOf("rankings/playback", "rankings/top").forEach {
+            assertTrue("Missing JavDB ranking category: $it", exploreUrl.contains(it))
+        }
+        listOf("p=daily&t=censored", "p=weekly&t=censored", "p=monthly&t=censored").forEach {
+            assertTrue("Missing JavDB ranking period: $it", exploreUrl.contains("rankings/movies?$it&page={{page}}"))
+        }
+        listOf("深喉", "母子", "黑人", "start", "ipzz", "母乳", "ntr", "abf").forEach {
+            assertTrue("Missing JavDB popular tag: $it", exploreUrl.contains(it))
+        }
+        assertFalse("JavDB discover should not use stale f=playable filter", exploreUrl.contains("f=playable"))
+        assertFalse("JavDB discover should not use stale f=download filter", exploreUrl.contains("f=download"))
+    }
+
+    @Test
+    fun hsexVideoSourceSearchUsesPagedSearchRoute() {
+        val sourceText = repoFile("tests/shareBookSource.json").readText()
+        val hsexSource = sourceObject(sourceText, """"bookSourceUrl": "https://hsex.icu/"""")
+        val searchUrl = fieldValue(hsexSource, "searchUrl")
+
+        assertTrue("好色TV source should exist", hsexSource.isNotBlank())
+        assertTrue(searchUrl.contains("search-{{page}}.htm?search={{key}}&sort=new"))
+        assertFalse("好色TV search should not stay on first page", searchUrl.contains("search.htm?search={{key}}&sort=new"))
     }
 
     private fun repoFile(relativePath: String): File {
