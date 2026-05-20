@@ -2579,10 +2579,10 @@ class ReadMenuLayoutTest {
         assertEquals("72dp", layout.elementById("layout_margin_adjust_overlay").androidAttr("paddingTop"))
         assertEquals("16dp", layout.elementById("layout_margin_adjust_overlay").androidAttr("paddingBottom"))
         assertEquals("wrap_content", layout.elementById("layout_tip_divider_section").androidAttr("layout_height"))
-        assertEquals("40dp", layout.elementById("layout_tip_divider_toggle_row").androidAttr("layout_height"))
-        assertEquals("36dp", layout.elementById("tv_layout_header_line_toggle").androidAttr("layout_height"))
-        assertEquals("72dp", layout.elementById("tv_layout_header_line_toggle").androidAttr("layout_width"))
-        assertEquals("46dp", layout.elementById("ll_layout_tip_divider_color").androidAttr("layout_height"))
+        assertEquals("36dp", layout.elementById("layout_tip_divider_toggle_row").androidAttr("layout_height"))
+        assertEquals("32dp", layout.elementById("tv_layout_header_line_toggle").androidAttr("layout_height"))
+        assertEquals("66dp", layout.elementById("tv_layout_header_line_toggle").androidAttr("layout_width"))
+        assertEquals("40dp", layout.elementById("ll_layout_tip_divider_color").androidAttr("layout_height"))
         assertEquals("LinearLayout", layout.elementById("layout_tip_controls").tagName)
         assertEquals("wrap_content", layout.elementById("layout_tip_controls").androidAttr("layout_height"))
         assertEquals("", layout.elementById("layout_tip_controls").androidAttr("scrollbars"))
@@ -2607,9 +2607,9 @@ class ReadMenuLayoutTest {
             layout.elementById("layout_footer_display_hide_card")
         ).forEach { card ->
             assertEquals("wrap_content", card.androidAttr("layout_height"))
-            assertEquals("64dp", card.androidAttr("minHeight"))
-            assertEquals("10dp", card.androidAttr("paddingTop"))
-            assertEquals("10dp", card.androidAttr("paddingBottom"))
+            assertEquals("56dp", card.androidAttr("minHeight"))
+            assertEquals("8dp", card.androidAttr("paddingTop"))
+            assertEquals("8dp", card.androidAttr("paddingBottom"))
         }
         listOf(
             "@string/read_menu_header_auto_summary",
@@ -2715,6 +2715,33 @@ class ReadMenuLayoutTest {
         assertTrue(readMenu.contains("ReadTipConfig.tipHeaderLeft = value"))
         assertTrue(readMenu.contains("ReadTipConfig.tipHeaderMiddle = value"))
         assertTrue(readMenu.contains("ReadTipConfig.tipHeaderRight = value"))
+        assertTrue(readMenu.contains("postEvent(EventBus.UP_CONFIG, arrayListOf(2, 6))"))
+    }
+
+    @Test
+    fun footerTipItemsCanBeCustomizedFromCurrentReadMenu() {
+        val layout = readMenuLayout()
+        val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
+        val footerControls = layout.elementById("layout_tip_footer_controls")
+
+        assertTrue(layout.elementById("layout_footer_tip_items").hasAncestor(footerControls))
+        assertEquals(
+            "@string/read_menu_footer_items",
+            layout.elementById("tv_layout_footer_tip_items_title").androidAttr("text")
+        )
+        listOf(
+            "ll_layout_footer_tip_left",
+            "ll_layout_footer_tip_middle",
+            "ll_layout_footer_tip_right",
+            "tv_layout_footer_tip_left_value",
+            "tv_layout_footer_tip_middle_value",
+            "tv_layout_footer_tip_right_value"
+        ).forEach { id ->
+            assertTrue(layout.elementById(id).hasAncestor(layout.elementById("layout_footer_tip_items")))
+        }
+        assertTrue(readMenu.contains("ReadTipConfig.tipFooterLeft = value"))
+        assertTrue(readMenu.contains("ReadTipConfig.tipFooterMiddle = value"))
+        assertTrue(readMenu.contains("ReadTipConfig.tipFooterRight = value"))
         assertTrue(readMenu.contains("postEvent(EventBus.UP_CONFIG, arrayListOf(2, 6))"))
     }
 

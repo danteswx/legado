@@ -1834,6 +1834,7 @@
     <string name="read_menu_header_display">页眉显示</string>
     <string name="read_menu_header_items">页眉内容</string>
     <string name="read_menu_footer_display">页脚显示</string>
+    <string name="read_menu_footer_items">页脚内容</string>
     <string name="read_menu_display_auto">自动</string>
     <string name="read_menu_display_always">始终显示</string>
     <string name="read_menu_header_auto_summary">在阅读时自动显示或隐藏页眉，保持阅读体验。</string>

@@ -2410,6 +2410,10 @@ class ReadMenu @JvmOverloads constructor(
             tvLayoutFooterMarginEntryValue,
             tvLayoutHeaderTitle,
             tvLayoutHeaderLineToggle,
+            tvLayoutHeaderTipItemsTitle,
+            tvLayoutHeaderTipLeftValue,
+            tvLayoutHeaderTipMiddleValue,
+            tvLayoutHeaderTipRightValue,
             tvLayoutTitleSizeValue,
             tvLayoutTitleTopSpacingValue,
             tvLayoutTitleBottomSpacingValue,
@@ -2417,6 +2421,10 @@ class ReadMenu @JvmOverloads constructor(
             tvLayoutHeaderPaddingBottomValue,
             tvLayoutFooterTitle,
             tvLayoutFooterLineToggle,
+            tvLayoutFooterTipItemsTitle,
+            tvLayoutFooterTipLeftValue,
+            tvLayoutFooterTipMiddleValue,
+            tvLayoutFooterTipRightValue,
             tvLayoutFooterPaddingTopValue,
             tvLayoutFooterPaddingBottomValue,
             tvLayoutLetterSpacingValue,
@@ -3196,6 +3204,9 @@ class ReadMenu @JvmOverloads constructor(
         tvLayoutHeaderTipLeftValue.text = tipName(ReadTipConfig.tipHeaderLeft)
         tvLayoutHeaderTipMiddleValue.text = tipName(ReadTipConfig.tipHeaderMiddle)
         tvLayoutHeaderTipRightValue.text = tipName(ReadTipConfig.tipHeaderRight)
+        tvLayoutFooterTipLeftValue.text = tipName(ReadTipConfig.tipFooterLeft)
+        tvLayoutFooterTipMiddleValue.text = tipName(ReadTipConfig.tipFooterMiddle)
+        tvLayoutFooterTipRightValue.text = tipName(ReadTipConfig.tipFooterRight)
         renderTipDisplayCards()
         renderTipDividerControls()
     }
@@ -5058,6 +5069,21 @@ class ReadMenu @JvmOverloads constructor(
         llLayoutHeaderTipRight.setOnClickListener {
             showHeaderTipItemSelector(R.string.right) { value ->
                 ReadTipConfig.tipHeaderRight = value
+            }
+        }
+        llLayoutFooterTipLeft.setOnClickListener {
+            showHeaderTipItemSelector(R.string.left) { value ->
+                ReadTipConfig.tipFooterLeft = value
+            }
+        }
+        llLayoutFooterTipMiddle.setOnClickListener {
+            showHeaderTipItemSelector(R.string.middle) { value ->
+                ReadTipConfig.tipFooterMiddle = value
+            }
+        }
+        llLayoutFooterTipRight.setOnClickListener {
+            showHeaderTipItemSelector(R.string.right) { value ->
+                ReadTipConfig.tipFooterRight = value
             }
         }
         taggedView("layout_footer_display_auto_card").setOnClickListener { setFooterDisplayMode(2) }
