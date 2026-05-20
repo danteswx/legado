@@ -408,6 +408,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     private fun bindMangaProgressMinimap() {
         binding.mangaProgressMinimap.onProgressChanging = ::previewMangaProgressMinimap
         binding.mangaProgressMinimap.onProgressChanged = ::commitMangaProgressMinimap
+        binding.mangaProgressMinimap.onThumbnailReady = ::reloadMangaProgressPageIfCurrent
         binding.btnMangaMinimapPrevious.setMinimapChapterNavigationClickListener(binding.tvMangaMinimapPrevious) {
             ReadManga.moveToPrevChapter(true)
         }
@@ -623,10 +624,31 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             if (ReadManga.durChapterIndex != targetChapterIndex || ReadManga.durChapterPos != targetPage) {
                 return@post
             }
-            val itemPos = adapterPositionForMangaPage(targetPage)
-            if (itemPos > -1 && mAdapter.getItem(itemPos) is MangaPage) {
-                mAdapter.notifyItemChanged(itemPos)
+            reloadMangaProgressPage(targetPage)
+        }
+    }
+
+    private fun reloadMangaProgressPageIfCurrent(pageIndex: Int, imageUrl: String) {
+        val targetChapterIndex = ReadManga.durChapterIndex
+        binding.recyclerView.post {
+            if (ReadManga.durChapterIndex != targetChapterIndex || ReadManga.durChapterPos != pageIndex) {
+                return@post
             }
+            if (currentMangaImageUrlAt(pageIndex) != imageUrl) {
+                return@post
+            }
+            reloadMangaProgressPage(pageIndex)
+        }
+    }
+
+    private fun reloadMangaProgressPage(pageIndex: Int) {
+        val itemPos = adapterPositionForMangaPage(pageIndex)
+        if (itemPos > -1 && mAdapter.getItem(itemPos) is MangaPage) {
+            val holder = binding.recyclerView.findViewHolderForAdapterPosition(itemPos) as? MangaAdapter.PageViewHolder
+            if (holder?.binding?.flProgress?.isVisible == false) {
+                return
+            }
+            mAdapter.notifyItemChanged(itemPos)
         }
     }
 
@@ -671,6 +693,12 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         return ReadManga.curMangaChapter?.pages?.filterIsInstance<MangaPage>()
             ?.map { it.mImageUrl }
             .orEmpty()
+    }
+
+    private fun currentMangaImageUrlAt(pageIndex: Int): String? {
+        return ReadManga.curMangaChapter?.pages?.filterIsInstance<MangaPage>()
+            ?.getOrNull(pageIndex)
+            ?.mImageUrl
     }
 
     override fun onResume() {

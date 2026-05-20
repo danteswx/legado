@@ -1787,6 +1787,56 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun mangaProgressMinimapReloadsCurrentPageWhenThumbnailFinishesLoading() {
+        val mangaActivity = repoFile("app/src/main/java/io/legado/app/ui/book/manga/ReadMangaActivity.kt").readText()
+        val minimapView = repoFile("app/src/main/java/io/legado/app/ui/book/manga/MangaProgressMinimapView.kt").readText()
+        val bindBody = mangaActivity.substringAfter("private fun bindMangaProgressMinimap()")
+            .substringBefore("private fun setupMangaMinimapControlGlass()")
+
+        assertTrue(minimapView.contains("var onThumbnailReady: ((pageIndex: Int, imageUrl: String) -> Unit)? = null"))
+        assertTrue(minimapView.contains("onThumbnailReady?.invoke(index, url)"))
+        assertTrue(bindBody.contains("binding.mangaProgressMinimap.onThumbnailReady = ::reloadMangaProgressPageIfCurrent"))
+        assertTrue(mangaActivity.contains("private fun reloadMangaProgressPageIfCurrent(pageIndex: Int, imageUrl: String)"))
+        assertTrue(mangaActivity.contains("val targetChapterIndex = ReadManga.durChapterIndex"))
+        assertTrue(
+            mangaActivity.contains(
+                "binding.recyclerView.post {\n" +
+                        "            if (ReadManga.durChapterIndex != targetChapterIndex || ReadManga.durChapterPos != pageIndex) {\n" +
+                        "                return@post\n" +
+                        "            }\n" +
+                        "            if (currentMangaImageUrlAt(pageIndex) != imageUrl) {\n" +
+                        "                return@post\n" +
+                        "            }\n" +
+                        "            reloadMangaProgressPage(pageIndex)"
+            )
+        )
+        assertTrue(mangaActivity.contains("val holder = binding.recyclerView.findViewHolderForAdapterPosition(itemPos) as? MangaAdapter.PageViewHolder"))
+        assertTrue(mangaActivity.contains("if (holder?.binding?.flProgress?.isVisible == false)"))
+    }
+
+    @Test
+    fun mangaProgressMinimapThumbnailsDoNotQueueWholeChapterBeforeBodyImage() {
+        val minimapView = repoFile("app/src/main/java/io/legado/app/ui/book/manga/MangaProgressMinimapView.kt").readText()
+        val mangaViewHolder = repoFile("app/src/main/java/io/legado/app/ui/book/manga/recyclerview/MangaVH.kt").readText()
+        val mangaAdapter = repoFile("app/src/main/java/io/legado/app/ui/book/manga/recyclerview/MangaAdapter.kt").readText()
+
+        assertTrue(minimapView.contains("private val thumbnailLoadingIndexes = mutableSetOf<Int>()"))
+        assertTrue(minimapView.contains("private const val MAX_THUMBNAIL_REQUESTS"))
+        assertTrue(minimapView.contains("val remainingSlots = MAX_THUMBNAIL_REQUESTS - thumbnailLoadingIndexes.size"))
+        assertTrue(minimapView.contains("sortedWith(compareBy<Int> { kotlin.math.abs(it - progress) }"))
+        assertTrue(minimapView.contains(".take(remainingSlots)"))
+        assertTrue(minimapView.contains("thumbnailLoadingIndexes.remove(index)"))
+        assertTrue(minimapView.contains("maybeLoadThumbnails()"))
+        assertTrue(minimapView.contains("prioritizeCurrentThumbnail()"))
+        assertTrue(minimapView.contains("cancelThumbnailTarget(index)"))
+        assertTrue(minimapView.contains("!isShown"))
+        assertTrue(minimapView.contains(".priority(Priority.LOW)"))
+        assertFalse(minimapView.contains("imageUrls.forEachIndexed { index, url ->"))
+        assertTrue(mangaViewHolder.contains(".priority(Priority.IMMEDIATE)"))
+        assertTrue(mangaAdapter.contains(".priority(Priority.LOW)"))
+    }
+
+    @Test
     fun expandedReaderPanelHidesChapterProgressMinimapUntilDismissed() {
         val readMenu = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadMenu.kt").readText()
         val readActivity = repoFile("app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt").readText()

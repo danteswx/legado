@@ -12,6 +12,7 @@ import android.view.View
 import android.view.ViewConfiguration
 import androidx.core.graphics.ColorUtils
 import com.bumptech.glide.Glide
+import com.bumptech.glide.Priority
 import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
 import io.legado.app.model.BookCover
@@ -27,6 +28,7 @@ class MangaProgressMinimapView @JvmOverloads constructor(
 
     var onProgressChanging: ((progressRatio: Float) -> Unit)? = null
     var onProgressChanged: ((progressRatio: Float) -> Unit)? = null
+    var onThumbnailReady: ((pageIndex: Int, imageUrl: String) -> Unit)? = null
 
     private val trackRect = RectF()
     private val thumbRect = RectF()
@@ -49,6 +51,8 @@ class MangaProgressMinimapView @JvmOverloads constructor(
     private var sourceOrigin: String? = null
     private val thumbnailDrawables = mutableMapOf<Int, Drawable>()
     private val thumbnailTargets = mutableMapOf<Int, CustomTarget<Drawable>>()
+    private val thumbnailLoadingIndexes = mutableSetOf<Int>()
+    private var clearingThumbnailTargets = false
     private var dragRatio: Float? = null
     private var pinnedProgressRatio: Float? = null
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
@@ -104,8 +108,9 @@ class MangaProgressMinimapView @JvmOverloads constructor(
         val safePageCount = pageCount.coerceAtLeast(0)
         val safeProgress = progress.coerceIn(0, (safePageCount - 1).coerceAtLeast(0))
         val pageCountChanged = this.pageCount != safePageCount
+        val progressChanged = this.progress != safeProgress
         if (!isDragging && pinnedProgressRatio == null &&
-            (pageCountChanged || this.progress != safeProgress)
+            (pageCountChanged || progressChanged)
         ) {
             pinnedProgressRatio = null
         }
@@ -116,6 +121,9 @@ class MangaProgressMinimapView @JvmOverloads constructor(
         this.progress = safeProgress
         if (pageCountChanged) {
             requestLayout()
+        }
+        if (progressChanged) {
+            prioritizeCurrentThumbnail()
         }
         invalidate()
     }
@@ -377,17 +385,72 @@ class MangaProgressMinimapView @JvmOverloads constructor(
     }
 
     private fun maybeLoadThumbnails() {
-        if (!isAttachedToWindow || imageUrls.isEmpty()) {
+        if (!isAttachedToWindow || !isShown || imageUrls.isEmpty()) {
             return
         }
-        imageUrls.forEachIndexed { index, url ->
-            if (!thumbnailTargets.containsKey(index)) {
-                loadThumbnail(index, url)
+        val remainingSlots = MAX_THUMBNAIL_REQUESTS - thumbnailLoadingIndexes.size
+        if (remainingSlots <= 0) {
+            return
+        }
+        imageUrls.indices.asSequence()
+            .filter {
+                !thumbnailTargets.containsKey(it) &&
+                    !thumbnailDrawables.containsKey(it) &&
+                    !thumbnailLoadingIndexes.contains(it)
             }
+            .sortedWith(compareBy<Int> { kotlin.math.abs(it - progress) }.thenBy { it })
+            .take(remainingSlots)
+            .forEach { index ->
+                loadThumbnail(index, imageUrls[index])
+            }
+    }
+
+    private fun finishThumbnailLoad(index: Int) {
+        thumbnailLoadingIndexes.remove(index)
+        maybeLoadThumbnails()
+    }
+
+    private fun clearThumbnailLoading(index: Int) {
+        thumbnailLoadingIndexes.remove(index)
+        if (!clearingThumbnailTargets) {
+            maybeLoadThumbnails()
+        }
+    }
+
+    private fun prioritizeCurrentThumbnail() {
+        if (
+            !isAttachedToWindow ||
+            !isShown ||
+            progress !in imageUrls.indices ||
+            thumbnailTargets.containsKey(progress) ||
+            thumbnailDrawables.containsKey(progress)
+        ) {
+            return
+        }
+        thumbnailLoadingIndexes.toList()
+            .filter { index -> index != progress }
+            .forEach { index -> cancelThumbnailTarget(index) }
+        maybeLoadThumbnails()
+    }
+
+    private fun cancelThumbnailTarget(index: Int) {
+        val target = thumbnailTargets.remove(index) ?: return
+        thumbnailLoadingIndexes.remove(index)
+        val wasClearingThumbnailTargets = clearingThumbnailTargets
+        clearingThumbnailTargets = true
+        try {
+            runCatching {
+                Glide.with(context).clear(target)
+            }
+        } finally {
+            clearingThumbnailTargets = wasClearingThumbnailTargets
         }
     }
 
     private fun loadThumbnail(index: Int, url: String) {
+        if (!thumbnailLoadingIndexes.add(index)) {
+            return
+        }
         val target = object : CustomTarget<Drawable>(
             thumbnailRequestWidth(),
             thumbnailRequestHeight()
@@ -395,6 +458,8 @@ class MangaProgressMinimapView @JvmOverloads constructor(
             override fun onResourceReady(resource: Drawable, transition: Transition<in Drawable>?) {
                 thumbnailDrawables[index] = resource.mutate()
                 invalidate()
+                onThumbnailReady?.invoke(index, url)
+                finishThumbnailLoad(index)
             }
 
             override fun onLoadFailed(errorDrawable: Drawable?) {
@@ -402,11 +467,13 @@ class MangaProgressMinimapView @JvmOverloads constructor(
                     thumbnailDrawables[index] = it.mutate()
                 }
                 invalidate()
+                finishThumbnailLoad(index)
             }
 
             override fun onLoadCleared(placeholder: Drawable?) {
                 thumbnailDrawables.remove(index)
                 invalidate()
+                clearThumbnailLoading(index)
             }
         }
         thumbnailTargets[index] = target
@@ -417,17 +484,23 @@ class MangaProgressMinimapView @JvmOverloads constructor(
         ).override(
             thumbnailRequestWidth(),
             thumbnailRequestHeight()
-        ).into(target)
+        ).priority(Priority.LOW).into(target)
     }
 
     private fun clearThumbnailTargets() {
-        thumbnailTargets.values.forEach { target ->
-            runCatching {
-                Glide.with(context).clear(target)
+        clearingThumbnailTargets = true
+        try {
+            thumbnailTargets.values.forEach { target ->
+                runCatching {
+                    Glide.with(context).clear(target)
+                }
             }
+        } finally {
+            clearingThumbnailTargets = false
         }
         thumbnailTargets.clear()
         thumbnailDrawables.clear()
+        thumbnailLoadingIndexes.clear()
     }
 
     private fun thumbnailRequestWidth(): Int {
@@ -469,5 +542,6 @@ class MangaProgressMinimapView @JvmOverloads constructor(
         const val MINIMAP_MAX_HEIGHT_DP = 620f
         const val MINIMAP_BASE_HEIGHT_DP = 180f
         const val MINIMAP_PAGE_HEIGHT_DP = 18f
+        private const val MAX_THUMBNAIL_REQUESTS = 3
     }
 }

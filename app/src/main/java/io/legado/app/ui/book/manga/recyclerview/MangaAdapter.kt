@@ -16,6 +16,7 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
 import com.bumptech.glide.Glide
 import com.bumptech.glide.ListPreloader.PreloadModelProvider
+import com.bumptech.glide.Priority
 import com.bumptech.glide.RequestBuilder
 import com.bumptech.glide.load.resource.bitmap.BitmapTransformation
 import io.legado.app.base.adapter.ItemViewHolder
@@ -240,7 +241,7 @@ class MangaAdapter(private val context: Context) :
                 context,
                 item.mImageUrl,
                 sourceOrigin = ReadManga.book?.origin,
-            )
+            ).priority(Priority.LOW)
         }
         return null
     }
