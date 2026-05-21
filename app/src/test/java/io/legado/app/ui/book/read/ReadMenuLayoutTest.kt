@@ -1822,20 +1822,32 @@ class ReadMenuLayoutTest {
     }
 
     @Test
-    fun mangaProgressMinimapPreviewScrollsBodyImmediatelyWhileCommitSavesProgress() {
+    fun mangaProgressMinimapPreviewScrollsBodyContinuouslyWhileCommitSavesProgress() {
         val mangaActivity = repoFile("app/src/main/java/io/legado/app/ui/book/manga/ReadMangaActivity.kt").readText()
         val minimapView = repoFile("app/src/main/java/io/legado/app/ui/book/manga/MangaProgressMinimapView.kt").readText()
-        val scrollBody = mangaActivity.substringAfter("private fun scrollToMangaPage(index: Int, commit: Boolean)")
+        val progressScrollBody = mangaActivity.substringAfter("private fun scrollToMangaProgress(ratio: Float, commit: Boolean)")
+            .substringBefore("private fun targetMangaPageForProgress")
+        val continuousScrollBody = mangaActivity.substringAfter("private fun scrollMangaBodyToProgressRatio(ratio: Float): Boolean")
+            .substringBefore("private fun currentMangaScrollOffset")
+        val progressUpdateBody = mangaActivity.substringAfter("private fun upMangaProgressAfterScroll(index: Int, commit: Boolean)")
             .substringBefore("private fun adapterPositionForMangaPage")
 
         assertTrue(minimapView.contains("fun clearPinnedProgressRatio()"))
         assertTrue(mangaActivity.contains("binding.mangaProgressMinimap.clearPinnedProgressRatio()"))
-        assertTrue(scrollBody.contains("if (commit) {"))
-        assertTrue(scrollBody.contains("binding.recyclerView.stopScroll()"))
-        assertTrue(scrollBody.contains("mLayoutManager.scrollToPositionWithOffset(itemPos, 0)"))
-        assertFalse(scrollBody.contains("smoothScrollToPositionWithOffset"))
-        assertTrue(scrollBody.indexOf("ReadManga.curPageChanged()") > scrollBody.indexOf("if (commit) {"))
-        assertTrue(scrollBody.indexOf("ReadManga.saveRead(true)") > scrollBody.indexOf("if (commit) {"))
+        assertTrue(progressScrollBody.contains("binding.recyclerView.stopScroll()"))
+        assertTrue(progressScrollBody.contains("if (!scrollMangaBodyToProgressRatio(ratio))"))
+        assertFalse(progressScrollBody.contains("scrollToMangaPage(targetPage, commit)"))
+        assertTrue(continuousScrollBody.contains("targetMangaScrollOffsetForProgress(ratio) ?: return false"))
+        assertTrue(continuousScrollBody.contains("val delta = targetOffset - currentMangaScrollOffset()"))
+        assertTrue(continuousScrollBody.contains("binding.recyclerView.scrollBy(delta, 0)"))
+        assertTrue(continuousScrollBody.contains("binding.recyclerView.scrollBy(0, delta)"))
+        assertTrue(continuousScrollBody.contains("return true"))
+        assertTrue(mangaActivity.contains("private fun targetMangaScrollOffsetForProgress(ratio: Float): Int?"))
+        assertTrue(mangaActivity.contains("computeHorizontalScrollRange()"))
+        assertTrue(mangaActivity.contains("computeVerticalScrollRange()"))
+        assertFalse(progressScrollBody.contains("smoothScrollToPositionWithOffset"))
+        assertTrue(progressUpdateBody.indexOf("ReadManga.curPageChanged()") > progressUpdateBody.indexOf("if (commit) {"))
+        assertTrue(progressUpdateBody.indexOf("ReadManga.saveRead(true)") > progressUpdateBody.indexOf("if (commit) {"))
     }
 
     @Test

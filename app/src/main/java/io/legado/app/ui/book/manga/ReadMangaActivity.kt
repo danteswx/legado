@@ -89,6 +89,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.DecimalFormat
 import kotlin.math.ceil
+import kotlin.math.roundToInt
 
 class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewModel>(),
     ReadManga.Callback, ChangeBookSourceDialog.CallBack, MangaMenu.CallBack,
@@ -606,7 +607,13 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
 
     private fun scrollToMangaProgress(ratio: Float, commit: Boolean) {
         val targetPage = targetMangaPageForProgress(ratio) ?: return
-        scrollToMangaPage(targetPage, commit)
+        if (commit) {
+            binding.recyclerView.stopScroll()
+        }
+        if (!scrollMangaBodyToProgressRatio(ratio)) {
+            scrollToMangaPageTop(targetPage)
+        }
+        upMangaProgressAfterScroll(targetPage, commit)
     }
 
     private fun targetMangaPageForProgress(ratio: Float): Int? {
@@ -653,7 +660,46 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         }
     }
 
-    private fun scrollToMangaPage(index: Int, commit: Boolean) {
+    private fun scrollMangaBodyToProgressRatio(ratio: Float): Boolean {
+        val targetOffset = targetMangaScrollOffsetForProgress(ratio) ?: return false
+        val delta = targetOffset - currentMangaScrollOffset()
+        if (delta == 0) {
+            return true
+        }
+        if (mangaHorizontalScroll) {
+            binding.recyclerView.scrollBy(delta, 0)
+        } else {
+            binding.recyclerView.scrollBy(0, delta)
+        }
+        return true
+    }
+
+    private fun currentMangaScrollOffset(): Int {
+        return if (mangaHorizontalScroll) {
+            binding.recyclerView.computeHorizontalScrollOffset()
+        } else {
+            binding.recyclerView.computeVerticalScrollOffset()
+        }
+    }
+
+    private fun targetMangaScrollOffsetForProgress(ratio: Float): Int? {
+        val scrollRange: Int
+        val scrollExtent: Int
+        if (mangaHorizontalScroll) {
+            scrollRange = binding.recyclerView.computeHorizontalScrollRange()
+            scrollExtent = binding.recyclerView.computeHorizontalScrollExtent()
+        } else {
+            scrollRange = binding.recyclerView.computeVerticalScrollRange()
+            scrollExtent = binding.recyclerView.computeVerticalScrollExtent()
+        }
+        val maxScrollOffset = (scrollRange - scrollExtent).coerceAtLeast(0)
+        if (maxScrollOffset == 0) {
+            return null
+        }
+        return (ratio.coerceIn(0f, 1f) * maxScrollOffset).roundToInt()
+    }
+
+    private fun scrollToMangaPageTop(index: Int) {
         val pageCount = currentMangaPageCount()
         if (pageCount <= 0) {
             return
@@ -663,10 +709,19 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         if (itemPos <= -1) {
             return
         }
-        if (commit) {
-            binding.recyclerView.stopScroll()
-        }
         mLayoutManager.scrollToPositionWithOffset(itemPos, 0)
+    }
+
+    private fun upMangaProgressAfterScroll(index: Int, commit: Boolean) {
+        val pageCount = currentMangaPageCount()
+        if (pageCount <= 0) {
+            return
+        }
+        val targetIndex = index.coerceIn(0, pageCount - 1)
+        val itemPos = adapterPositionForMangaPage(targetIndex)
+        if (itemPos <= -1) {
+            return
+        }
         upInfoBar(mAdapter.getItem(itemPos))
         ReadManga.durChapterPos = targetIndex
         updateMangaProgressMinimap()
