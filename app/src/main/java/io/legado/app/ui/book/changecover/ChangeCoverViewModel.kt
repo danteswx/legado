@@ -14,6 +14,7 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.source.BookSourcePrioritySorter
 import io.legado.app.model.BookCover
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.utils.mapParallelSafe
@@ -113,7 +114,9 @@ class ChangeCoverViewModel(application: Application) : BaseViewModel(application
             searchBooks.clear()
             upAdapter?.invoke()
             bookSourceParts.clear()
-            bookSourceParts.addAll(appDb.bookSourceDao.allEnabledPart)
+            bookSourceParts.addAll(
+                BookSourcePrioritySorter.sortByPriority(appDb.bookSourceDao.allEnabledPart)
+            )
             initSearchPool()
             searchWithBookCover()
         }

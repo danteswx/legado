@@ -17,6 +17,7 @@ import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.databinding.DialogSearchScopeBinding
 import io.legado.app.databinding.ItemCheckBoxBinding
 import io.legado.app.databinding.ItemRadioButtonBinding
+import io.legado.app.help.source.BookSourcePrioritySorter
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.flowWithLifecycleAndDatabaseChange
@@ -28,6 +29,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -136,14 +138,16 @@ class SearchScopeDialog : BaseDialogFragment(R.layout.dialog_search_scope) {
                 else -> {
                     appDb.bookSourceDao.flowSearch(searchKey)
                 }
+            }.map { data ->
+                BookSourcePrioritySorter.sortByPriority(data)
             }.flowWithLifecycleAndDatabaseChange(
                 lifecycle,
                 table = AppDatabase.BOOK_SOURCE_TABLE_NAME
             ).catch {
                 AppLog.put("多分组/书源界面更新书源出错", it)
-            }.flowOn(IO).conflate().collect { data ->
+            }.flowOn(IO).conflate().collect { sources ->
                 screenSources.clear()
-                screenSources.addAll(data)
+                screenSources.addAll(sources)
                 adapter.notifyDataSetChanged()
                 delay(500)
             }

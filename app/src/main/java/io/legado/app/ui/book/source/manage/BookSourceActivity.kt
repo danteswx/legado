@@ -28,6 +28,7 @@ import io.legado.app.databinding.ActivityBookSourceBinding
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.DirectLinkUpload
 import io.legado.app.help.config.LocalConfig
+import io.legado.app.help.source.BookSourcePrioritySorter
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.primaryTextColor
@@ -354,7 +355,7 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
                             sort
                         }
 
-                        else -> data
+                        else -> BookSourcePrioritySorter.sortByPriority(data)
                     }
                 } else {
                     when (sort) {
@@ -374,7 +375,7 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
                             sort
                         }
 
-                        else -> data.reversed()
+                        else -> BookSourcePrioritySorter.sortByPriority(data).reversed()
                     }
                 }
             }.flowWithLifecycleAndDatabaseChange(

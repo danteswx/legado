@@ -23,6 +23,7 @@ import io.legado.app.help.book.releaseHtmlData
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.SourceConfig
 import io.legado.app.help.coroutine.Coroutine
+import io.legado.app.help.source.BookSourcePrioritySorter
 import io.legado.app.help.source.SourceHelp
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.utils.internString
@@ -195,14 +196,18 @@ open class ChangeBookSourceViewModel(application: Application) : BaseViewModel(a
             _changeSourceProgress.value = 0 to ""
             val searchGroup = AppConfig.searchGroup
             if (searchGroup.isBlank()) {
-                bookSourceParts.addAll(appDb.bookSourceDao.allEnabledPart)
+                bookSourceParts.addAll(
+                    BookSourcePrioritySorter.sortByPriority(appDb.bookSourceDao.allEnabledPart)
+                )
             } else {
                 val sources = appDb.bookSourceDao.getEnabledPartByGroup(searchGroup)
                 if (sources.isEmpty()) {
                     AppConfig.searchGroup = ""
-                    bookSourceParts.addAll(appDb.bookSourceDao.allEnabledPart)
+                    bookSourceParts.addAll(
+                        BookSourcePrioritySorter.sortByPriority(appDb.bookSourceDao.allEnabledPart)
+                    )
                 } else {
-                    bookSourceParts.addAll(sources)
+                    bookSourceParts.addAll(BookSourcePrioritySorter.sortByPriority(sources))
                 }
             }
             initSearchPool()

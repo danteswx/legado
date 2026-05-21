@@ -6,6 +6,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.source.BookSourcePrioritySorter
 import io.legado.app.utils.splitNotBlank
 import splitties.init.appCtx
 
@@ -138,7 +139,7 @@ data class SearchScope(private var scope: String) {
                 }
             }
         }
-        return list.sortedBy { it.customOrder }
+        return BookSourcePrioritySorter.sortByPriority(list.toList())
     }
 
     fun getSingleBookSourcePart(): BookSourcePart? {

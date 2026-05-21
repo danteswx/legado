@@ -21,6 +21,7 @@ import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.databinding.DialogSourcePickerBinding
 import io.legado.app.databinding.Item1lineTextBinding
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.source.BookSourcePrioritySorter
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.ui.widget.number.NumberPickerDialog
@@ -32,6 +33,7 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import splitties.views.onClick
 
@@ -90,6 +92,8 @@ class SourcePickerDialog : BaseDialogFragment(R.layout.dialog_source_picker),
             when {
                 searchKey.isNullOrEmpty() -> appDb.bookSourceDao.flowEnabled()
                 else -> appDb.bookSourceDao.flowSearchEnabled(searchKey)
+            }.map { data ->
+                BookSourcePrioritySorter.sortByPriority(data)
             }.catch {
                 AppLog.put("书源选择界面获取书源数据失败\n${it.localizedMessage}", it)
             }.flowOn(IO).collect {

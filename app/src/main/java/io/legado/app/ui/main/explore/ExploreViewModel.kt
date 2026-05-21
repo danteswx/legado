@@ -8,6 +8,7 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.help.config.DiscoverSourceUseConfig
+import io.legado.app.help.source.BookSourcePrioritySorter
 import io.legado.app.help.source.SourceHelp
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.withContext
@@ -54,9 +55,7 @@ class ExploreViewModel(application: Application) : BaseViewModel(application) {
         }
         return withContext(IO) {
             runCatching {
-                val shelfStats = appDb.bookDao.getBookSourceShelfStats()
-                val useStats = DiscoverSourceUseConfig.getUseStats(list.map { it.bookSourceUrl })
-                DiscoverSourceSorter.sort(list, shelfStats, useStats.values, System.currentTimeMillis())
+                BookSourcePrioritySorter.sortByPriority(list)
             }.getOrElse {
                 list
             }

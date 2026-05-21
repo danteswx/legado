@@ -8,6 +8,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.toBookSource
+import io.legado.app.help.source.BookSourcePrioritySorter
 import io.legado.app.help.source.SourceHelp
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
@@ -234,7 +235,7 @@ class BookSourceViewModel(application: Application) : BaseViewModel(application)
                     sortNum
                 }
 
-                else -> data
+                else -> BookSourcePrioritySorter.sortByPriority(data)
             }
             else when (sort) {
                 BookSourceSort.Weight -> data.sortedByDescending { it.weight }
@@ -253,7 +254,7 @@ class BookSourceViewModel(application: Application) : BaseViewModel(application)
                     sortNum
                 }
 
-                else -> data.reversed()
+                else -> BookSourcePrioritySorter.sortByPriority(data).reversed()
             }
         }
     }

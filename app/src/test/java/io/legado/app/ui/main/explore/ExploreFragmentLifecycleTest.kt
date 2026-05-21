@@ -50,7 +50,7 @@ class ExploreFragmentLifecycleTest {
         val adapter = repoFile("app/src/main/java/io/legado/app/ui/main/explore/ExploreAdapter.kt").readText()
 
         assertTrue(viewModel.contains("suspend fun sortDiscoverSources"))
-        assertTrue(viewModel.contains("DiscoverSourceSorter.sort"))
+        assertTrue(viewModel.contains("BookSourcePrioritySorter.sortByPriority(list)"))
         assertTrue(viewModel.contains("DiscoverSourceUseConfig.addUse"))
         assertTrue(fragment.contains("val sortedList = viewModel.sortDiscoverSources(list)"))
         assertTrue(fragment.contains("val sortedList = viewModel.sortDiscoverSources(it)"))
