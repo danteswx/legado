@@ -10,6 +10,9 @@ import io.legado.app.ui.browser.WebViewActivity
 import io.legado.app.utils.isMainThread
 import io.legado.app.utils.startActivity
 import splitties.init.appCtx
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.LockSupport
 import kotlin.time.Duration.Companion.minutes
 
@@ -19,6 +22,16 @@ import kotlin.time.Duration.Companion.minutes
 object SourceVerificationHelp {
 
     private val waitTime = 1.minutes.inWholeNanoseconds
+    private val browserVerificationStates = ConcurrentHashMap<String, BrowserVerificationState>()
+    private val singleVerificationLock = Any()
+
+    private class BrowserVerificationState {
+        val latch = CountDownLatch(1)
+        @Volatile
+        var result: Pair<String, String>? = null
+        @Volatile
+        var error: Throwable? = null
+    }
 
     private fun getVerificationResultKey(source: BaseSource) =
         getVerificationResultKey(source.getKey())
@@ -29,20 +42,58 @@ object SourceVerificationHelp {
      * 获取书源验证结果
      * 图片验证码 防爬 滑动验证码 点击字符 等等
      */
-    @Synchronized
     fun getVerificationResult(
         source: BaseSource?,
         url: String,
         title: String,
         useBrowser: Boolean,
         refetchAfterSuccess: Boolean = true,
-        html: String? = null
+        html: String? = null,
+        refetchAfterSharedVerification: ((String) -> Pair<String, String>)? = null
     ): Pair<String, String> {
         source
             ?: throw NoStackTraceException("getVerificationResult parameter source cannot be null")
         require(url.length < 64 * 1024) { "getVerificationResult parameter url too long" }
         check(!isMainThread) { "getVerificationResult must be called on a background thread" }
 
+        val shareBrowserVerification = useBrowser && refetchAfterSuccess && html == null
+        if (!shareBrowserVerification) {
+            return synchronized(singleVerificationLock) {
+                performVerification(source, url, title, useBrowser, refetchAfterSuccess, html)
+            }
+        }
+
+        val ownerState = BrowserVerificationState()
+        val activeState = browserVerificationStates.putIfAbsent(source.getKey(), ownerState)
+        if (activeState != null) {
+            return waitForSharedBrowserVerification(
+                source, url, activeState, refetchAfterSharedVerification
+            )
+        }
+
+        try {
+            val result = synchronized(singleVerificationLock) {
+                performVerification(source, url, title, useBrowser, refetchAfterSuccess, html)
+            }
+            ownerState.result = result
+            return result
+        } catch (e: Throwable) {
+            ownerState.error = e
+            throw e
+        } finally {
+            ownerState.latch.countDown()
+            browserVerificationStates.remove(source.getKey(), ownerState)
+        }
+    }
+
+    private fun performVerification(
+        source: BaseSource,
+        url: String,
+        title: String,
+        useBrowser: Boolean,
+        refetchAfterSuccess: Boolean,
+        html: String?
+    ): Pair<String, String> {
         clearResult(source.getKey())
 
         if (!useBrowser) {
@@ -69,6 +120,31 @@ object SourceVerificationHelp {
         clearResult(source.getKey())
         if (result.second.isEmpty()) throw NoStackTraceException("验证结果为空")
         return result
+    }
+
+    private fun waitForSharedBrowserVerification(
+        source: BaseSource,
+        url: String,
+        activeState: BrowserVerificationState,
+        refetchAfterSharedVerification: ((String) -> Pair<String, String>)?
+    ): Pair<String, String> {
+        var waitUserInput = false
+        while (activeState.latch.count > 0) {
+            if (!waitUserInput) {
+                AppLog.putDebug("${source.getTag()} waiting for shared browser verification result...")
+                waitUserInput = true
+            }
+            activeState.latch.await(waitTime, TimeUnit.NANOSECONDS)
+        }
+        activeState.error?.let { throw it }
+        val result = activeState.result ?: throw NoStackTraceException("verification result is empty")
+        if (result.second.isEmpty()) throw NoStackTraceException("verification result is empty")
+        if (result.first == url || refetchAfterSharedVerification == null) {
+            return result
+        }
+        return refetchAfterSharedVerification(url).also {
+            if (it.second.isEmpty()) throw NoStackTraceException("verification result is empty")
+        }
     }
 
     /**

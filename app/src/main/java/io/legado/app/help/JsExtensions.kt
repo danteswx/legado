@@ -341,8 +341,19 @@ interface JsExtensions : JsEncodeUtils {
 
     fun startBrowserAwait(url: String, title: String, refetchAfterSuccess: Boolean, html: String?): StrResponse {
         rhinoContext.ensureActive()
+        val analyzeUrl = this as? AnalyzeUrl
         val pair = SourceVerificationHelp.getVerificationResult(
-            getSource(), url, title, true, refetchAfterSuccess, html
+            getSource(), url, title, true, refetchAfterSuccess, html,
+            refetchAfterSharedVerification = { refetchUrl ->
+                val response = runBlocking(context) {
+                    AnalyzeUrl(refetchUrl,
+                        headerMapF = analyzeUrl?.headerMap,
+                        source = getSource(),
+                        coroutineContext = context
+                    ).getStrResponseAwait(useWebView = false, skipRateLimit = true)
+                }
+                response.url to (response.body ?: "")
+            }
         )
         val (url2, body) = pair
         return StrResponse(url2.ifEmpty { url }, body)

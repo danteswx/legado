@@ -8,6 +8,16 @@ import java.io.File
 class BookSourceConfigTest {
 
     @Test
+    fun shareBookSourceJsonIsUtf8WithoutBom() {
+        val bytes = repoFile("tests/shareBookSource.json").readBytes()
+
+        assertFalse(
+            "shareBookSource.json should not start with UTF-8 BOM because the app import path treats it as invalid",
+            bytes.take(3).toByteArray().contentEquals(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()))
+        )
+    }
+
+    @Test
     fun uaaSourceDetectsCloudflareAndOpensBrowserVerification() {
         val sourceText = repoFile("tests/shareBookSource.json").readText()
         val uaaSource = sourceObject(sourceText, """"bookSourceUrl": "https://www.uaa.com"""")
@@ -17,7 +27,7 @@ class BookSourceConfigTest {
         assertTrue(uaaSource.contains(""""concurrentRate": "1/3000""""))
         assertFalse("UAA loginCheckJs should not be blank", loginCheckJs.isBlank())
         assertTrue(loginCheckJs.contains("startBrowserAwait"))
-        assertTrue(loginCheckJs.contains("source.getKey()"))
+        assertFalse(loginCheckJs.contains("removeCookie"))
         assertTrue(loginCheckJs.contains("cf-mitigated"))
         assertTrue(loginCheckJs.contains("_cf_chl_opt"))
         assertTrue(loginCheckJs.contains("cf_chl"))
