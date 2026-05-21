@@ -19,12 +19,15 @@ import androidx.annotation.MenuRes
 import androidx.core.content.ContextCompat
 import io.legado.app.R
 import io.legado.app.lib.theme.UiCorner
+import io.legado.app.lib.theme.accentColor
+import io.legado.app.utils.ColorUtils
 import io.legado.app.utils.dpToPx
 
 object ModernActionPopup {
 
     data class Action(
         val title: String,
+        val checked: Boolean = false,
         val invoke: () -> Unit
     )
 
@@ -71,7 +74,7 @@ object ModernActionPopup {
         for (index in 0 until popupMenu.menu.size()) {
             val item = popupMenu.menu.getItem(index)
             if (item.isVisible) {
-                actions.add(Action(item.title.toString()) { onClick(item) })
+                actions.add(Action(item.title.toString(), checked = item.isChecked) { onClick(item) })
             }
         }
         return show(anchor, actions, previousPopup)
@@ -118,18 +121,20 @@ object ModernActionPopup {
         textColor: Int,
         dismiss: () -> Unit
     ): TextView {
+        val selectedHoverColor = ColorUtils.adjustAlpha(context.accentColor, 0.18f)
         return TextView(context).apply {
             text = action.title
             gravity = Gravity.CENTER_VERTICAL
             minWidth = 132.dpToPx()
             minHeight = 42.dpToPx()
+            isSelected = action.checked
             setTextColor(textColor)
             textSize = 14f
             includeFontPadding = false
             setPadding(16.dpToPx(), 0, 16.dpToPx(), 0)
             background = UiCorner.actionSelector(
-                Color.TRANSPARENT,
-                ContextCompat.getColor(context, R.color.background_menu),
+                if (action.checked) selectedHoverColor else Color.TRANSPARENT,
+                if (action.checked) selectedHoverColor else ContextCompat.getColor(context, R.color.background_menu),
                 UiCorner.actionRadius(context)
             )
             setOnClickListener {
