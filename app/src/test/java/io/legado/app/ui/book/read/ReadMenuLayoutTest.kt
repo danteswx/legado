@@ -88,6 +88,22 @@ class ReadMenuLayoutTest {
     }
 
     @Test
+    fun mainBottomNavigationSelectedLabelUsesWhiteOnThemeIndicator() {
+        val bottomNavigationView = repoFile(
+            "app/src/main/java/io/legado/app/lib/theme/view/ThemeBottomNavigationVIew.kt"
+        ).readText()
+        val colorStateList = bottomNavigationView.substringAfter("fun createThemeColorStateList(): ColorStateList")
+            .substringBefore("fun restoreThemeIconTint()")
+
+        assertTrue(colorStateList.contains("val textColor = if (AppConfig.isNightTheme) Color.WHITE else Color.BLACK"))
+        assertTrue(colorStateList.contains(".setDefaultColor(textColor)"))
+        assertTrue(colorStateList.contains(".setSelectedColor(Color.WHITE)"))
+        assertFalse(colorStateList.contains("ThemeStore.accentColor(context)"))
+        assertFalse(colorStateList.contains("getSecondaryTextColor"))
+        assertFalse(colorStateList.contains("ColorUtils.isColorLight"))
+    }
+
+    @Test
     fun mainBottomNavigationSelectionKeepsOutlineIconAndUsesReaderLabelAnimation() {
         val mainLayout = parseXml(repoFile("app/src/main/res/layout/activity_main.xml"))
         val mainActivity = repoFile("app/src/main/java/io/legado/app/ui/main/MainActivity.kt").readText()

@@ -10,13 +10,10 @@ import android.widget.FrameLayout
 import androidx.core.view.ViewCompat
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import io.legado.app.databinding.ViewNavigationBadgeBinding
+import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.Selector
-import io.legado.app.lib.theme.ThemeStore
-import io.legado.app.lib.theme.bottomBackground
-import io.legado.app.lib.theme.getSecondaryTextColor
 import io.legado.app.lib.theme.transparentNavBar
 import io.legado.app.ui.widget.text.BadgeView
-import io.legado.app.utils.ColorUtils
 import io.legado.app.lib.theme.elevation
 import androidx.core.graphics.drawable.toDrawable
 
@@ -42,13 +39,10 @@ class ThemeBottomNavigationVIew(context: Context, attrs: AttributeSet) :
     }
 
     fun createThemeColorStateList(): ColorStateList {
-        val bgColor = context.bottomBackground
-        val selectedColor = ThemeStore.accentColor(context)
-        val textIsDark = ColorUtils.isColorLight(bgColor)
-        val textColor = context.getSecondaryTextColor(textIsDark)
+        val textColor = if (AppConfig.isNightTheme) Color.WHITE else Color.BLACK
         return Selector.colorBuild()
             .setDefaultColor(textColor)
-            .setSelectedColor(selectedColor)
+            .setSelectedColor(Color.WHITE)
             .create()
     }
 
