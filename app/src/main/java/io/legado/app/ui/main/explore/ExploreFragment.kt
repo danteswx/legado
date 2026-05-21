@@ -1386,7 +1386,8 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 if (!isAdded || requestVersion != discoverRequestVersion || url != discoverCurrentUrl) {
                     return@launch
                 }
-                if (newBooks.isEmpty()) {
+                val appendBooks = filterDiscoverBooksForAppend(newBooks)
+                if (appendBooks.isEmpty()) {
                     discoverHasMore = false
                     if (discoverBooks.isEmpty()) {
                         binding.tvDiscoverEmpty.text = getString(R.string.explore_empty)
@@ -1394,14 +1395,14 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     }
                 } else {
                     withContext(IO) {
-                        appDb.searchBookDao.insert(*newBooks.toTypedArray())
+                        appDb.searchBookDao.insert(*appendBooks.toTypedArray())
                     }
                     val oldBookCount = discoverBooks.size
                     val oldAdapterItemCount = discoverBookAdapter.getActualItemCount()
                     discoverPage += 1
-                    discoverBooks.addAll(newBooks)
+                    discoverBooks.addAll(appendBooks)
                     if (!reset && oldAdapterItemCount == oldBookCount && oldAdapterItemCount > 0) {
-                        discoverBookAdapter.addItems(newBooks)
+                        discoverBookAdapter.addItems(appendBooks)
                     } else {
                         discoverBookAdapter.setItems(discoverBooks.toList())
                         restoreDiscoverScrollIfNeeded()
@@ -1429,6 +1430,33 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 }
             }
         }
+    }
+
+    private fun filterDiscoverBooksForAppend(newBooks: List<SearchBook>): List<SearchBook> {
+        val seenBookUrls = discoverBooks.mapTo(hashSetOf()) { it.bookUrl }
+        return newBooks.filter { book ->
+            book.bookUrl.isNotBlank()
+                    && book.name.isNotBlank()
+                    && !isDiscoverNavigationBook(book)
+                    && seenBookUrls.add(book.bookUrl)
+        }
+    }
+
+    private fun isDiscoverNavigationBook(book: SearchBook): Boolean {
+        val normalizedName = book.name.trim().lowercase()
+        val navigationNames = setOf(
+            "next",
+            "next page",
+            "more",
+            ">",
+            ">>",
+            "\u00bb",
+            "\u4e0b\u4e00\u9875",
+            "\u4e0b\u4e00\u9801",
+            "\u4e0b\u9875",
+            "\u4e0b\u9801"
+        )
+        return normalizedName in navigationNames
     }
 
     private fun initRecyclerView() {

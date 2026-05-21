@@ -60,6 +60,32 @@ class ExploreFragmentLifecycleTest {
         assertTrue(adapter.contains("callBack.recordSourceUse(it)"))
     }
 
+    @Test
+    fun modernDiscoveryFiltersNavigationItemsBeforeAppendingNextPage() {
+        val source = repoFile("app/src/main/java/io/legado/app/ui/main/explore/ExploreFragment.kt").readText()
+        val loadBlock = source.substringAfter("private fun loadDiscoverBooks(reset: Boolean)")
+            .substringBefore("private fun initRecyclerView()")
+        val filterBlock = source.substringAfter("private fun filterDiscoverBooksForAppend(")
+            .substringBefore("private fun isDiscoverNavigationBook(")
+        val navigationBlock = source.substringAfter("private fun isDiscoverNavigationBook(")
+            .substringBefore("private fun initRecyclerView()")
+
+        assertTrue(source.contains("private fun filterDiscoverBooksForAppend(newBooks: List<SearchBook>): List<SearchBook>"))
+        assertTrue(source.contains("private fun isDiscoverNavigationBook(book: SearchBook): Boolean"))
+        assertTrue(loadBlock.contains("val appendBooks = filterDiscoverBooksForAppend(newBooks)"))
+        assertTrue(loadBlock.contains("if (appendBooks.isEmpty())"))
+        assertTrue(loadBlock.contains("appDb.searchBookDao.insert(*appendBooks.toTypedArray())"))
+        assertTrue(loadBlock.contains("discoverBooks.addAll(appendBooks)"))
+        assertTrue(loadBlock.contains("discoverBookAdapter.addItems(appendBooks)"))
+        assertFalse(loadBlock.contains("discoverBookAdapter.addItems(newBooks)"))
+        assertTrue(filterBlock.contains("seenBookUrls.add(book.bookUrl)"))
+        assertTrue(filterBlock.contains("book.bookUrl.isNotBlank()"))
+        assertTrue(filterBlock.contains("!isDiscoverNavigationBook(book)"))
+        assertTrue(navigationBlock.contains("next"))
+        assertTrue(navigationBlock.contains("\\u4e0b\\u4e00\\u9875"))
+        assertTrue(navigationBlock.contains("normalizedName in navigationNames"))
+    }
+
     private fun repoFile(relativePath: String): File {
         return generateSequence(File("").absoluteFile) { it.parentFile }
             .map { File(it, relativePath) }
