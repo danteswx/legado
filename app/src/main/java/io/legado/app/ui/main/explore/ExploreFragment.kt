@@ -1396,10 +1396,16 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                     withContext(IO) {
                         appDb.searchBookDao.insert(*newBooks.toTypedArray())
                     }
+                    val oldBookCount = discoverBooks.size
+                    val oldAdapterItemCount = discoverBookAdapter.getActualItemCount()
                     discoverPage += 1
                     discoverBooks.addAll(newBooks)
-                    discoverBookAdapter.setItems(discoverBooks.toList())
-                    restoreDiscoverScrollIfNeeded()
+                    if (!reset && oldAdapterItemCount == oldBookCount && oldAdapterItemCount > 0) {
+                        discoverBookAdapter.addItems(newBooks)
+                    } else {
+                        discoverBookAdapter.setItems(discoverBooks.toList())
+                        restoreDiscoverScrollIfNeeded()
+                    }
                     binding.tvDiscoverEmpty.gone()
                 }
             } catch (_: CancellationException) {

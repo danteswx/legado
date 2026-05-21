@@ -140,7 +140,13 @@ class ExploreShowActivity : VMBaseActivity<ActivityExploreShowBinding, ExploreSh
         } else if (adapter.getActualItemCount() == books.size) {
             loadMoreView.noMore()
         } else {
-            adapter.setItems(books)
+            val oldItemCount = adapter.getActualItemCount()
+            val appendedBooks = books.drop(oldItemCount)
+            if (!isClearAll && oldItemCount > 0 && appendedBooks.isNotEmpty()) {
+                adapter.addItems(appendedBooks)
+            } else {
+                adapter.setItems(books)
+            }
             if (isClearAll) { //全清空后,加了头,位置下移一个
                 val layoutManager = binding.recyclerView.layoutManager as LinearLayoutManager
                 layoutManager.scrollToPositionWithOffset(1, 0)
