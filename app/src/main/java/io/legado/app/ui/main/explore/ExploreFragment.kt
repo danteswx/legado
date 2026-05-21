@@ -174,6 +174,11 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         private const val DISCOVER_GRID_COLUMNS_MAX = 7
     }
 
+    private data class DiscoverScrollAnchor(
+        val position: Int,
+        val offset: Int
+    )
+
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         setSupportToolbar(binding.titleBar.toolbar)
         usingModernDiscovery = AppConfig.modernDiscoveryPage
@@ -1398,15 +1403,8 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                         appDb.searchBookDao.insert(*appendBooks.toTypedArray())
                     }
                     val oldBookCount = discoverBooks.size
-                    val oldAdapterItemCount = discoverBookAdapter.getActualItemCount()
                     discoverPage += 1
-                    discoverBooks.addAll(appendBooks)
-                    if (!reset && oldAdapterItemCount == oldBookCount && oldAdapterItemCount > 0) {
-                        discoverBookAdapter.addItems(appendBooks)
-                    } else {
-                        discoverBookAdapter.setItems(discoverBooks.toList())
-                        restoreDiscoverScrollIfNeeded()
-                    }
+                    appendDiscoverBooks(reset, oldBookCount, appendBooks)
                     binding.tvDiscoverEmpty.gone()
                 }
             } catch (_: CancellationException) {
@@ -1430,6 +1428,35 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 }
             }
         }
+    }
+
+    private fun appendDiscoverBooks(reset: Boolean, oldBookCount: Int, appendBooks: List<SearchBook>) {
+        val oldAdapterItemCount = discoverBookAdapter.getActualItemCount()
+        discoverBooks.addAll(appendBooks)
+        when {
+            reset || oldAdapterItemCount != oldBookCount || oldAdapterItemCount <= 0 -> {
+                discoverBookAdapter.setItems(discoverBooks.toList())
+                restoreDiscoverScrollIfNeeded()
+            }
+
+            shouldRefreshDiscoverAppendForGrid(reset, oldBookCount) -> {
+                val anchor = captureDiscoverScrollAnchor()
+                discoverBookAdapter.setItems(discoverBooks.toList())
+                restoreDiscoverScrollAnchor(anchor)
+            }
+
+            else -> {
+                discoverBookAdapter.addItems(appendBooks)
+            }
+        }
+    }
+
+    private fun shouldRefreshDiscoverAppendForGrid(reset: Boolean, oldBookCount: Int): Boolean {
+        return !reset &&
+            oldBookCount > 0 &&
+            AppConfig.modernDiscoveryGridColumns > 1 &&
+            normalizeDiscoverBookLayout(AppConfig.modernDiscoveryLayout) == DISCOVER_LAYOUT_GRID &&
+            oldBookCount % AppConfig.modernDiscoveryGridColumns != 0
     }
 
     private fun filterDiscoverBooksForAppend(newBooks: List<SearchBook>): List<SearchBook> {
@@ -1571,6 +1598,26 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
                 ?.scrollToPositionWithOffset(position, viewModel.scrollOffset)
             viewModel.scrollPosition = RecyclerView.NO_POSITION
             viewModel.scrollOffset = 0
+        }
+    }
+
+    private fun captureDiscoverScrollAnchor(): DiscoverScrollAnchor? {
+        val layoutManager = binding.rvDiscoverBooks.layoutManager as? LinearLayoutManager ?: return null
+        val position = layoutManager.findFirstVisibleItemPosition()
+        if (position == RecyclerView.NO_POSITION) {
+            return null
+        }
+        return DiscoverScrollAnchor(
+            position = position,
+            offset = layoutManager.findViewByPosition(position)?.top ?: 0
+        )
+    }
+
+    private fun restoreDiscoverScrollAnchor(anchor: DiscoverScrollAnchor?) {
+        anchor ?: return
+        binding.rvDiscoverBooks.post {
+            (binding.rvDiscoverBooks.layoutManager as? LinearLayoutManager)
+                ?.scrollToPositionWithOffset(anchor.position, anchor.offset)
         }
     }
 

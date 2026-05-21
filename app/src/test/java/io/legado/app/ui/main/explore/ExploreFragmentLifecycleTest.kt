@@ -76,7 +76,7 @@ class ExploreFragmentLifecycleTest {
         assertTrue(loadBlock.contains("if (appendBooks.isEmpty())"))
         assertTrue(loadBlock.contains("appDb.searchBookDao.insert(*appendBooks.toTypedArray())"))
         assertTrue(loadBlock.contains("discoverBooks.addAll(appendBooks)"))
-        assertTrue(loadBlock.contains("discoverBookAdapter.addItems(appendBooks)"))
+        assertTrue(loadBlock.contains("appendDiscoverBooks(reset, oldBookCount, appendBooks)"))
         assertFalse(loadBlock.contains("discoverBookAdapter.addItems(newBooks)"))
         assertTrue(filterBlock.contains("seenBookUrls.add(book.bookUrl)"))
         assertTrue(filterBlock.contains("book.bookUrl.isNotBlank()"))
@@ -84,6 +84,24 @@ class ExploreFragmentLifecycleTest {
         assertTrue(navigationBlock.contains("next"))
         assertTrue(navigationBlock.contains("\\u4e0b\\u4e00\\u9875"))
         assertTrue(navigationBlock.contains("normalizedName in navigationNames"))
+    }
+
+    @Test
+    fun modernDiscoveryRefreshesIncompleteGridRowWhenAppendingNextPage() {
+        val source = repoFile("app/src/main/java/io/legado/app/ui/main/explore/ExploreFragment.kt").readText()
+        val appendBlock = source.substringAfter("private fun appendDiscoverBooks(")
+            .substringBefore("private fun shouldRefreshDiscoverAppendForGrid")
+        val refreshBlock = source.substringAfter("private fun shouldRefreshDiscoverAppendForGrid(")
+            .substringBefore("private fun filterDiscoverBooksForAppend(")
+
+        assertTrue(source.contains("private fun appendDiscoverBooks(reset: Boolean, oldBookCount: Int, appendBooks: List<SearchBook>)"))
+        assertTrue(source.contains("private fun shouldRefreshDiscoverAppendForGrid(reset: Boolean, oldBookCount: Int): Boolean"))
+        assertTrue(appendBlock.contains("val anchor = captureDiscoverScrollAnchor()"))
+        assertTrue(appendBlock.contains("discoverBookAdapter.setItems(discoverBooks.toList())"))
+        assertTrue(appendBlock.contains("restoreDiscoverScrollAnchor(anchor)"))
+        assertTrue(appendBlock.contains("discoverBookAdapter.addItems(appendBooks)"))
+        assertTrue(refreshBlock.contains("normalizeDiscoverBookLayout(AppConfig.modernDiscoveryLayout) == DISCOVER_LAYOUT_GRID"))
+        assertTrue(refreshBlock.contains("oldBookCount % AppConfig.modernDiscoveryGridColumns != 0"))
     }
 
     private fun repoFile(relativePath: String): File {

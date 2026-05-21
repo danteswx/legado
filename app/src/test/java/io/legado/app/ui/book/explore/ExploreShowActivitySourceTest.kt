@@ -28,9 +28,11 @@ class ExploreShowActivitySourceTest {
 
         assertTrue(loadBody.contains("val oldBookCount = discoverBooks.size"))
         assertTrue(loadBody.contains("val oldAdapterItemCount = discoverBookAdapter.getActualItemCount()"))
-        assertTrue(loadBody.contains("oldAdapterItemCount == oldBookCount"))
-        assertTrue(loadBody.contains("discoverBookAdapter.addItems(newBooks)"))
+        assertTrue(loadBody.contains("oldAdapterItemCount != oldBookCount"))
+        assertTrue(loadBody.contains("appendDiscoverBooks(reset, oldBookCount, appendBooks)"))
+        assertTrue(loadBody.contains("discoverBookAdapter.addItems(appendBooks)"))
         assertTrue(loadBody.contains("discoverBookAdapter.setItems(discoverBooks.toList())"))
+        assertTrue(loadBody.contains("restoreDiscoverScrollAnchor(anchor)"))
         assertFalse(loadBody.contains("discoverBooks.addAll(newBooks)\n                    discoverBookAdapter.setItems(discoverBooks.toList())"))
     }
 
