@@ -100,6 +100,36 @@ class BookSourceConfigTest {
         assertFalse("好色TV search should not stay on first page", searchUrl.contains("search.htm?search={{key}}&sort=new"))
     }
 
+    @Test
+    fun xmanSourceAddsNewMangaReleaseExploreCategory() {
+        val sourceText = repoFile("tests/shareBookSource.json").readText()
+        val xmanSource = sourceObject(sourceText, """"bookSourceUrl": "https://xman7.org"""")
+        val exploreUrl = fieldValue(xmanSource, "exploreUrl")
+        val bookListRule = fieldValue(xmanSource, "bookList")
+
+        assertTrue("禁漫 source should exist", xmanSource.isNotBlank())
+        assertTrue("禁漫 discover should include 新漫发布 category", exploreUrl.contains("新漫发布"))
+        assertTrue("禁漫 新漫发布 should point to /nm", exploreUrl.contains("https://xman7.org/nm"))
+        assertTrue("禁漫 explore parser should detect the /nm page", bookListRule.contains("/nm"))
+        assertTrue("禁漫 新漫发布 should parse only the second /nm section", bookListRule.contains("sections.get(1)"))
+        assertFalse("禁漫 explore parser should not depend on unavailable java.net.URL", bookListRule.contains("java.net.URL"))
+    }
+
+    @Test
+    fun xmanSourceCollectsEveryLazyChapterImage() {
+        val sourceText = repoFile("tests/shareBookSource.json").readText()
+        val xmanSource = sourceObject(sourceText, """"bookSourceUrl": "https://xman7.org"""")
+        val contentRule = fieldValue(xmanSource, "content")
+
+        assertTrue("Xman source should exist", xmanSource.isNotBlank())
+        assertTrue("Xman content should parse the chapter document", contentRule.contains("org.jsoup.Jsoup.parse(result)"))
+        assertTrue("Xman content should read lazy image URLs", contentRule.contains("data-original"))
+        assertTrue("Xman content should preserve all matching images", contentRule.contains("urls.push"))
+        assertTrue("Xman content should return image tags for every collected URL", contentRule.contains("urls.map(function(u)"))
+        assertTrue("Xman content should include image request headers", contentRule.contains("JSON.stringify(headers)"))
+        assertFalse("Xman content should not keep the old single XPath image rule", contentRule.contains("//body/div[2]/center[3]/div/img"))
+    }
+
     private fun repoFile(relativePath: String): File {
         return generateSequence(File("").absoluteFile) { it.parentFile }
             .map { File(it, relativePath) }
