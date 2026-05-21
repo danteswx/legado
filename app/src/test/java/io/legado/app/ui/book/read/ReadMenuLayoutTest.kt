@@ -1730,7 +1730,8 @@ class ReadMenuLayoutTest {
         assertTrue(mangaActivity.contains("ReadManga.moveToNextChapter(true)"))
         assertTrue(mangaActivity.contains("private fun updateMangaProgressMinimap(show: Boolean = binding.mangaMenu.isVisible)"))
         assertTrue(mangaActivity.contains("val imageUrls = currentMangaImageUrls()"))
-        assertTrue(mangaActivity.contains("binding.mangaProgressMinimap.updatePages(imageUrls, ReadManga.book?.origin, ReadManga.durChapterPos)"))
+        assertTrue(mangaActivity.contains("val progressRatio = currentMangaScrollProgressRatio()"))
+        assertTrue(mangaActivity.contains("binding.mangaProgressMinimap.updatePages(imageUrls, ReadManga.book?.origin, ReadManga.durChapterPos, progressRatio)"))
         assertTrue(mangaActivity.contains("binding.mangaProgressMinimapPanel.gone(!show || pageCount <= 1)"))
         assertTrue(mangaActivity.contains("private fun currentMangaImageUrls(): List<String>"))
         assertTrue(mangaActivity.contains("ReadManga.curMangaChapter?.pages?.filterIsInstance<MangaPage>()"))
@@ -1768,8 +1769,8 @@ class ReadMenuLayoutTest {
 
         assertTrue(minimapView.contains("var onProgressChanging: ((progressRatio: Float) -> Unit)? = null"))
         assertTrue(minimapView.contains("var onProgressChanged: ((progressRatio: Float) -> Unit)? = null"))
-        assertTrue(minimapView.contains("fun updatePages(imageUrls: List<String>, sourceOrigin: String?, progress: Int)"))
-        assertTrue(minimapView.contains("fun updateProgress(pageCount: Int, progress: Int)"))
+        assertTrue(minimapView.contains("fun updatePages(imageUrls: List<String>, sourceOrigin: String?, progress: Int, progressRatio: Float?)"))
+        assertTrue(minimapView.contains("fun updateProgress(pageCount: Int, progress: Int, progressRatio: Float?)"))
         assertTrue(minimapView.contains("fun setMaxAvailableHeight(maxHeightPx: Int)"))
         assertTrue(minimapView.contains("fun desiredHeightWithin(maxHeightPx: Int): Int"))
         assertTrue(minimapView.contains("private var maxAvailableHeightPx"))
@@ -1817,15 +1818,16 @@ class ReadMenuLayoutTest {
         val mangaActivity = repoFile("app/src/main/java/io/legado/app/ui/book/manga/ReadMangaActivity.kt").readText()
         val commitBody = mangaActivity.substringAfter("private fun commitMangaProgressMinimap(ratio: Float)")
             .substringBefore("private fun scrollToMangaProgress")
+        val reloadBody = mangaActivity.substringAfter("private fun reloadCommittedMangaProgressPage()")
+            .substringBefore("private fun reloadMangaProgressPageIfCurrent")
 
         assertTrue(commitBody.contains("scrollToMangaProgress(ratio, commit = true)"))
-        assertTrue(commitBody.contains("reloadCommittedMangaProgressPage(ratio)"))
-        assertTrue(mangaActivity.contains("private fun reloadCommittedMangaProgressPage(ratio: Float)"))
-        assertTrue(mangaActivity.contains("private fun targetMangaPageForProgress(ratio: Float): Int?"))
-        assertTrue(mangaActivity.contains("val targetPage = targetMangaPageForProgress(ratio) ?: return"))
+        assertTrue(commitBody.contains("reloadCommittedMangaProgressPage()"))
+        assertTrue(mangaActivity.contains("private fun reloadCommittedMangaProgressPage()"))
         assertTrue(mangaActivity.contains("val targetChapterIndex = ReadManga.durChapterIndex"))
+        assertTrue(mangaActivity.contains("val targetPage = ReadManga.durChapterPos"))
         assertTrue(
-            mangaActivity.contains(
+            reloadBody.contains(
                 "binding.recyclerView.post {\n" +
                         "            if (ReadManga.durChapterIndex != targetChapterIndex || ReadManga.durChapterPos != targetPage) {\n" +
                         "                return@post\n" +
@@ -1842,16 +1844,21 @@ class ReadMenuLayoutTest {
         val mangaActivity = repoFile("app/src/main/java/io/legado/app/ui/book/manga/ReadMangaActivity.kt").readText()
         val minimapView = repoFile("app/src/main/java/io/legado/app/ui/book/manga/MangaProgressMinimapView.kt").readText()
         val progressScrollBody = mangaActivity.substringAfter("private fun scrollToMangaProgress(ratio: Float, commit: Boolean)")
-            .substringBefore("private fun targetMangaPageForProgress")
+            .substringBefore("private fun fallbackMangaPageForProgress")
         val continuousScrollBody = mangaActivity.substringAfter("private fun scrollMangaBodyToProgressRatio(ratio: Float): Boolean")
             .substringBefore("private fun currentMangaScrollOffset")
-        val progressUpdateBody = mangaActivity.substringAfter("private fun upMangaProgressAfterScroll(index: Int, commit: Boolean)")
+        val progressUpdateBody = mangaActivity.substringAfter("private fun syncMangaProgressAfterScroll(commit: Boolean)")
             .substringBefore("private fun adapterPositionForMangaPage")
 
         assertTrue(minimapView.contains("fun clearPinnedProgressRatio()"))
         assertTrue(mangaActivity.contains("binding.mangaProgressMinimap.clearPinnedProgressRatio()"))
         assertTrue(progressScrollBody.contains("binding.recyclerView.stopScroll()"))
-        assertTrue(progressScrollBody.contains("if (!scrollMangaBodyToProgressRatio(ratio))"))
+        assertTrue(progressScrollBody.contains("val scrolled = scrollMangaBodyToProgressRatio(ratio)"))
+        assertTrue(progressScrollBody.contains("if (!scrolled)"))
+        assertTrue(progressScrollBody.contains("fallbackMangaPageForProgress(ratio)?.let(::scrollToMangaPageTop)"))
+        assertTrue(progressScrollBody.contains("syncMangaProgressAfterScroll(commit)"))
+        assertFalse(progressScrollBody.contains("val targetPage = targetMangaPageForProgress(ratio)"))
+        assertFalse(progressScrollBody.contains("upMangaProgressAfterScroll(targetPage, commit)"))
         assertFalse(progressScrollBody.contains("scrollToMangaPage(targetPage, commit)"))
         assertTrue(continuousScrollBody.contains("targetMangaScrollOffsetForProgress(ratio) ?: return false"))
         assertTrue(continuousScrollBody.contains("val delta = targetOffset - currentMangaScrollOffset()"))
@@ -1864,6 +1871,37 @@ class ReadMenuLayoutTest {
         assertFalse(progressScrollBody.contains("smoothScrollToPositionWithOffset"))
         assertTrue(progressUpdateBody.indexOf("ReadManga.curPageChanged()") > progressUpdateBody.indexOf("if (commit) {"))
         assertTrue(progressUpdateBody.indexOf("ReadManga.saveRead(true)") > progressUpdateBody.indexOf("if (commit) {"))
+    }
+
+    @Test
+    fun mangaProgressMinimapUsesRecyclerScrollRatioInsteadOfPageTicks() {
+        val mangaActivity = repoFile("app/src/main/java/io/legado/app/ui/book/manga/ReadMangaActivity.kt").readText()
+        val minimapView = repoFile("app/src/main/java/io/legado/app/ui/book/manga/MangaProgressMinimapView.kt").readText()
+        val webtoonRecyclerView = repoFile("app/src/main/java/io/legado/app/ui/book/manga/recyclerview/WebtoonRecyclerView.kt").readText()
+        val updateBody = mangaActivity.substringAfter("private fun updateMangaProgressMinimap(")
+            .substringBefore("private fun scheduleMangaProgressMinimapStableSync()")
+        val progressBody = minimapView.substringAfter("fun updateProgress(")
+            .substringBefore("override fun onAttachedToWindow()")
+        val ratioBody = minimapView.substringAfter("private fun progressRatio(): Float")
+            .substringBefore("private fun updateTrackRect()")
+        val onScrolledBody = webtoonRecyclerView.substringAfter("override fun onScrolled(dx: Int, dy: Int)")
+            .substringBefore("override fun onScrollStateChanged")
+
+        assertTrue(mangaActivity.contains("private fun currentMangaScrollProgressRatio(): Float?"))
+        assertTrue(updateBody.contains("val progressRatio = currentMangaScrollProgressRatio()"))
+        assertTrue(updateBody.contains("updatePages(imageUrls, ReadManga.book?.origin, ReadManga.durChapterPos, progressRatio)"))
+        assertTrue(updateBody.contains("updateProgress(pageCount, ReadManga.durChapterPos, progressRatio)"))
+        assertTrue(minimapView.contains("private var scrollProgressRatio: Float? = null"))
+        assertTrue(minimapView.contains("fun updatePages(imageUrls: List<String>, sourceOrigin: String?, progress: Int, progressRatio: Float?)"))
+        assertTrue(minimapView.contains("fun updateProgress(pageCount: Int, progress: Int, progressRatio: Float?)"))
+        assertTrue(progressBody.contains("val safeProgressRatio = progressRatio?.coerceIn(0f, 1f) ?: pageProgressRatio(safePageCount, safeProgress)"))
+        assertTrue(progressBody.contains("this.scrollProgressRatio = safeProgressRatio"))
+        assertTrue(ratioBody.contains("return scrollProgressRatio ?: pageProgressRatio(pageCount, progress)"))
+        assertFalse(ratioBody.contains("progress / (pageCount - 1).toFloat()"))
+        assertTrue(onScrolledBody.contains("if (position != NO_POSITION) {"))
+        assertTrue(onScrolledBody.contains("if (position != mLastCenterViewPosition)"))
+        assertTrue(onScrolledBody.contains("mPreScrollListener?.onPreScrollListener(this, dx, dy, position)"))
+        assertFalse(onScrolledBody.contains("position != NO_POSITION && position != mLastCenterViewPosition"))
     }
 
     @Test

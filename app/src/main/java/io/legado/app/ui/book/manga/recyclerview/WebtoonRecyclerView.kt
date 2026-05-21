@@ -66,8 +66,10 @@ class WebtoonRecyclerView @JvmOverloads constructor(
         firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition()
 
         val position = findCenterViewPosition()
-        if (position != NO_POSITION && position != mLastCenterViewPosition) {
-            mLastCenterViewPosition = position
+        if (position != NO_POSITION) {
+            if (position != mLastCenterViewPosition) {
+                mLastCenterViewPosition = position
+            }
             mPreScrollListener?.onPreScrollListener(this, dx, dy, position)
         }
     }

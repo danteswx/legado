@@ -22,6 +22,7 @@ import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.PagerSnapHelper
+import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.integration.recyclerview.RecyclerViewPreloader
 import com.bumptech.glide.request.target.Target.SIZE_ORIGINAL
@@ -272,7 +273,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                             ReadManga.moveToNextChapter()
                         } else if (ReadManga.durChapterIndex > item.chapterIndex) {
                             ReadManga.moveToPrevChapter()
-                        } else {
+                        } else if (ReadManga.durChapterPos != item.index) {
                             ReadManga.durChapterPos = item.index
                             ReadManga.curPageChanged()
                         }
@@ -475,10 +476,11 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     private fun updateMangaProgressMinimap(show: Boolean = binding.mangaMenu.isVisible) {
         val imageUrls = currentMangaImageUrls()
         val pageCount = imageUrls.size
+        val progressRatio = currentMangaScrollProgressRatio()
         if (show) {
-            binding.mangaProgressMinimap.updatePages(imageUrls, ReadManga.book?.origin, ReadManga.durChapterPos)
+            binding.mangaProgressMinimap.updatePages(imageUrls, ReadManga.book?.origin, ReadManga.durChapterPos, progressRatio)
         } else {
-            binding.mangaProgressMinimap.updateProgress(pageCount, ReadManga.durChapterPos)
+            binding.mangaProgressMinimap.updateProgress(pageCount, ReadManga.durChapterPos, progressRatio)
         }
         binding.mangaProgressMinimapPanel.gone(!show || pageCount <= 1)
         if (!show || pageCount <= 1) {
@@ -600,23 +602,23 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
 
     private fun commitMangaProgressMinimap(ratio: Float) {
         scrollToMangaProgress(ratio, commit = true)
-        reloadCommittedMangaProgressPage(ratio)
+        reloadCommittedMangaProgressPage()
         updateMangaProgressMinimap(show = true)
         binding.mangaProgressMinimap.pinProgressRatio(ratio)
     }
 
     private fun scrollToMangaProgress(ratio: Float, commit: Boolean) {
-        val targetPage = targetMangaPageForProgress(ratio) ?: return
         if (commit) {
             binding.recyclerView.stopScroll()
         }
-        if (!scrollMangaBodyToProgressRatio(ratio)) {
-            scrollToMangaPageTop(targetPage)
+        val scrolled = scrollMangaBodyToProgressRatio(ratio)
+        if (!scrolled) {
+            fallbackMangaPageForProgress(ratio)?.let(::scrollToMangaPageTop)
         }
-        upMangaProgressAfterScroll(targetPage, commit)
+        syncMangaProgressAfterScroll(commit)
     }
 
-    private fun targetMangaPageForProgress(ratio: Float): Int? {
+    private fun fallbackMangaPageForProgress(ratio: Float): Int? {
         val pageCount = currentMangaPageCount()
         if (pageCount <= 0) {
             return null
@@ -625,9 +627,9 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         return (ratio.coerceIn(0f, 1f) * maxPage).toInt().coerceIn(0, maxPage)
     }
 
-    private fun reloadCommittedMangaProgressPage(ratio: Float) {
-        val targetPage = targetMangaPageForProgress(ratio) ?: return
+    private fun reloadCommittedMangaProgressPage() {
         val targetChapterIndex = ReadManga.durChapterIndex
+        val targetPage = ReadManga.durChapterPos
         binding.recyclerView.post {
             if (ReadManga.durChapterIndex != targetChapterIndex || ReadManga.durChapterPos != targetPage) {
                 return@post
@@ -683,6 +685,16 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     }
 
     private fun targetMangaScrollOffsetForProgress(ratio: Float): Int? {
+        val maxScrollOffset = maxMangaScrollOffset() ?: return null
+        return (ratio.coerceIn(0f, 1f) * maxScrollOffset).roundToInt()
+    }
+
+    private fun currentMangaScrollProgressRatio(): Float? {
+        val maxScrollOffset = maxMangaScrollOffset() ?: return null
+        return currentMangaScrollOffset().toFloat() / maxScrollOffset
+    }
+
+    private fun maxMangaScrollOffset(): Int? {
         val scrollRange: Int
         val scrollExtent: Int
         if (mangaHorizontalScroll) {
@@ -693,10 +705,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             scrollExtent = binding.recyclerView.computeVerticalScrollExtent()
         }
         val maxScrollOffset = (scrollRange - scrollExtent).coerceAtLeast(0)
-        if (maxScrollOffset == 0) {
-            return null
-        }
-        return (ratio.coerceIn(0f, 1f) * maxScrollOffset).roundToInt()
+        return maxScrollOffset.takeIf { it > 0 }
     }
 
     private fun scrollToMangaPageTop(index: Int) {
@@ -712,23 +721,34 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         mLayoutManager.scrollToPositionWithOffset(itemPos, 0)
     }
 
-    private fun upMangaProgressAfterScroll(index: Int, commit: Boolean) {
-        val pageCount = currentMangaPageCount()
-        if (pageCount <= 0) {
-            return
-        }
-        val targetIndex = index.coerceIn(0, pageCount - 1)
-        val itemPos = adapterPositionForMangaPage(targetIndex)
-        if (itemPos <= -1) {
-            return
-        }
-        upInfoBar(mAdapter.getItem(itemPos))
-        ReadManga.durChapterPos = targetIndex
+    private fun syncMangaProgressAfterScroll(commit: Boolean) {
+        val currentPage = currentVisibleMangaPage() ?: return
+        upInfoBar(currentPage)
+        ReadManga.durChapterPos = currentPage.index
         updateMangaProgressMinimap()
         if (commit) {
             ReadManga.curPageChanged()
             ReadManga.saveRead(true)
         }
+    }
+
+    private fun currentVisibleMangaPage(): MangaPage? {
+        val centerPosition = binding.recyclerView.findCenterViewPosition()
+        (mAdapter.getItem(centerPosition) as? MangaPage)
+            ?.takeIf { it.chapterIndex == ReadManga.durChapterIndex }
+            ?.let { return it }
+
+        val firstVisiblePosition = mLayoutManager.findFirstVisibleItemPosition()
+        val lastVisiblePosition = mLayoutManager.findLastVisibleItemPosition()
+        if (firstVisiblePosition == RecyclerView.NO_POSITION ||
+            lastVisiblePosition == RecyclerView.NO_POSITION ||
+            firstVisiblePosition > lastVisiblePosition
+        ) {
+            return null
+        }
+        return (firstVisiblePosition..lastVisiblePosition).asSequence()
+            .mapNotNull { mAdapter.getItem(it) as? MangaPage }
+            .firstOrNull { it.chapterIndex == ReadManga.durChapterIndex }
     }
 
     private fun adapterPositionForMangaPage(index: Int): Int {

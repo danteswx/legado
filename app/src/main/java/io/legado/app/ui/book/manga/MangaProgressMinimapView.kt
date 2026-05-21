@@ -47,6 +47,7 @@ class MangaProgressMinimapView @JvmOverloads constructor(
 
     private var pageCount: Int = 0
     private var progress: Int = 0
+    private var scrollProgressRatio: Float? = null
     private var imageUrls: List<String> = emptyList()
     private var sourceOrigin: String? = null
     private val thumbnailDrawables = mutableMapOf<Int, Drawable>()
@@ -97,7 +98,7 @@ class MangaProgressMinimapView @JvmOverloads constructor(
         return isDragging || pinnedProgressRatio != null
     }
 
-    fun updatePages(imageUrls: List<String>, sourceOrigin: String?, progress: Int) {
+    fun updatePages(imageUrls: List<String>, sourceOrigin: String?, progress: Int, progressRatio: Float?) {
         val safeImageUrls = imageUrls.filter { it.isNotBlank() }
         val pagesChanged = this.imageUrls != safeImageUrls || this.sourceOrigin != sourceOrigin
         if (pagesChanged) {
@@ -106,27 +107,35 @@ class MangaProgressMinimapView @JvmOverloads constructor(
             this.sourceOrigin = sourceOrigin
             pinnedProgressRatio = null
         }
-        updateProgress(safeImageUrls.size, progress)
+        updateProgress(safeImageUrls.size, progress, progressRatio)
         if (pagesChanged) {
             maybeLoadThumbnails()
         }
     }
 
-    fun updateProgress(pageCount: Int, progress: Int) {
+    fun updateProgress(pageCount: Int, progress: Int, progressRatio: Float?) {
         val safePageCount = pageCount.coerceAtLeast(0)
         val safeProgress = progress.coerceIn(0, (safePageCount - 1).coerceAtLeast(0))
+        val safeProgressRatio = progressRatio?.coerceIn(0f, 1f)
+            ?: pageProgressRatio(safePageCount, safeProgress)
         val pageCountChanged = this.pageCount != safePageCount
         val progressChanged = this.progress != safeProgress
+        val progressRatioChanged = this.scrollProgressRatio != safeProgressRatio
         if (!isDragging && pinnedProgressRatio == null &&
-            (pageCountChanged || progressChanged)
+            (pageCountChanged || progressChanged || progressRatioChanged)
         ) {
             pinnedProgressRatio = null
         }
-        if (this.pageCount == safePageCount && this.progress == safeProgress && !isDragging) {
+        if (this.pageCount == safePageCount &&
+            this.progress == safeProgress &&
+            this.scrollProgressRatio == safeProgressRatio &&
+            !isDragging
+        ) {
             return
         }
         this.pageCount = safePageCount
         this.progress = safeProgress
+        this.scrollProgressRatio = safeProgressRatio
         if (pageCountChanged) {
             requestLayout()
         }
@@ -298,6 +307,10 @@ class MangaProgressMinimapView @JvmOverloads constructor(
     }
 
     private fun progressRatio(): Float {
+        return scrollProgressRatio ?: pageProgressRatio(pageCount, progress)
+    }
+
+    private fun pageProgressRatio(pageCount: Int, progress: Int): Float {
         return if (pageCount <= 1) 0f else progress / (pageCount - 1).toFloat()
     }
 
