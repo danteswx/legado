@@ -57,6 +57,7 @@ class MangaProgressMinimapView @JvmOverloads constructor(
     private var clearingThumbnailTargets = false
     private var dragRatio: Float? = null
     private var pinnedProgressRatio: Float? = null
+    private var dragThumbTouchOffset = 0f
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     private var dragStartY = 0f
     private var hasDragged = false
@@ -243,6 +244,7 @@ class MangaProgressMinimapView @JvmOverloads constructor(
         isPressed = false
         isDragging = false
         dragRatio = null
+        dragThumbTouchOffset = 0f
         dragStartY = 0f
         hasDragged = false
         invalidate()
@@ -258,6 +260,12 @@ class MangaProgressMinimapView @JvmOverloads constructor(
         val initialRatio = dragRatio ?: pinnedProgressRatio ?: progressRatio()
         val thumbTop = trackRect.top + travel * initialRatio.coerceIn(0f, 1f)
         val touchInsideThumb = isTouchInsideThumb(y, thumbTop, thumbHeight)
+        dragThumbTouchOffset = ProgressMinimapDragCalculator.dragTouchOffset(
+            touchInsideThumb,
+            y,
+            thumbTop,
+            thumbHeight
+        )
         dragStartY = y
         hasDragged = !touchInsideThumb
         pinnedProgressRatio = null
@@ -299,10 +307,13 @@ class MangaProgressMinimapView @JvmOverloads constructor(
         if (maxPage == 0 || trackRect.height() <= 0f) {
             return 0f
         }
-        return ProgressMinimapDragCalculator.ratioForTrackY(
+        val thumbHeight = thumbHeight(trackRect.height())
+        return ProgressMinimapDragCalculator.ratioForY(
             y,
+            dragThumbTouchOffset,
             trackRect.top,
-            trackRect.bottom
+            trackRect.bottom,
+            thumbHeight
         )
     }
 
