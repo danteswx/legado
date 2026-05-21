@@ -35,6 +35,18 @@ public final class ProgressMinimapDragCalculator {
         return coerce((thumbTop - trackTop) / travel, 0f, 1f);
     }
 
+    public static float ratioForTrackY(
+            float touchY,
+            float trackTop,
+            float trackBottom
+    ) {
+        float trackHeight = Math.max(0f, trackBottom - trackTop);
+        if (trackHeight <= 0f) {
+            return 0f;
+        }
+        return coerce((touchY - trackTop) / trackHeight, 0f, 1f);
+    }
+
     private static float coerce(float value, float min, float max) {
         if (max < min) {
             return min;

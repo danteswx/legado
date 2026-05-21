@@ -1594,8 +1594,8 @@ class ReadMenuLayoutTest {
         assertTrue(minimapView.contains("hasDragged = true"))
         assertTrue(minimapView.contains("val initialRatio = dragRatio ?: pinnedProgressRatio ?: progressRatio()"))
         assertTrue(minimapView.contains("private fun isTouchInsideThumb(y: Float, thumbTop: Float, thumbHeight: Float): Boolean"))
-        assertTrue(minimapView.contains("dragThumbTouchOffset = (y - thumbTop).coerceIn(0f, thumbHeight)"))
-        assertTrue(minimapView.contains("val thumbTop = (y - dragThumbTouchOffset)"))
+        assertTrue(minimapView.contains("ProgressMinimapDragCalculator.dragTouchOffset("))
+        assertTrue(minimapView.contains("ProgressMinimapDragCalculator.ratioForY("))
         assertFalse(minimapView.contains("finished: Boolean"))
         assertFalse(minimapView.contains("finished = false"))
         assertFalse(minimapView.contains("drawRoundRect"))
@@ -1793,7 +1793,7 @@ class ReadMenuLayoutTest {
         assertTrue(minimapView.contains("fun shouldPreservePanelPosition(): Boolean"))
         assertTrue(minimapView.contains("return isDragging || pinnedProgressRatio != null"))
         assertTrue(minimapView.contains("if (!isDragging && pinnedProgressRatio == null"))
-        assertTrue(minimapView.contains("private var dragThumbTouchOffset = 0f"))
+        assertFalse(minimapView.contains("private var dragThumbTouchOffset = 0f"))
         assertTrue(minimapView.contains("private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop"))
         assertTrue(minimapView.contains("private var hasDragged = false"))
         assertTrue(minimapView.contains("private fun beginDrag(y: Float)"))
@@ -1805,8 +1805,8 @@ class ReadMenuLayoutTest {
         assertTrue(minimapView.contains("private fun isTouchInsideThumb(y: Float, thumbTop: Float, thumbHeight: Float): Boolean"))
         assertTrue(minimapView.contains("pinnedProgressRatio = ratio"))
         assertTrue(minimapView.contains("dragRatio ?: pinnedProgressRatio ?: progressRatio()"))
-        assertTrue(minimapView.contains("dragThumbTouchOffset = (y - thumbTop).coerceIn(0f, thumbHeight)"))
-        assertTrue(minimapView.contains("val thumbTop = (y - dragThumbTouchOffset)"))
+        assertTrue(minimapView.contains("ProgressMinimapDragCalculator.ratioForTrackY("))
+        assertFalse(minimapView.contains("ProgressMinimapDragCalculator.dragTouchOffset("))
         assertTrue(minimapView.contains("onProgressChanging?.invoke(ratio)"))
         assertTrue(minimapView.contains("onProgressChanged?.invoke(ratio)"))
         assertTrue(minimapView.contains("drawPageStrip(canvas)"))
@@ -1902,6 +1902,20 @@ class ReadMenuLayoutTest {
         assertTrue(onScrolledBody.contains("if (position != mLastCenterViewPosition)"))
         assertTrue(onScrolledBody.contains("mPreScrollListener?.onPreScrollListener(this, dx, dy, position)"))
         assertFalse(onScrolledBody.contains("position != NO_POSITION && position != mLastCenterViewPosition"))
+    }
+
+    @Test
+    fun mangaProgressMinimapDragMapsWholeTrackToWholeBookProgress() {
+        val minimapView = repoFile("app/src/main/java/io/legado/app/ui/book/manga/MangaProgressMinimapView.kt").readText()
+        val ratioBody = minimapView.substringAfter("private fun ratioForY(y: Float): Float")
+            .substringBefore("private fun pageForRatio")
+        val beginDragBody = minimapView.substringAfter("private fun beginDrag(y: Float): Boolean")
+            .substringBefore("private fun isTouchInsideThumb")
+
+        assertTrue(ratioBody.contains("ProgressMinimapDragCalculator.ratioForTrackY("))
+        assertFalse(ratioBody.contains("dragThumbTouchOffset"))
+        assertFalse(ratioBody.contains("thumbHeight"))
+        assertFalse(beginDragBody.contains("ProgressMinimapDragCalculator.dragTouchOffset"))
     }
 
     @Test

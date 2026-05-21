@@ -46,4 +46,16 @@ public class ProgressMinimapDragCalculatorTest {
 
         Assert.assertEquals(touchY - thumbTop, offset, 0f);
     }
+
+    @Test
+    public void trackRatioUsesWholeTrackInsteadOfThumbTravel() {
+        float trackTop = 100f;
+        float trackBottom = 500f;
+
+        Assert.assertEquals(0f, ProgressMinimapDragCalculator.ratioForTrackY(100f, trackTop, trackBottom), 0f);
+        Assert.assertEquals(0.5f, ProgressMinimapDragCalculator.ratioForTrackY(300f, trackTop, trackBottom), 0.0001f);
+        Assert.assertEquals(1f, ProgressMinimapDragCalculator.ratioForTrackY(500f, trackTop, trackBottom), 0f);
+        Assert.assertEquals(0f, ProgressMinimapDragCalculator.ratioForTrackY(40f, trackTop, trackBottom), 0f);
+        Assert.assertEquals(1f, ProgressMinimapDragCalculator.ratioForTrackY(560f, trackTop, trackBottom), 0f);
+    }
 }
