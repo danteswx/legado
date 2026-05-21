@@ -25,6 +25,24 @@ class GithubWorkflowSigningTest {
     }
 
     @Test
+    fun bookSourceSampleTestsAreNonBlocking() {
+        listOf(
+            ".github/workflows/test.yml",
+            ".github/workflows/release.yml"
+        ).forEach { workflowPath ->
+            val workflow = repoFile(workflowPath).readText()
+            val bookSourceStep = workflow
+                .substringAfter("- name: Run book source sample tests")
+                .substringBefore("script: |")
+
+            assertTrue(
+                "$workflowPath should keep book source sample test failures visible but non-blocking",
+                bookSourceStep.contains("continue-on-error: true")
+            )
+        }
+    }
+
+    @Test
     fun releaseWorkflowWritesGeneratedChangelogIntoBundledUpdateLogBeforeBuild() {
         val workflow = repoFile(".github/workflows/release.yml").readText()
         val buildJob = workflow.substringAfter("  build:")
