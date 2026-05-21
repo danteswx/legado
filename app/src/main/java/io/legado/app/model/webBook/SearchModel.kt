@@ -61,6 +61,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
             searchBooks.clear()
             bookSourceParts = callBack.getSearchScope().getBookSourceParts()
             if (bookSourceParts.isEmpty()) {
+                callBack.onSearchSourcesReset(emptyList())
                 callBack.onSearchCancel(NoStackTraceException("启用书源为空"))
                 return
             }
@@ -86,26 +87,17 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
             .substringBeforeLast("@")
             .trim()
         var hasMore = false
+        callBack.onSearchSourcesReset(bookSourceParts)
         searchJob = scope.launch(searchPool!!) {
             flow {
                 for (bs in bookSourceParts) {
-                    bs.getBookSource()?.let {
-                        emit(it)
-                    }
+                    emit(bs)
                     workingState.first { it }
                 }
             }.onStart {
                 callBack.onSearchStart()
-            }.mapParallelSafe(threadCount) {
-                withTimeout(30000L) {
-                    WebBook.searchBookAwait(
-                        it, searchKey, searchPage,
-                        filter = { name, author, kind ->
-                            !precision || name.contains(matchKey) ||
-                                    author.contains(matchKey) ||
-                                    kind?.contains(matchKey) == true
-                        })
-                }
+            }.mapParallelSafe(threadCount) { sourcePart ->
+                searchSource(sourcePart, precision, matchKey)
             }.onEach { items ->
                 for (book in items) {
                     book.releaseHtmlData()
@@ -120,6 +112,41 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
             }.catch {
                 AppLog.put("书源搜索出错\n${it.localizedMessage}", it)
             }.collect()
+        }
+    }
+
+    private suspend fun searchSource(
+        sourcePart: BookSourcePart,
+        precision: Boolean,
+        matchKey: String
+    ): ArrayList<SearchBook> {
+        val source = sourcePart.getBookSource()
+        if (source == null) {
+            val throwable = NoStackTraceException("书源不存在")
+            callBack.onSearchSourceFailed(sourcePart, throwable)
+            return arrayListOf()
+        }
+        return kotlin.runCatching {
+            withTimeout(30000L) {
+                WebBook.searchBookAwait(
+                    source, searchKey, searchPage,
+                    filter = { name, author, kind ->
+                        !precision || name.contains(matchKey) ||
+                                author.contains(matchKey) ||
+                                kind?.contains(matchKey) == true
+                    })
+            }
+        }.onSuccess { items ->
+            if (items.isEmpty()) {
+                callBack.onSearchSourceEmpty(sourcePart)
+            } else {
+                callBack.onSearchSourceFound(sourcePart, items.size)
+            }
+        }.getOrElse { throwable ->
+            currentCoroutineContext().ensureActive()
+            AppLog.put("${sourcePart.bookSourceName}涔︽簮鎼滅储鍑洪敊\n${throwable.localizedMessage}", throwable)
+            callBack.onSearchSourceFailed(sourcePart, throwable)
+            arrayListOf()
         }
     }
 
@@ -229,6 +256,10 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
     interface CallBack {
         fun getSearchScope(): SearchScope
         fun onSearchStart()
+        fun onSearchSourcesReset(sources: List<BookSourcePart>)
+        fun onSearchSourceFound(source: BookSourcePart, resultCount: Int)
+        fun onSearchSourceEmpty(source: BookSourcePart)
+        fun onSearchSourceFailed(source: BookSourcePart, error: Throwable)
         fun onSearchSuccess(searchBooks: List<SearchBook>)
         fun onSearchFinish(isEmpty: Boolean, hasMore: Boolean)
         fun onSearchCancel(exception: Throwable? = null)

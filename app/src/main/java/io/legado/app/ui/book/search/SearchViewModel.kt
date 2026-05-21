@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppLog
 import io.legado.app.data.appDb
+import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.data.entities.SearchKeyword
 import io.legado.app.help.book.isNotShelf
@@ -29,9 +30,12 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
     val searchScope: SearchScope = SearchScope(AppConfig.searchScope)
     var searchFinishLiveData = MutableLiveData<Boolean>()
     var isSearchLiveData = MutableLiveData<Boolean>()
+    val searchSourceStatusLiveData = ConflateLiveData<List<SearchSourceStatus>>(250)
     var searchKey: String = ""
     var hasMore = true
     private var searchID = 0L
+    private val sourceStatusLock = Any()
+    private val sourceStatuses = linkedMapOf<String, SearchSourceStatus>()
     private val searchModel = SearchModel(viewModelScope, object : SearchModel.CallBack {
 
         override fun getSearchScope(): SearchScope {
@@ -40,6 +44,46 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
 
         override fun onSearchStart() {
             isSearchLiveData.postValue(true)
+        }
+
+        override fun onSearchSourcesReset(sources: List<BookSourcePart>) {
+            val snapshot = synchronized(sourceStatusLock) {
+                sourceStatuses.clear()
+                sources.forEach { source ->
+                    sourceStatuses[source.bookSourceUrl] =
+                        source.toSearchSourceStatus(SearchSourceState.PENDING)
+                }
+                sourceStatuses.values.toList()
+            }
+            searchSourceStatusLiveData.postValue(snapshot)
+        }
+
+        override fun onSearchSourceFound(source: BookSourcePart, resultCount: Int) {
+            val snapshot = synchronized(sourceStatusLock) {
+                sourceStatuses[source.bookSourceUrl] = source.toSearchSourceStatus(SearchSourceState.FOUND, resultCount)
+                sourceStatuses.values.toList()
+            }
+            searchSourceStatusLiveData.postValue(snapshot)
+        }
+
+        override fun onSearchSourceEmpty(source: BookSourcePart) {
+            val snapshot = synchronized(sourceStatusLock) {
+                sourceStatuses[source.bookSourceUrl] =
+                    source.toSearchSourceStatus(SearchSourceState.EMPTY)
+                sourceStatuses.values.toList()
+            }
+            searchSourceStatusLiveData.postValue(snapshot)
+        }
+
+        override fun onSearchSourceFailed(source: BookSourcePart, error: Throwable) {
+            val snapshot = synchronized(sourceStatusLock) {
+                sourceStatuses[source.bookSourceUrl] = source.toSearchSourceStatus(
+                    SearchSourceState.FAILED,
+                    errorMessage = error.localizedMessage
+                )
+                sourceStatuses.values.toList()
+            }
+            searchSourceStatusLiveData.postValue(snapshot)
         }
 
         override fun onSearchSuccess(searchBooks: List<SearchBook>) {
@@ -116,6 +160,13 @@ class SearchViewModel(application: Application) : BaseViewModel(application) {
      */
     fun stop() {
         searchModel.cancelSearch()
+    }
+
+    fun clearSearchSourceStatuses() {
+        synchronized(sourceStatusLock) {
+            sourceStatuses.clear()
+        }
+        searchSourceStatusLiveData.postValue(emptyList())
     }
 
     fun pause() {

@@ -3,6 +3,7 @@ package io.legado.app.web.socket
 import fi.iki.elonen.NanoHTTPD
 import fi.iki.elonen.NanoWSD
 import io.legado.app.R
+import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.help.config.AppConfig
 import io.legado.app.model.webBook.SearchModel
@@ -83,6 +84,22 @@ class BookSearchWebSocket(handshakeRequest: NanoHTTPD.IHTTPSession) :
     override fun getSearchScope(): SearchScope = SearchScope(AppConfig.searchScope)
 
     override fun onSearchStart() {
+
+    }
+
+    override fun onSearchSourcesReset(sources: List<BookSourcePart>) {
+
+    }
+
+    override fun onSearchSourceFound(source: BookSourcePart, resultCount: Int) {
+
+    }
+
+    override fun onSearchSourceEmpty(source: BookSourcePart) {
+
+    }
+
+    override fun onSearchSourceFailed(source: BookSourcePart, error: Throwable) {
 
     }
 

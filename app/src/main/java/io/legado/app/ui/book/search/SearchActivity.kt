@@ -5,11 +5,14 @@ import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.text.TextUtils
+import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.View.GONE
 import android.view.View.VISIBLE
+import android.view.ViewGroup
 import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.activity.viewModels
@@ -23,6 +26,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.flexbox.FlexboxLayoutManager
+import com.google.android.flexbox.FlexboxLayout
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.AppLog
@@ -101,6 +105,9 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
     private var booksFlowJob: Job? = null
     private var modernMenuPopup: PopupWindow? = null
     private var isManualStopSearch = false
+    private var searchSourceStatusExpanded = false
+    private var lastSearchSourceStatuses: List<SearchSourceStatus> = emptyList()
+    private var pendingSourceResultJump: String? = null
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         initTopBar()
@@ -185,11 +192,30 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
             1.dpToPx(),
             strokeColor
         )
+        binding.llSourceStatusPanel.background = UiCorner.roundedStroke(
+            cardColor,
+            UiCorner.searchRadius(20f),
+            1.dpToPx(),
+            strokeColor
+        )
         binding.tvClearHistory.background = UiCorner.actionSelector(
             chipColor,
             chipPressedColor,
             UiCorner.searchRadius(14f)
         )
+        binding.tvSearchSourceStatusExpand.background = UiCorner.actionSelector(
+            Color.TRANSPARENT,
+            ColorUtils.adjustAlpha(accentColor, 0.16f),
+            UiCorner.searchRadius(12f)
+        )
+        binding.tvSearchSourceStatusTitle.setTextColor(primaryTextColor)
+        binding.tvSearchSourceStatusSummary.setTextColor(secondaryTextColor)
+        binding.tvSearchSourceStatusProgress.setTextColor(accentColor)
+        binding.tvSearchSourceStatusExpand.setTextColor(accentColor)
+        binding.tvSearchSourceStatusExpand.setOnClickListener {
+            searchSourceStatusExpanded = !searchSourceStatusExpanded
+            renderSearchSourceStatuses(lastSearchSourceStatuses)
+        }
         binding.btnMenu.setOnClickListener {
             showSearchMenu(it)
         }
@@ -277,6 +303,7 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
 
             override fun onQueryTextChange(newText: String): Boolean {
                 viewModel.stop()
+                viewModel.clearSearchSourceStatuses()
                 binding.fbStartStop.invisible()
                 searchView.findViewById<TextView>(androidx.appcompat.R.id.search_src_text)?.apply {
                     setTextColor(primaryTextColor)
@@ -378,6 +405,14 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
         }
         viewModel.searchBookLiveData.observe(this) {
             adapter.setItems(it)
+            pendingSourceResultJump?.let { sourceUrl ->
+                binding.recyclerView.post {
+                    scrollToSearchSourceResult(sourceUrl)
+                }
+            }
+        }
+        viewModel.searchSourceStatusLiveData.observe(this) {
+            renderSearchSourceStatuses(it)
         }
         lifecycleScope.launch {
             appDb.bookSourceDao.flowEnabledGroups().collect {
@@ -435,9 +470,131 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
         if (visible) {
             upHistory(searchView.query.toString())
             binding.llInputHelp.visibility = VISIBLE
+            binding.llSourceStatusPanel.gone()
         } else {
             binding.llInputHelp.visibility = GONE
+            renderSearchSourceStatuses(lastSearchSourceStatuses)
         }
+    }
+
+    private fun renderSearchSourceStatuses(statuses: List<SearchSourceStatus>) {
+        if (lastSearchSourceStatuses.map { it.sourceUrl } != statuses.map { it.sourceUrl }) {
+            searchSourceStatusExpanded = false
+        }
+        lastSearchSourceStatuses = statuses
+        if (statuses.isEmpty() || binding.llInputHelp.isVisible) {
+            binding.llSourceStatusPanel.gone()
+            return
+        }
+        val completedCount = statuses.count { it.state != SearchSourceState.PENDING }
+        val foundResultCount = statuses.sumOf { if (it.state == SearchSourceState.FOUND) it.resultCount else 0 }
+        val emptyCount = statuses.count { it.state == SearchSourceState.EMPTY }
+        val failedCount = statuses.count { it.state == SearchSourceState.FAILED }
+        val isSearching = viewModel.isSearchLiveData.value == true
+        binding.tvSearchSourceStatusTitle.text = if (isSearching) {
+            "正在检索书源..."
+        } else {
+            "书源搜索情况"
+        }
+        binding.tvSearchSourceStatusSummary.text = "找到 ${foundResultCount} 条 · 未搜到 ${emptyCount} 个 · 失败 ${failedCount} 个"
+        binding.tvSearchSourceStatusProgress.text = "$completedCount/${statuses.size}"
+        binding.tvSearchSourceStatusExpand.text = if (searchSourceStatusExpanded) "收起" else "展开"
+        binding.tvSearchSourceStatusExpand.isVisible = statuses.size > COLLAPSED_SOURCE_STATUS_CHIP_COUNT
+        binding.flSearchSourceStatuses.removeAllViews()
+
+        val visibleStatuses = if (searchSourceStatusExpanded) {
+            statuses
+        } else {
+            statuses.take(COLLAPSED_SOURCE_STATUS_CHIP_COUNT)
+        }
+        visibleStatuses.forEach { status ->
+            binding.flSearchSourceStatuses.addView(createSearchSourceStatusChip(status))
+        }
+        if (!searchSourceStatusExpanded && statuses.size > COLLAPSED_SOURCE_STATUS_CHIP_COUNT) {
+            val overflowCount = statuses.size - COLLAPSED_SOURCE_STATUS_CHIP_COUNT
+            binding.flSearchSourceStatuses.addView(
+                createSearchSourceStatusChip(statuses.last(), overflowCount)
+            )
+        }
+        binding.llSourceStatusPanel.visible()
+    }
+
+    private fun createSearchSourceStatusChip(status: SearchSourceStatus, overflowCount: Int? = null): TextView {
+        val chipColor = if (overflowCount != null) {
+            accentColor
+        } else {
+            searchSourceStatusColor(status.state)
+        }
+        val defaultAlpha = if (status.state == SearchSourceState.PENDING && overflowCount == null) 0.07f else 0.16f
+        val pressedAlpha = if (status.state == SearchSourceState.PENDING && overflowCount == null) 0.11f else 0.24f
+        return TextView(this).apply {
+            text = if (overflowCount != null) "+$overflowCount" else status.sourceName
+            contentDescription = if (overflowCount != null) {
+                "展开更多书源状态"
+            } else {
+                "${status.sourceName}，${searchSourceStatusText(status)}"
+            }
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            minHeight = 30.dpToPx()
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            setPadding(10.dpToPx(), 0, 10.dpToPx(), 0)
+            setTextColor(chipColor)
+            textSize = 13f
+            background = UiCorner.actionSelector(
+                ColorUtils.adjustAlpha(chipColor, defaultAlpha),
+                ColorUtils.adjustAlpha(chipColor, pressedAlpha),
+                UiCorner.searchRadius(8f)
+            )
+            layoutParams = FlexboxLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                30.dpToPx()
+            ).apply {
+                setMargins(0, 0, 8.dpToPx(), 8.dpToPx())
+            }
+            when {
+                overflowCount != null -> setOnClickListener {
+                    searchSourceStatusExpanded = true
+                    renderSearchSourceStatuses(lastSearchSourceStatuses)
+                }
+
+                status.state == SearchSourceState.FOUND -> setOnClickListener {
+                    scrollToSearchSourceResult(status.sourceUrl)
+                }
+            }
+        }
+    }
+
+    private fun searchSourceStatusColor(state: SearchSourceState): Int {
+        return when (state) {
+            SearchSourceState.FOUND -> accentColor
+            SearchSourceState.FAILED -> Color.rgb(229, 91, 91)
+            SearchSourceState.EMPTY -> secondaryTextColor
+            SearchSourceState.PENDING -> ColorUtils.adjustAlpha(primaryTextColor, 0.42f)
+        }
+    }
+
+    private fun searchSourceStatusText(status: SearchSourceStatus): String {
+        return when (status.state) {
+            SearchSourceState.FOUND -> "搜索到 ${status.resultCount} 条"
+            SearchSourceState.FAILED -> "搜索失败"
+            SearchSourceState.EMPTY -> "未搜索到"
+            SearchSourceState.PENDING -> "还没搜索"
+        }
+    }
+
+    private fun scrollToSearchSourceResult(sourceUrl: String) {
+        lastSearchSourceStatuses.firstOrNull { it.sourceUrl == sourceUrl } ?: return
+        val index = adapter.getItems().indexOfFirst { book ->
+            book.origin == sourceUrl || book.origins.any { it.substringBefore('\t') == sourceUrl }
+        }
+        if (index < 0) {
+            pendingSourceResultJump = sourceUrl
+            return
+        }
+        pendingSourceResultJump = null
+        binding.recyclerView.smoothScrollToPosition(index)
     }
 
     /**
@@ -675,6 +832,8 @@ class SearchActivity : VMBaseActivity<ActivityBookSearchBinding, SearchViewModel
     }
 
     companion object {
+
+        private const val COLLAPSED_SOURCE_STATUS_CHIP_COUNT = 12
 
         fun start(context: Context, key: String?, searchScope: String? = null) {
             context.startActivity<SearchActivity> {
