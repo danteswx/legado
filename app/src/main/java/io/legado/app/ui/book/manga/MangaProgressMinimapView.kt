@@ -85,6 +85,14 @@ class MangaProgressMinimapView @JvmOverloads constructor(
         invalidate()
     }
 
+    fun clearPinnedProgressRatio() {
+        if (pinnedProgressRatio == null) {
+            return
+        }
+        pinnedProgressRatio = null
+        invalidate()
+    }
+
     fun shouldPreservePanelPosition(): Boolean {
         return isDragging || pinnedProgressRatio != null
     }

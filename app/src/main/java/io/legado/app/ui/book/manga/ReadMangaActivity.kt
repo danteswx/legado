@@ -276,6 +276,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                             ReadManga.curPageChanged()
                         }
                         if (item is MangaPage) {
+                            binding.mangaProgressMinimap.clearPinnedProgressRatio()
                             updateMangaProgressMinimap()
                             binding.mangaMenu.upBookView()
                             upInfoBar(item)
@@ -664,10 +665,8 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         }
         if (commit) {
             binding.recyclerView.stopScroll()
-            mLayoutManager.scrollToPositionWithOffset(itemPos, 0)
-        } else {
-            mLayoutManager.smoothScrollToPositionWithOffset(itemPos, 0)
         }
+        mLayoutManager.scrollToPositionWithOffset(itemPos, 0)
         upInfoBar(mAdapter.getItem(itemPos))
         ReadManga.durChapterPos = targetIndex
         updateMangaProgressMinimap()
@@ -1036,6 +1035,9 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
 
     override fun upSystemUiVisibility(menuIsVisible: Boolean) {
         toggleSystemBar(menuIsVisible)
+        if (!menuIsVisible) {
+            binding.mangaProgressMinimap.clearPinnedProgressRatio()
+        }
         updateMangaProgressMinimap(menuIsVisible)
         if (menuIsVisible) {
             scheduleMangaProgressMinimapStableSync()
