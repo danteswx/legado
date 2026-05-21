@@ -173,6 +173,21 @@ class BookSourceConfigTest {
         assertFalse("Xman content should not keep the old single XPath image rule", contentRule.contains("//body/div[2]/center[3]/div/img"))
     }
 
+    @Test
+    fun jmcomicSourceBuildsEveryReaderImageFromPageArr() {
+        val sourceText = repoFile("tests/shareBookSource.json").readText()
+        val jmcomicSource = sourceObject(sourceText, """"bookSourceUrl": "https://jmcomicgo.me"""")
+        val contentRule = fieldValue(jmcomicSource, "content")
+
+        assertTrue("Jmcomic source should exist", jmcomicSource.isNotBlank())
+        assertTrue("Jmcomic content should read the reader page array", contentRule.contains("page_arr"))
+        assertTrue("Jmcomic content should derive the CDN photo root from reader images", contentRule.contains("/media/photos/"))
+        assertTrue("Jmcomic content should build image URLs from every page_arr file", contentRule.contains("root + file"))
+        assertTrue("Jmcomic content should still fall back to DOM image parsing", contentRule.contains(".scramble-page img[data-original]"))
+        assertTrue("Jmcomic content should include image request headers", contentRule.contains("JSON.stringify(headers)"))
+        assertFalse("Jmcomic content should not keep the old album thumbnail selector", contentRule.contains("thumb-overlay-albums"))
+    }
+
     private fun repoFile(relativePath: String): File {
         return generateSequence(File("").absoluteFile) { it.parentFile }
             .map { File(it, relativePath) }
