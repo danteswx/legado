@@ -28,6 +28,7 @@ class MangaProgressMinimapView @JvmOverloads constructor(
 
     var onProgressChanging: ((progressRatio: Float) -> Unit)? = null
     var onProgressChanged: ((progressRatio: Float) -> Unit)? = null
+    var onProgressDragFinished: (() -> Unit)? = null
     var onThumbnailReady: ((pageIndex: Int, imageUrl: String) -> Unit)? = null
 
     private val trackRect = RectF()
@@ -93,11 +94,18 @@ class MangaProgressMinimapView @JvmOverloads constructor(
         invalidate()
     }
 
+    fun isDraggingProgress(): Boolean {
+        return isDragging
+    }
+
     fun shouldPreservePanelPosition(): Boolean {
         return isDragging || pinnedProgressRatio != null
     }
 
     fun updatePages(imageUrls: List<String>, sourceOrigin: String?, progress: Int, progressRatio: Float?) {
+        if (isDragging) {
+            return
+        }
         val safeImageUrls = imageUrls.filter { it.isNotBlank() }
         val pagesChanged = this.imageUrls != safeImageUrls || this.sourceOrigin != sourceOrigin
         if (pagesChanged) {
@@ -113,6 +121,9 @@ class MangaProgressMinimapView @JvmOverloads constructor(
     }
 
     fun updateProgress(pageCount: Int, progress: Int, progressRatio: Float?) {
+        if (isDragging) {
+            return
+        }
         val safePageCount = pageCount.coerceAtLeast(0)
         val safeProgress = progress.coerceIn(0, (safePageCount - 1).coerceAtLeast(0))
         val safeProgressRatio = progressRatio?.coerceIn(0f, 1f)
@@ -188,12 +199,14 @@ class MangaProgressMinimapView @JvmOverloads constructor(
         }
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                isPressed = true
+                isDragging = true
                 if (!beginDrag(event.y)) {
+                    isPressed = false
+                    isDragging = false
                     return false
                 }
                 parent.requestDisallowInterceptTouchEvent(true)
-                isPressed = true
-                isDragging = true
                 return true
             }
 
@@ -225,7 +238,7 @@ class MangaProgressMinimapView @JvmOverloads constructor(
         return true
     }
 
-    private fun finishDrag() {
+    private fun finishDrag(notifyFinished: Boolean = true) {
         parent.requestDisallowInterceptTouchEvent(false)
         isPressed = false
         isDragging = false
@@ -233,6 +246,9 @@ class MangaProgressMinimapView @JvmOverloads constructor(
         dragStartY = 0f
         hasDragged = false
         invalidate()
+        if (notifyFinished) {
+            onProgressDragFinished?.invoke()
+        }
     }
 
     private fun beginDrag(y: Float): Boolean {
@@ -274,7 +290,7 @@ class MangaProgressMinimapView @JvmOverloads constructor(
         val ratio = dragRatio ?: progressRatio()
         progress = pageForRatio(ratio)
         pinnedProgressRatio = ratio
-        finishDrag()
+        finishDrag(notifyFinished = false)
         onProgressChanged?.invoke(ratio)
     }
 

@@ -96,6 +96,25 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     ReadManga.Callback, ChangeBookSourceDialog.CallBack, MangaMenu.CallBack,
     MangaColorFilterDialog.Callback, ScrollTimer.ScrollCallback, MangaEpaperDialog.Callback {
 
+    private data class MangaProgressMinimapDragScrollRange(
+        val chapterIndex: Int,
+        val startOffset: Int,
+        val endOffset: Int
+    ) {
+        fun targetOffset(ratio: Float): Int {
+            val travel = (endOffset - startOffset).coerceAtLeast(0)
+            return startOffset + (ratio.coerceIn(0f, 1f) * travel).roundToInt()
+        }
+
+        fun progressRatio(offset: Int): Float {
+            val travel = (endOffset - startOffset).coerceAtLeast(0)
+            if (travel == 0) {
+                return 0f
+            }
+            return ((offset - startOffset).toFloat() / travel).coerceIn(0f, 1f)
+        }
+    }
+
     private val mLayoutManager by lazy {
         MangaLayoutManager(this)
     }
@@ -112,6 +131,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     }
     private val boundMangaMinimapGlassViewIds = hashSetOf<Int>()
     private var pendingMangaProgressMinimapLayoutSync = false
+    private var mangaProgressMinimapDragScrollRange: MangaProgressMinimapDragScrollRange? = null
 
     private lateinit var mMangaFooterConfig: MangaFooterConfig
     private val mLabelBuilder by lazy { StringBuilder() }
@@ -269,6 +289,12 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                 if (mAdapter.isNotEmpty()) {
                     val item = mAdapter.getItem(position)
                     if (item is BaseMangaPage) {
+                        if ((binding.mangaProgressMinimap.isDraggingProgress() ||
+                                mangaProgressMinimapDragScrollRange != null) &&
+                            item.chapterIndex != ReadManga.durChapterIndex
+                        ) {
+                            return@setPreScrollListener
+                        }
                         if (ReadManga.durChapterIndex < item.chapterIndex) {
                             ReadManga.moveToNextChapter()
                         } else if (ReadManga.durChapterIndex > item.chapterIndex) {
@@ -411,6 +437,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     private fun bindMangaProgressMinimap() {
         binding.mangaProgressMinimap.onProgressChanging = ::previewMangaProgressMinimap
         binding.mangaProgressMinimap.onProgressChanged = ::commitMangaProgressMinimap
+        binding.mangaProgressMinimap.onProgressDragFinished = ::finishMangaProgressMinimapDrag
         binding.mangaProgressMinimap.onThumbnailReady = ::reloadMangaProgressPageIfCurrent
         binding.btnMangaMinimapPrevious.setMinimapChapterNavigationClickListener(binding.tvMangaMinimapPrevious) {
             ReadManga.moveToPrevChapter(true)
@@ -597,21 +624,31 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     }
 
     private fun previewMangaProgressMinimap(ratio: Float) {
+        ensureMangaProgressMinimapDragScrollRange()
         scrollToMangaProgress(ratio, commit = false)
     }
 
     private fun commitMangaProgressMinimap(ratio: Float) {
-        scrollToMangaProgress(ratio, commit = true)
-        reloadCommittedMangaProgressPage()
-        updateMangaProgressMinimap(show = true)
-        binding.mangaProgressMinimap.pinProgressRatio(ratio)
+        try {
+            scrollToMangaProgress(ratio, commit = true)
+            reloadCommittedMangaProgressPage()
+            updateMangaProgressMinimap(show = true)
+            binding.mangaProgressMinimap.pinProgressRatio(ratio)
+        } finally {
+            mangaProgressMinimapDragScrollRange = null
+        }
+    }
+
+    private fun finishMangaProgressMinimapDrag() {
+        mangaProgressMinimapDragScrollRange = null
     }
 
     private fun scrollToMangaProgress(ratio: Float, commit: Boolean) {
         if (commit) {
             binding.recyclerView.stopScroll()
         }
-        val scrolled = scrollMangaBodyToProgressRatio(ratio)
+        val dragScrollRange = mangaProgressMinimapDragScrollRange
+        val scrolled = scrollMangaBodyToProgressRatio(ratio, dragScrollRange)
         if (!scrolled) {
             fallbackMangaPageForProgress(ratio)?.let(::scrollToMangaPageTop)
         }
@@ -662,8 +699,11 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         }
     }
 
-    private fun scrollMangaBodyToProgressRatio(ratio: Float): Boolean {
-        val targetOffset = targetMangaScrollOffsetForProgress(ratio) ?: return false
+    private fun scrollMangaBodyToProgressRatio(
+        ratio: Float,
+        dragScrollRange: MangaProgressMinimapDragScrollRange? = null
+    ): Boolean {
+        val targetOffset = targetMangaScrollOffsetForProgress(ratio, dragScrollRange) ?: return false
         val delta = targetOffset - currentMangaScrollOffset()
         if (delta == 0) {
             return true
@@ -684,26 +724,96 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         }
     }
 
-    private fun targetMangaScrollOffsetForProgress(ratio: Float): Int? {
-        val maxScrollOffset = maxMangaScrollOffset() ?: return null
-        return (ratio.coerceIn(0f, 1f) * maxScrollOffset).roundToInt()
+    private fun targetMangaScrollOffsetForProgress(
+        ratio: Float,
+        dragScrollRange: MangaProgressMinimapDragScrollRange? = null
+    ): Int? {
+        dragScrollRange?.targetOffset(ratio)?.let { return it }
+        val scrollRange = currentMangaProgressMinimapScrollRange() ?: return null
+        return scrollRange.targetOffset(ratio)
     }
 
     private fun currentMangaScrollProgressRatio(): Float? {
+        val scrollRange = currentMangaProgressMinimapScrollRange() ?: return null
+        return scrollRange.progressRatio(currentMangaScrollOffset())
+    }
+
+    private fun ensureMangaProgressMinimapDragScrollRange() {
+        if (mangaProgressMinimapDragScrollRange == null) {
+            mangaProgressMinimapDragScrollRange = currentMangaProgressMinimapScrollRange()
+        }
+    }
+
+    private fun currentMangaProgressMinimapScrollRange(): MangaProgressMinimapDragScrollRange? {
+        val pageCount = currentMangaPageCount()
+        if (pageCount <= 0) {
+            return null
+        }
+        val firstPagePosition = adapterPositionForMangaPage(0)
+        val lastPagePosition = adapterPositionForMangaPage(pageCount - 1)
+        if (firstPagePosition <= -1 || lastPagePosition < firstPagePosition) {
+            return null
+        }
+        val adapterItemCount = binding.recyclerView.adapter?.itemCount?.takeIf { it > 0 } ?: return null
+        val scrollRange = currentMangaScrollRange()
+        val scrollExtent = currentMangaScrollExtent()
         val maxScrollOffset = maxMangaScrollOffset() ?: return null
-        return currentMangaScrollOffset().toFloat() / maxScrollOffset
+        if (scrollRange <= 0 || scrollExtent <= 0) {
+            return null
+        }
+
+        val averageItemSpan = scrollRange.toFloat() / adapterItemCount
+        val anchorPosition = currentVisibleMangaPage()
+            ?.let { adapterPositionForMangaPage(it.index) }
+            ?.takeIf { it in firstPagePosition..lastPagePosition }
+        val anchorOffset = anchorPosition?.let(::absoluteScrollOffsetForAdapterPosition)
+        val startOffset = if (anchorPosition != null && anchorOffset != null) {
+            anchorOffset - ((anchorPosition - firstPagePosition) * averageItemSpan).roundToInt()
+        } else {
+            (firstPagePosition * averageItemSpan).roundToInt()
+        }.coerceIn(0, maxScrollOffset)
+        val pageItemCount = lastPagePosition - firstPagePosition + 1
+        val chapterScrollSpan = ((pageItemCount * averageItemSpan) - scrollExtent)
+            .roundToInt()
+            .coerceAtLeast(0)
+        val endOffset = (startOffset + chapterScrollSpan).coerceIn(startOffset, maxScrollOffset)
+        return MangaProgressMinimapDragScrollRange(
+            chapterIndex = ReadManga.durChapterIndex,
+            startOffset = startOffset,
+            endOffset = endOffset
+        )
+    }
+
+    private fun absoluteScrollOffsetForAdapterPosition(adapterPosition: Int): Int? {
+        val view = binding.recyclerView.findViewHolderForAdapterPosition(adapterPosition)?.itemView
+            ?: return null
+        val childStart = if (mangaHorizontalScroll) {
+            view.left - binding.recyclerView.paddingLeft
+        } else {
+            view.top - binding.recyclerView.paddingTop
+        }
+        return currentMangaScrollOffset() + childStart
+    }
+
+    private fun currentMangaScrollRange(): Int {
+        return if (mangaHorizontalScroll) {
+            binding.recyclerView.computeHorizontalScrollRange()
+        } else {
+            binding.recyclerView.computeVerticalScrollRange()
+        }
+    }
+
+    private fun currentMangaScrollExtent(): Int {
+        return if (mangaHorizontalScroll) {
+            binding.recyclerView.computeHorizontalScrollExtent()
+        } else {
+            binding.recyclerView.computeVerticalScrollExtent()
+        }
     }
 
     private fun maxMangaScrollOffset(): Int? {
-        val scrollRange: Int
-        val scrollExtent: Int
-        if (mangaHorizontalScroll) {
-            scrollRange = binding.recyclerView.computeHorizontalScrollRange()
-            scrollExtent = binding.recyclerView.computeHorizontalScrollExtent()
-        } else {
-            scrollRange = binding.recyclerView.computeVerticalScrollRange()
-            scrollExtent = binding.recyclerView.computeVerticalScrollExtent()
-        }
+        val scrollRange = currentMangaScrollRange()
+        val scrollExtent = currentMangaScrollExtent()
         val maxScrollOffset = (scrollRange - scrollExtent).coerceAtLeast(0)
         return maxScrollOffset.takeIf { it > 0 }
     }
