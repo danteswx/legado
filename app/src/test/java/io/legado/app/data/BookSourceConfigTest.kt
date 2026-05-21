@@ -60,15 +60,16 @@ class BookSourceConfigTest {
 
         assertTrue("JavDB source should exist", javdbSource.isNotBlank())
         assertTrue(loginUrl.contains("login"))
-        listOf("censored", "uncensored", "western", "FC2", "anime").forEach {
+        listOf("有码", "无码", "FC2", "动漫", "排行榜").forEach {
             assertTrue("Missing JavDB primary category: $it", exploreUrl.contains(it))
+        }
+        listOf("censored", "uncensored", "fc2", "anime", "rankings/top").forEach {
+            assertTrue("Missing JavDB primary category route: $it", exploreUrl.contains(it))
         }
         listOf("vft=4&vst=3", "vft=5&vst=3", "vft=1", "vft=2", "vft=3").forEach {
             assertTrue("Missing JavDB secondary filter: $it", exploreUrl.contains(it))
         }
-        listOf("LUXU", "VR", "jur", "snos", "mida", "start", "ipzz", "ntr", "abf").forEach {
-            assertTrue("Missing JavDB tag: $it", exploreUrl.contains(it))
-        }
+        assertFalse("JavDB default categories should not include 欧美", exploreUrl.contains("western"))
     }
 
     @Test
@@ -78,25 +79,57 @@ class BookSourceConfigTest {
         val exploreUrl = fieldValue(javdbSource, "exploreUrl")
 
         assertTrue("JavDB source should exist", javdbSource.isNotBlank())
-        listOf("censored", "uncensored", "western", "fc2", "anime").forEach {
+        listOf("censored", "uncensored", "fc2", "anime").forEach {
             assertTrue("Missing JavDB primary category route: $it", exploreUrl.contains(it))
         }
         listOf("vft=0", "vft=4&vst=3", "vft=5&vst=3", "vft=1", "vft=2", "vft=3").forEach {
             assertTrue("Missing JavDB current filter route: $it", exploreUrl.contains(it))
         }
-        assertTrue(exploreUrl.contains("categories.filter"))
+        assertTrue(exploreUrl.contains("primary.forEach"))
         assertTrue(exploreUrl.contains("filters.forEach"))
+        assertTrue(exploreUrl.contains("rankTypes"))
         listOf("rankings/playback", "rankings/top").forEach {
             assertTrue("Missing JavDB ranking category: $it", exploreUrl.contains(it))
         }
-        listOf("p=daily&t=censored", "p=weekly&t=censored", "p=monthly&t=censored").forEach {
-            assertTrue("Missing JavDB ranking period: $it", exploreUrl.contains("rankings/movies?$it&page={{page}}"))
+        listOf("daily", "weekly", "monthly", "censored", "uncensored", "fc2", "anime").forEach {
+            assertTrue("Missing JavDB ranking option: $it", exploreUrl.contains(it))
         }
-        listOf("深喉", "母子", "黑人", "start", "ipzz", "母乳", "ntr", "abf").forEach {
-            assertTrue("Missing JavDB popular tag: $it", exploreUrl.contains(it))
-        }
+        assertTrue("Missing JavDB ranking movie route", exploreUrl.contains("rankings/movies?p=${'$'}{period}&t=${'$'}{type}&page=${'$'}{page}"))
+        assertFalse("JavDB discover should not include old hot tag block", exploreUrl.contains("热门 Tag"))
         assertFalse("JavDB discover should not use stale f=playable filter", exploreUrl.contains("f=playable"))
         assertFalse("JavDB discover should not use stale f=download filter", exploreUrl.contains("f=download"))
+    }
+
+    @Test
+    fun javdbVideoSourceUsesSmallCoverWithoutCropDecode() {
+        val sourceText = repoFile("tests/shareBookSource.json").readText()
+        val javdbSource = sourceObject(sourceText, """"bookSourceUrl": "https://javdb.com/"""")
+        val infoCoverRule = fieldValue(javdbSource, "coverUrl")
+        val coverDecodeJs = fieldValue(javdbSource, "coverDecodeJs")
+
+        assertTrue("JavDB source should exist", javdbSource.isNotBlank())
+        assertTrue("JavDB should not crop covers through coverDecodeJs", coverDecodeJs.isBlank())
+        assertTrue("JavDB detail should keep the small cover already captured from list/search", infoCoverRule.contains("book.coverUrl"))
+        assertTrue("JavDB detail should still fall back to page thumbnails", infoCoverRule.contains(".movie-list .item img"))
+        assertTrue("JavDB list/search should read thumbnail image URLs", javdbSource.contains(""""coverUrl": "img@src||img@data-src""""))
+        assertFalse("JavDB small cover mode should not use BitmapFactory crop", javdbSource.contains("BitmapFactory"))
+    }
+
+    @Test
+    fun javdbVideoSourceAddsClickableMagnetsToIntro() {
+        val sourceText = repoFile("tests/shareBookSource.json").readText()
+        val javdbSource = sourceObject(sourceText, """"bookSourceUrl": "https://javdb.com/"""")
+        val introRule = fieldValue(javdbSource, "intro")
+
+        assertTrue("JavDB source should exist", javdbSource.isNotBlank())
+        assertTrue("JavDB intro should be generated as rich text", introRule.contains("<usehtml>"))
+        assertTrue("JavDB intro should parse magnet attributes from detail HTML", introRule.contains("data-clipboard-text|href"))
+        assertTrue("JavDB intro should keep magnets as vertical buttons", introRule.contains("<p><button>磁力 "))
+        assertTrue("JavDB intro should not show raw magnet links", introRule.contains("<a href=\\\"").not())
+        assertTrue("JavDB intro should preserve magnet URLs in button actions", introRule.contains("magnet:\\\\?xt"))
+        assertTrue("JavDB intro should copy magnets when tapping a button", introRule.contains("java.copyText"))
+        assertTrue("JavDB intro should open magnet apps when tapping a button", introRule.contains("java.openUrl"))
+        assertTrue("JavDB intro should keep short magnet button blocks clickable without Kotlin UI changes", introRule.contains("Array(230).join('&#8203;')"))
     }
 
     @Test
