@@ -93,7 +93,7 @@ object AiCaptchaService {
         }.toString()
     }
 
-    fun extractCaptchaText(responseBody: String): String {
+    fun extractCaptchaText(responseBody: String, prompt: String? = null): String {
         val root = JSONObject(responseBody)
         val message = root.optJSONArray("choices")
             ?.optJSONObject(0)
@@ -101,7 +101,7 @@ object AiCaptchaService {
             ?: JSONObject()
         val raw = extractContentText(message.opt("content"))
             .ifBlank { root.optString("response") }
-        return normalizeCaptchaText(raw)
+        return normalizeCaptchaText(raw, prompt)
     }
 
     suspend fun recognize(
@@ -140,7 +140,7 @@ object AiCaptchaService {
                     debugLog = "url=$chatUrl\nstatus=${rawResponse.code} ${rawResponse.message}\nresponse=$payload"
                 )
             }
-            return extractCaptchaText(payload).ifBlank {
+            return extractCaptchaText(payload, prompt).ifBlank {
                 throw AiChatException(
                     message = "AI captcha response is empty",
                     debugLog = "url=$chatUrl\nresponse=$payload"
@@ -194,11 +194,96 @@ object AiCaptchaService {
         }
     }
 
-    private fun normalizeCaptchaText(raw: String): String {
+    private fun normalizeCaptchaText(raw: String, prompt: String?): String {
+        if (isMathCaptchaPrompt(prompt)) {
+            normalizeMathCaptchaText(raw).takeIf { it.isNotBlank() }?.let {
+                return it
+            }
+        }
         return raw.asSequence()
             .filter { it in '0'..'9' || it in 'A'..'Z' || it in 'a'..'z' }
             .joinToString("")
             .take(12)
+    }
+
+    private fun isMathCaptchaPrompt(prompt: String?): Boolean {
+        val text = prompt?.lowercase(Locale.ROOT).orEmpty()
+        return listOf("公式", "计算", "结果", "整数", "加减乘", "answer", "result", "math")
+            .any(text::contains)
+    }
+
+    private fun normalizeMathCaptchaText(raw: String): String {
+        val text = raw
+            .replace('×', '*')
+            .replace('x', '*')
+            .replace('X', '*')
+            .replace('＋', '+')
+            .replace('－', '-')
+            .replace('—', '-')
+            .replace('–', '-')
+            .trim()
+
+        Regex("""^[^\d-]*(-?\d{1,4})[^\d]*$""").matchEntire(text)?.let {
+            return it.groupValues[1]
+        }
+
+        val rightSide = text.substringAfterLast('=', "")
+        if (rightSide.isNotBlank()) {
+            Regex("""-?\d{1,4}""").find(rightSide)?.let {
+                return it.value
+            }
+        }
+
+        if (Regex("""答案|结果|answer|result""", RegexOption.IGNORE_CASE).containsMatchIn(text)) {
+            Regex("""-?\d{1,4}""").findAll(text).lastOrNull()?.let {
+                return it.value
+            }
+        }
+
+        return evaluateSingleDigitExpression(text)?.toString().orEmpty()
+    }
+
+    private fun evaluateSingleDigitExpression(raw: String): Int? {
+        val expression = Regex("""[0-9+\-* ]+""").find(raw)?.value
+            ?.replace(" ", "")
+            ?.takeIf { it.any(Char::isDigit) && it.any { char -> char == '+' || char == '-' || char == '*' } }
+            ?: return null
+        val values = mutableListOf<Int>()
+        val operators = mutableListOf<Char>()
+        var expectDigit = true
+        expression.forEach { char ->
+            when {
+                expectDigit && char in '0'..'9' -> {
+                    values.add(char.digitToInt())
+                    expectDigit = false
+                }
+                !expectDigit && (char == '+' || char == '-' || char == '*') -> {
+                    operators.add(char)
+                    expectDigit = true
+                }
+                else -> return null
+            }
+        }
+        if (expectDigit || values.size != operators.size + 1) {
+            return null
+        }
+
+        var index = 0
+        while (index < operators.size) {
+            if (operators[index] == '*') {
+                values[index] = values[index] * values.removeAt(index + 1)
+                operators.removeAt(index)
+            } else {
+                index++
+            }
+        }
+
+        var result = values.first()
+        operators.forEachIndexed { opIndex, operator ->
+            val value = values[opIndex + 1]
+            result = if (operator == '+') result + value else result - value
+        }
+        return result
     }
 
     private fun extractContentText(content: Any?): String {

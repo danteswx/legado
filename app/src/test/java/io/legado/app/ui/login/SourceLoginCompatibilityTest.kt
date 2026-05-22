@@ -31,6 +31,23 @@ class SourceLoginCompatibilityTest {
         assertTrue(exploreSource.contains("selectedDiscoverSourcePart?.canOpenSourceLogin() == true"))
     }
 
+    @Test
+    fun uaaCompatReplacesStaleVisibleCaptchaLoginUi() {
+        val compatSource = repoFile(
+            "app/src/main/java/io/legado/app/help/source/UaaLoginCompat.kt"
+        ).readText()
+        val loginUi = compatSource.substringAfter("val LOGIN_UI: String =")
+            .substringBefore("val LOGIN_URL: String =")
+
+        assertTrue(compatSource.contains("shouldReplaceLoginUi"))
+        assertTrue(compatSource.contains("AI识别验证码"))
+        assertTrue(compatSource.contains("验证码"))
+        assertTrue(compatSource.contains("solveUaaCaptcha"))
+        assertFalse(loginUi.contains("验证码"))
+        assertFalse(loginUi.contains("AI识别验证码"))
+        assertFalse(loginUi.contains("refreshCaptcha"))
+    }
+
     private fun repoFile(path: String): File {
         return generateSequence(File("").absoluteFile) { it.parentFile }
             .map { File(it, path) }

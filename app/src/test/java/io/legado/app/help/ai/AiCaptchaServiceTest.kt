@@ -77,6 +77,52 @@ class AiCaptchaServiceTest {
     }
 
     @Test
+    fun extractCaptchaTextReturnsSignedIntegerForMathPrompt() {
+        val response = """
+            {
+              "choices": [
+                {
+                  "message": {
+                    "content": "结果是 -2"
+                  }
+                }
+              ]
+            }
+        """.trimIndent()
+
+        assertEquals(
+            "-2",
+            AiCaptchaService.extractCaptchaText(
+                response,
+                "计算验证码里的加减乘公式，只返回整数结果"
+            )
+        )
+    }
+
+    @Test
+    fun extractCaptchaTextEvaluatesMathExpressionForMathPrompt() {
+        val response = """
+            {
+              "choices": [
+                {
+                  "message": {
+                    "content": "3+4*2"
+                  }
+                }
+              ]
+            }
+        """.trimIndent()
+
+        assertEquals(
+            "11",
+            AiCaptchaService.extractCaptchaText(
+                response,
+                "计算验证码里的加减乘公式，只返回整数结果"
+            )
+        )
+    }
+
+    @Test
     fun requireConfiguredProviderRejectsMissingAiConfig() {
         try {
             AiCaptchaService.requireConfiguredProvider(null, null)

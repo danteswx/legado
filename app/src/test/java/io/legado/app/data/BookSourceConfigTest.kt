@@ -52,7 +52,7 @@ class BookSourceConfigTest {
     }
 
     @Test
-    fun uaaSourceUsesAiCaptchaLoginUiWithWebFallback() {
+    fun uaaSourceUsesHiddenAiMathCaptchaWithWebFallback() {
         val sourceText = repoFile("tests/shareBookSource.json").readText()
         val uaaSource = sourceObject(sourceText, """"bookSourceUrl": "https://www.uaa.com"""")
         val loginUi = fieldValue(uaaSource, "loginUi")
@@ -62,11 +62,14 @@ class BookSourceConfigTest {
         assertFalse("UAA loginUi should not be blank", loginUi.isBlank())
         assertTrue(loginUi.contains("账号"))
         assertTrue(loginUi.contains("密码"))
-        assertTrue(loginUi.contains("验证码"))
-        assertTrue(loginUi.contains("aiCaptcha"))
-        assertTrue(loginUi.contains("refreshCaptcha"))
+        assertFalse("UAA captcha must not be visible in login UI", loginUi.contains("验证码"))
+        assertFalse("UAA should not show a manual AI captcha button", loginUi.contains("AI识别验证码"))
+        assertFalse("UAA should not show captcha refresh controls", loginUi.contains("refreshCaptcha"))
         assertTrue(loginUi.contains("openWebLogin"))
         assertTrue(loginUrl.contains("function login"))
+        assertTrue(loginUrl.contains("solveUaaCaptcha"))
+        assertTrue(loginUrl.contains("java.aiCaptcha"))
+        assertTrue(loginUrl.contains("计算这张UAA验证码里的三位个位数加减乘公式"))
         assertTrue(loginUrl.contains("source.putLoginHeader"))
         assertTrue(loginUrl.contains("登录失败"))
         assertFalse("UAA loginUrl must not run login while loginUi is being evaluated", loginUrl.contains("login();"))
