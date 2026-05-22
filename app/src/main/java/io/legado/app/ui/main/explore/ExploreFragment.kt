@@ -38,6 +38,7 @@ import io.legado.app.data.entities.rule.RowUi
 import io.legado.app.databinding.FragmentExploreBinding
 import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.source.UaaLoginCompat
 import io.legado.app.help.source.clearExploreKindsCache
 import io.legado.app.help.source.exploreKinds
 import io.legado.app.lib.dialogs.alert
@@ -510,7 +511,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
 
     private fun openSelectedSourceLogin() {
         val source = selectedDiscoverSourcePart ?: return
-        if (!source.hasLoginUrl) {
+        if (!source.canOpenSourceLogin()) {
             openSelectedDiscoverPageInWebView(source)
             return
         }
@@ -541,7 +542,7 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
     }
 
     private fun updateDiscoverLoginButtonState() {
-        val hasLoginUrl = selectedDiscoverSourcePart?.hasLoginUrl == true
+        val hasLoginUrl = selectedDiscoverSourcePart?.canOpenSourceLogin() == true
         binding.btnDiscoverMore.setImageResource(
             if (hasLoginUrl) R.drawable.ic_lucide_user else R.drawable.ic_lucide_link_2
         )
@@ -1753,6 +1754,10 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
         }
     }
 
+}
+
+private fun BookSourcePart.canOpenSourceLogin(): Boolean {
+    return hasLoginUrl || UaaLoginCompat.isUaaSource(bookSourceUrl)
 }
 
 private fun String.limitDiscoverText(max: Int): String {

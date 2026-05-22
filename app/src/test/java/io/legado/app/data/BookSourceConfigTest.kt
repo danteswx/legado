@@ -52,6 +52,29 @@ class BookSourceConfigTest {
     }
 
     @Test
+    fun uaaSourceUsesAiCaptchaLoginUiWithWebFallback() {
+        val sourceText = repoFile("tests/shareBookSource.json").readText()
+        val uaaSource = sourceObject(sourceText, """"bookSourceUrl": "https://www.uaa.com"""")
+        val loginUi = fieldValue(uaaSource, "loginUi")
+        val loginUrl = fieldValue(uaaSource, "loginUrl")
+
+        assertTrue("UAA source should exist", uaaSource.isNotBlank())
+        assertFalse("UAA loginUi should not be blank", loginUi.isBlank())
+        assertTrue(loginUi.contains("账号"))
+        assertTrue(loginUi.contains("密码"))
+        assertTrue(loginUi.contains("验证码"))
+        assertTrue(loginUi.contains("aiCaptcha"))
+        assertTrue(loginUi.contains("refreshCaptcha"))
+        assertTrue(loginUi.contains("openWebLogin"))
+        assertTrue(loginUrl.contains("function login"))
+        assertTrue(loginUrl.contains("source.putLoginHeader"))
+        assertTrue(loginUrl.contains("登录失败"))
+        assertFalse("UAA loginUrl must not run login while loginUi is being evaluated", loginUrl.contains("login();"))
+        assertFalse("UAA source must not hard-code AI keys", uaaSource.contains("sk-"))
+        assertFalse("UAA source must not hard-code external captcha services", uaaSource.contains("打码"))
+    }
+
+    @Test
     fun javdbVideoSourceIncludesLoginAndDiscoverCategories() {
         val sourceText = repoFile("tests/shareBookSource.json").readText()
         val javdbSource = sourceObject(sourceText, """"bookSourceUrl": "https://javdb.com/"""")

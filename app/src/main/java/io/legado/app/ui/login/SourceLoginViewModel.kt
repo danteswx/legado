@@ -10,7 +10,9 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.BaseSource
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
+import io.legado.app.data.entities.BookSource
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.source.UaaLoginCompat
 import io.legado.app.model.AudioPlay
 import io.legado.app.model.ReadBook
 import io.legado.app.model.ReadManga
@@ -72,6 +74,7 @@ class SourceLoginViewModel(application: Application) : BaseViewModel(application
                     }
                 }
             }
+            applySourceLoginCompatIfNeeded()
             headerMap = runScriptWithContext {
                 source?.getHeaderMap(true) ?: emptyMap()
             }
@@ -86,6 +89,13 @@ class SourceLoginViewModel(application: Application) : BaseViewModel(application
         }.onError {
             error.invoke()
             AppLog.put("登录 UI 初始化失败\n$it", it, true)
+        }
+    }
+
+    private fun applySourceLoginCompatIfNeeded() {
+        val bookSource = source as? BookSource ?: return
+        if (UaaLoginCompat.apply(bookSource)) {
+            appDb.bookSourceDao.update(bookSource)
         }
     }
 
