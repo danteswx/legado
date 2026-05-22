@@ -308,18 +308,36 @@ class MangaProgressMinimapView @JvmOverloads constructor(
             return 0f
         }
         val thumbHeight = thumbHeight(trackRect.height())
-        return ProgressMinimapDragCalculator.ratioForY(
-            y,
-            dragThumbTouchOffset,
-            trackRect.top,
-            trackRect.bottom,
-            thumbHeight
+        val centerY = y - dragThumbTouchOffset + thumbHeight / 2f
+        return ratioForThumbCenterY(centerY)
+    }
+
+    private fun ratioForThumbCenterY(centerY: Float): Float {
+        val thumbHeight = thumbHeight(trackRect.height())
+        return ProgressMinimapDragCalculator.ratioForTrackY(
+            centerY,
+            trackRect.top + thumbHeight / 2f,
+            trackRect.bottom - thumbHeight / 2f
         )
     }
 
+    private fun thumbCenterYForRatio(ratio: Float): Float {
+        val thumbHeight = thumbHeight(trackRect.height())
+        val travelTop = trackRect.top + thumbHeight / 2f
+        val travelBottom = trackRect.bottom - thumbHeight / 2f
+        return travelTop + (travelBottom - travelTop).coerceAtLeast(0f) * ratio.coerceIn(0f, 1f)
+    }
+
     private fun pageForRatio(ratio: Float): Int {
-        val maxPage = (pageCount - 1).coerceAtLeast(0)
-        return (ratio * maxPage).toInt().coerceIn(0, maxPage)
+        if (pageCount <= 0) {
+            return 0
+        }
+        val scaledProgress = (ratio.coerceIn(0f, 1f) * pageCount).coerceIn(0f, pageCount.toFloat())
+        return if (scaledProgress >= pageCount) {
+            pageCount - 1
+        } else {
+            scaledProgress.toInt().coerceIn(0, pageCount - 1)
+        }
     }
 
     private fun progressRatio(): Float {
@@ -327,7 +345,11 @@ class MangaProgressMinimapView @JvmOverloads constructor(
     }
 
     private fun pageProgressRatio(pageCount: Int, progress: Int): Float {
-        return if (pageCount <= 1) 0f else progress / (pageCount - 1).toFloat()
+        return if (pageCount <= 0) {
+            0f
+        } else {
+            progress.coerceIn(0, pageCount - 1) / pageCount.toFloat()
+        }
     }
 
     private fun updateTrackRect() {
@@ -399,9 +421,9 @@ class MangaProgressMinimapView @JvmOverloads constructor(
 
     private fun drawThumb(canvas: Canvas) {
         val thumbHeight = thumbHeight(trackRect.height())
-        val travel = (trackRect.height() - thumbHeight).coerceAtLeast(0f)
         val ratio = dragRatio ?: pinnedProgressRatio ?: progressRatio()
-        val top = trackRect.top + travel * ratio.coerceIn(0f, 1f)
+        val centerY = thumbCenterYForRatio(ratio)
+        val top = centerY - thumbHeight / 2f
         thumbRect.set(
             trackRect.left + 2f.dpToPx(),
             top,
