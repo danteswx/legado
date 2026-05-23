@@ -13,7 +13,6 @@ import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern
 import io.legado.app.data.entities.BaseSource
 import io.legado.app.exception.NoStackTraceException
-import io.legado.app.help.ai.AiCaptchaService
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.BackstageWebView
 import io.legado.app.help.http.CookieManager.cookieJarHeader
@@ -366,17 +365,6 @@ interface JsExtensions : JsEncodeUtils {
     fun getVerificationCode(imageUrl: String): String {
         rhinoContext.ensureActive()
         return SourceVerificationHelp.getVerificationResult(getSource(), imageUrl, "", false).second
-    }
-
-    fun aiCaptcha(imageUrl: String): String {
-        return aiCaptcha(imageUrl, null)
-    }
-
-    fun aiCaptcha(imageUrl: String, prompt: String?): String {
-        rhinoContext.ensureActive()
-        return runBlocking(context) {
-            AiCaptchaService.recognize(getSource(), imageUrl, prompt)
-        }
     }
 
     /**
