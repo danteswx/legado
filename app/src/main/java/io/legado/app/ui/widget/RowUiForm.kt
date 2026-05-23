@@ -20,6 +20,7 @@ object RowUiForm {
     interface Callback {
         fun onValueChanged(rowUi: RowUi, value: String) = Unit
         fun onAction(rowUi: RowUi, isLongClick: Boolean) = Unit
+        fun sourceOrigin(): String? = null
         fun resolveViewName(rowUi: RowUi, fallback: String, apply: (String) -> Unit) {
             apply(fallback)
         }
@@ -60,6 +61,7 @@ object RowUiForm {
             )
             RowUi.Type.select -> createSelectRow(inflater, container, rowUi, values, callback)
             RowUi.Type.toggle -> createToggleRow(inflater, container, rowUi, values, callback)
+            RowUi.Type.image -> createImageRow(container, rowUi, values, callback)
             else -> createButtonRow(inflater, container, rowUi, callback)
         }
     }
@@ -161,6 +163,27 @@ object RowUiForm {
         bindActionTouch(binding.root, rowUi, callback)
         return FormRow(binding.root) {
             RowUiViewFactory.applyJustify(rowUi, binding.root, binding.textView)
+        }
+    }
+
+    private fun createImageRow(
+        container: FlexboxLayout,
+        rowUi: RowUi,
+        values: Map<String, String>,
+        callback: Callback
+    ): FormRow {
+        val imageUrl = values[rowUi.name] ?: rowUi.default.orEmpty()
+        val imageView = RowUiViewFactory.imageView(
+            parent = container,
+            rowUi = rowUi,
+            imageUrl = imageUrl,
+            sourceOrigin = callback.sourceOrigin(),
+            onClick = rowUi.action?.let {
+                { _: View -> callback.onAction(rowUi, false) }
+            }
+        )
+        return FormRow(imageView) {
+            rowUi.style().apply(imageView)
         }
     }
 

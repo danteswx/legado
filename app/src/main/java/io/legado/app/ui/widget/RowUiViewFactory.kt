@@ -1,16 +1,23 @@
 package io.legado.app.ui.widget
 
+import android.annotation.SuppressLint
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
+import android.widget.ImageView
 import android.widget.TextView
+import androidx.appcompat.widget.AppCompatImageView
+import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.request.RequestOptions
 import io.legado.app.R
 import io.legado.app.data.entities.rule.RowUi
 import io.legado.app.databinding.ItemFilletTextBinding
 import io.legado.app.databinding.ItemSelectorSingleBinding
+import io.legado.app.help.glide.ImageLoader
+import io.legado.app.help.glide.OkHttpModelLoader
 import io.legado.app.lib.theme.applyUiBodyTypeface
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.setSelectionSafely
@@ -103,6 +110,43 @@ object RowUiViewFactory {
         binding.textView.text = text
         binding.root.setOnClickListener(onClick)
         return binding
+    }
+
+    fun imageView(
+        parent: ViewGroup,
+        rowUi: RowUi,
+        imageUrl: String?,
+        sourceOrigin: String?,
+        onClick: ((View) -> Unit)? = null
+    ): AppCompatImageView {
+        return AppCompatImageView(parent.context).apply {
+            rowUi.applyModernStyle(this)
+            minimumHeight = 84.dpToPx()
+            maxHeight = 120.dpToPx()
+            adjustViewBounds = true
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = rowUi.name
+            setPadding(8.dpToPx(), 6.dpToPx(), 8.dpToPx(), 6.dpToPx())
+            onClick?.let { setOnClickListener(it) }
+            loadImageRow(this, imageUrl, sourceOrigin)
+        }
+    }
+
+    @SuppressLint("CheckResult")
+    fun loadImageRow(imageView: ImageView, imageUrl: String?, sourceOrigin: String?) {
+        val url = imageUrl.orEmpty()
+        if (url.isBlank()) {
+            imageView.setImageDrawable(null)
+            return
+        }
+        ImageLoader.load(imageView.context, url).apply {
+            sourceOrigin?.let {
+                apply(RequestOptions().set(OkHttpModelLoader.sourceOriginOption, it))
+            }
+        }.error(R.drawable.image_loading_error)
+            .diskCacheStrategy(DiskCacheStrategy.NONE)
+            .skipMemoryCache(true)
+            .into(imageView)
     }
 
     fun applyJustify(rowUi: RowUi, view: View, textView: TextView? = view as? TextView) {

@@ -21,6 +21,7 @@ data class RowUi(
         const val button = "button"
         const val toggle = "toggle"
         const val select = "select"
+        const val image = "image"
 
     }
 

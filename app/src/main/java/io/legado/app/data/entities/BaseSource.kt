@@ -207,7 +207,7 @@ interface BaseSource : JsExtensions {
                 }
             }
             val longinInfo = GSON.fromJsonArray<RowUi>(loginUiJson).getOrNull()
-                ?.filter { it.type != "button" }
+                ?.filter { it.type != RowUi.Type.button && it.type != RowUi.Type.image }
                 ?.associate { it.name to (it.default ?: "") }
                 ?.takeIf { it.isNotEmpty() }?.also {
                     putLoginInfo(GSON.toJson(it))
