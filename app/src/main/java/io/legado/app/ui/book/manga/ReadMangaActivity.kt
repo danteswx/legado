@@ -435,6 +435,10 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             clearCommittedMangaProgressMinimapRatio()
             ReadManga.moveToPrevChapter(true)
         }
+        binding.btnMangaMinimapCurrent.setMinimapChapterNavigationClickListener(binding.tvMangaMinimapCurrent) {
+            clearCommittedMangaProgressMinimapRatio()
+            openMangaCatalog()
+        }
         binding.btnMangaMinimapNext.setMinimapChapterNavigationClickListener(binding.tvMangaMinimapNext) {
             clearCommittedMangaProgressMinimapRatio()
             ReadManga.moveToNextChapter(true)
@@ -444,6 +448,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
     private fun setupMangaMinimapControlGlass() {
         val glassViews = listOf(
             binding.mangaMinimapPreviousGlassView,
+            binding.mangaMinimapCurrentGlassView,
             binding.mangaMinimapNextGlassView
         )
         if (!ViewCompat.isLaidOut(binding.webtoonFrame) || glassViews.any { !ViewCompat.isLaidOut(it) }) {
@@ -460,6 +465,13 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             button = binding.btnMangaMinimapPrevious,
             glassView = binding.mangaMinimapPreviousGlassView,
             shellOverlay = binding.mangaMinimapPreviousShellOverlay,
+            glassLevel = glassLevel,
+            cornerRadius = cornerRadius
+        )
+        setupMangaMinimapControlGlassView(
+            button = binding.btnMangaMinimapCurrent,
+            glassView = binding.mangaMinimapCurrentGlassView,
+            shellOverlay = binding.mangaMinimapCurrentShellOverlay,
             glassLevel = glassLevel,
             cornerRadius = cornerRadius
         )
@@ -494,10 +506,17 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         }
     }
 
+    private fun openMangaCatalog() {
+        ReadManga.book?.let {
+            tocActivity.launch(it.bookUrl)
+        }
+    }
+
     private fun updateMangaProgressMinimap(show: Boolean = binding.mangaMenu.isVisible) {
         val imageUrls = currentMangaImageUrls()
         val pageCount = imageUrls.size
         val progressRatio = currentMangaScrollProgressRatio()
+        updateMangaMinimapCurrentChapterButton()
         if (show) {
             binding.mangaProgressMinimap.updatePages(imageUrls, ReadManga.book?.origin, ReadManga.durChapterPos, progressRatio)
         } else {
@@ -572,7 +591,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             ?.topMargin ?: 0
         val controlsHeight = binding.mangaProgressMinimapControls.height
             .takeIf { it > 0 }
-            ?: 70.dpToPx()
+            ?: 108.dpToPx()
         val maxMinimapHeight = availableHeight - controlsTopMargin - controlsHeight
         val minimumMinimapHeight = 96.dpToPx()
         if (maxMinimapHeight < minimumMinimapHeight) {
@@ -615,6 +634,17 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         root.getLocationOnScreen(rootLocation)
         view.getLocationOnScreen(viewLocation)
         return viewLocation[1] - rootLocation[1]
+    }
+
+    private fun updateMangaMinimapCurrentChapterButton() {
+        val chapterTitle = ReadManga.curMangaChapter?.chapter?.title.orEmpty()
+        val label = chapterTitle.ifBlank { getString(R.string.chapter) }
+        binding.tvMangaMinimapCurrent.text = label
+        binding.btnMangaMinimapCurrent.contentDescription = if (chapterTitle.isBlank()) {
+            getString(R.string.chapter_list)
+        } else {
+            "${getString(R.string.chapter_list)}: $chapterTitle"
+        }
     }
 
     private fun previewMangaProgressMinimap(ratio: Float) {
@@ -1089,9 +1119,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             }
 
             R.id.menu_catalog -> {
-                ReadManga.book?.let {
-                    tocActivity.launch(it.bookUrl)
-                }
+                openMangaCatalog()
             }
 
             R.id.menu_refresh -> {
