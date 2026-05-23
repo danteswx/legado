@@ -639,11 +639,6 @@ interface JsExtensions : JsEncodeUtils {
         return EncoderUtils.base64Encode(str, flags)
     }
 
-    @JavascriptInterface
-    fun base64Encode(bytes: ByteArray): String {
-        return EncoderUtils.base64Encode(bytes)
-    }
-
     /* HexString 解码为字节数组 */
     fun hexDecodeToByteArray(hex: String): ByteArray? {
         return HexUtil.decodeHex(hex)

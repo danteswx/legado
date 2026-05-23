@@ -49,7 +49,6 @@ import kotlin.text.lastIndexOf
 import kotlin.text.startsWith
 import kotlin.text.substring
 import android.view.MotionEvent
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -160,12 +159,6 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
                         }
                     }
 
-                    is ImageView -> {
-                        if (rowUi.type == Type.image) {
-                            RowUiViewFactory.loadImageRow(rowView, default, viewModel.source?.getKey())
-                        }
-                    }
-
                     is LinearLayout -> {
                         val chars = rowUi.chars?.filterNotNull() ?: listOf("chars","is null")
                         val index = chars.indexOf(default)
@@ -212,12 +205,6 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
                         }
                     }
 
-                    is ImageView -> {
-                        if (rowUi.type == Type.image) {
-                            RowUiViewFactory.loadImageRow(rowView, value, viewModel.source?.getKey())
-                        }
-                    }
-
                     is LinearLayout -> {
                         val items = rowUi.chars?.filterNotNull() ?: listOf("chars","is null")
                         val index = items.indexOf(value)
@@ -244,7 +231,6 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
         return try {
             runScriptWithContext {
                 source.evalJS("$loginJS\n$jsStr") {
-                    put("java", sourceLoginJsExtensions)
                     put("result", result)
                     put("book", viewModel.book)
                     put("chapter", viewModel.chapter)
@@ -273,10 +259,6 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
             rows = rows,
             values = buildLoginUiValues(rows, loginInfo),
             callback = object : RowUiForm.Callback {
-                override fun sourceOrigin(): String? {
-                    return source.getKey()
-                }
-
                 override fun onValueChanged(rowUi: RowUi, value: String) {
                     hasChange = true
                     loginInfo[rowUi.name] = value
@@ -327,13 +309,7 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
                         ?: chars.firstOrNull()
                         ?: ""
                 }
-                Type.image -> rowUi.default.orEmpty()
-                else -> if (shouldPreferFreshDefault(rowUi)) {
-                    rowUi.default.orEmpty()
-                } else {
-                    loginInfo[rowUi.name]?.takeIf { it.isNotEmpty() }
-                        ?: rowUi.default.orEmpty()
-                }
+                else -> loginInfo[rowUi.name] ?: rowUi.default.orEmpty()
             }
             if ((rowUi.type == Type.select || rowUi.type == Type.toggle)
                 && loginInfo[rowUi.name] != value
@@ -344,14 +320,6 @@ class SourceLoginDialog : BaseDialogFragment(R.layout.dialog_login, true),
             values[rowUi.name] = value
         }
         return values
-    }
-
-    private fun shouldPreferFreshDefault(rowUi: RowUi): Boolean {
-        val name = rowUi.name.lowercase()
-        return name.contains("验证码") ||
-            name.contains("驗證碼") ||
-            name.contains("captcha") ||
-            name.contains("verify")
     }
 
     private fun resolveLoginViewName(
