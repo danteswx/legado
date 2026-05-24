@@ -1096,8 +1096,15 @@ class ReadMenu @JvmOverloads constructor(
     }
 
     private fun updateTopBarLoginAction() = binding.run {
-        titleBar.menu.findItem(R.id.menu_login)?.isVisible =
-            !ReadBook.isLocalBook && ReadBook.bookSource != null
+        val source = ReadBook.bookSource
+        val hasLoginUrl = !source?.loginUrl.isNullOrBlank()
+        titleBar.menu.findItem(R.id.menu_login)?.run {
+            isVisible = !ReadBook.isLocalBook && source != null
+            setIcon(if (hasLoginUrl) R.drawable.ic_lucide_user else R.drawable.ic_lucide_link_2)
+            title = context.getString(
+                if (hasLoginUrl) R.string.login else R.string.open_in_app_webview
+            )
+        }
         applyTopBarIconColor()
     }
 
@@ -4833,10 +4840,16 @@ class ReadMenu @JvmOverloads constructor(
         tvChapterUrl.setOnLongClickListener(chapterViewLongClickListener)
         //书源操作
         tvSourceAction.onClick {
-            sourceMenu.menu.findItem(R.id.menu_login).isVisible =
-                !ReadBook.bookSource?.loginUrl.isNullOrEmpty()
+            val source = ReadBook.bookSource
+            val hasLoginUrl = !source?.loginUrl.isNullOrEmpty()
+            sourceMenu.menu.findItem(R.id.menu_login).apply {
+                isVisible = source != null
+                title = context.getString(
+                    if (hasLoginUrl) R.string.login else R.string.open_in_app_webview
+                )
+            }
             sourceMenu.menu.findItem(R.id.menu_chapter_pay).isVisible =
-                !ReadBook.bookSource?.loginUrl.isNullOrEmpty()
+                hasLoginUrl
                         && ReadBook.curTextChapter?.isVip == true
                         && ReadBook.curTextChapter?.isPay != true
             sourceMenu.show()

@@ -474,6 +474,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
         menu.findItem(R.id.menu_login)?.isVisible =
             onLine && ReadBook.bookSource != null
+        updateSourceActionMenuItem(menu.findItem(R.id.menu_login), ReadBook.bookSource)
         lifecycleScope.launch {
             val show = ReadBook.inBookshelf && withContext(IO) {
                 AppWebDav.isOk
@@ -481,6 +482,16 @@ class ReadBookActivity : BaseReadBookActivity(),
             menu.findItem(R.id.menu_get_progress)?.isVisible = show
             menu.findItem(R.id.menu_cover_progress)?.isVisible = show
         }
+    }
+
+    private fun updateSourceActionMenuItem(item: MenuItem?, source: BookSource?) {
+        val hasLoginUrl = !source?.loginUrl.isNullOrBlank()
+        item?.setIcon(
+            if (hasLoginUrl) R.drawable.ic_lucide_user else R.drawable.ic_lucide_link_2
+        )
+        item?.title = getString(
+            if (hasLoginUrl) R.string.login else R.string.open_in_app_webview
+        )
     }
 
     /**

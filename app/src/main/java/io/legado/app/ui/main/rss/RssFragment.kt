@@ -20,6 +20,7 @@ import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.base.VMBaseFragment
 import io.legado.app.constant.AppLog
+import io.legado.app.constant.SourceType
 import io.legado.app.data.AppDatabase
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.RssSource
@@ -31,6 +32,7 @@ import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.lib.theme.secondaryTextColor
+import io.legado.app.ui.browser.WebViewActivity
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.main.MainFragmentInterface
 import io.legado.app.ui.rss.article.ReadRecordDialog
@@ -236,7 +238,7 @@ class RssFragment() : VMBaseFragment<RssViewModel>(R.layout.fragment_rss), MainF
             showSourceSelector()
         }
         binding.btnRssSourceLogin.setOnClickListener {
-            selectedRssSource?.let(::openRssLogin)
+            selectedRssSource?.let(::openSelectedRssSourceAction)
         }
         binding.btnRssSourceStar.setOnClickListener {
             startActivity<RssFavoritesActivity>()
@@ -274,6 +276,23 @@ class RssFragment() : VMBaseFragment<RssViewModel>(R.layout.fragment_rss), MainF
         val spacing = 16.dpToPx() + (visibleActionCount - 1).coerceAtLeast(0) * actionGap
         val maxWidth = (rowWidth - actionsWidth - spacing).coerceIn(96.dpToPx(), 190.dpToPx())
         binding.tvRssSourceSelect.maxWidth = maxWidth
+    }
+
+    private fun updateRssSourceActionButtonState(source: RssSource?) {
+        if (source == null) {
+            binding.btnRssSourceLogin.gone()
+            binding.llRssSourceRow.post(::updateRssSourceNameWidth)
+            return
+        }
+        val hasLoginUrl = !source.loginUrl.isNullOrBlank()
+        binding.btnRssSourceLogin.visible()
+        binding.btnRssSourceLogin.setImageResource(
+            if (hasLoginUrl) R.drawable.ic_lucide_user else R.drawable.ic_lucide_link_2
+        )
+        binding.btnRssSourceLogin.contentDescription = getString(
+            if (hasLoginUrl) R.string.login else R.string.open_in_app_webview
+        )
+        binding.llRssSourceRow.post(::updateRssSourceNameWidth)
     }
 
     private fun currentRssScrollTarget(): View? {
@@ -369,7 +388,7 @@ class RssFragment() : VMBaseFragment<RssViewModel>(R.layout.fragment_rss), MainF
         selectedRssSource = source
         AppConfig.modernRssSourceUrl = source.sourceUrl
         binding.tvRssSourceSelect.text = source.sourceName
-        binding.btnRssSourceLogin.isVisible = !source.loginUrl.isNullOrBlank()
+        updateRssSourceActionButtonState(source)
         binding.btnRssSourceSearch.isVisible = !source.searchUrl.isNullOrBlank()
         binding.btnRssSourceRefresh.isVisible = source.ruleArticles.isNullOrBlank()
         binding.llRssSourceRow.post(::updateRssSourceNameWidth)
@@ -551,7 +570,7 @@ class RssFragment() : VMBaseFragment<RssViewModel>(R.layout.fragment_rss), MainF
         selectedRssSource = null
         currentSorts.clear()
         binding.tvRssSourceSelect.text = getString(R.string.rss)
-        binding.btnRssSourceLogin.gone()
+        updateRssSourceActionButtonState(null)
         binding.btnRssSourceSearch.gone()
         binding.btnRssSourceRefresh.gone()
         binding.swipeRefreshLayout.isEnabled = true
@@ -604,6 +623,40 @@ class RssFragment() : VMBaseFragment<RssViewModel>(R.layout.fragment_rss), MainF
         RssSortActivity.start(requireContext(), null, source.sourceUrl, focusSearch = true)
     }
 
+    private fun openSelectedRssSourceAction(rssSource: RssSource) {
+        if (rssSource.loginUrl.isNullOrBlank()) {
+            openRssSourceLink(rssSource)
+        } else {
+            openRssLogin(rssSource)
+        }
+    }
+
+    private fun openRssSourceLink(rssSource: RssSource) {
+        if (rssSource.singleUrl) {
+            viewModel.getSingleUrl(rssSource) { url ->
+                openRssSourceLinkUrl(rssSource, url)
+            }
+        } else {
+            openRssSourceLinkUrl(rssSource, rssSource.sourceUrl)
+        }
+    }
+
+    private fun openRssSourceLinkUrl(rssSource: RssSource, url: String) {
+        val targetUrl = url.takeIf { it.isNotBlank() } ?: rssSource.sourceUrl
+        if (!targetUrl.startsWith("http", true)) {
+            context?.openUrl(targetUrl)
+            return
+        }
+        startActivity<WebViewActivity> {
+            putExtra("url", targetUrl)
+            putExtra("title", rssSource.sourceName)
+            putExtra("sourceName", rssSource.sourceName)
+            putExtra("sourceOrigin", rssSource.sourceUrl)
+            putExtra("sourceType", SourceType.rss)
+            putExtra("refetchAfterSuccess", false)
+        }
+    }
+
     private fun openRssLogin(rssSource: RssSource) {
         startActivity<SourceLoginActivity> {
             putExtra("type", "rssSource")
@@ -648,7 +701,7 @@ class RssFragment() : VMBaseFragment<RssViewModel>(R.layout.fragment_rss), MainF
     }
 
     override fun login(rssSource: RssSource) {
-        openRssLogin(rssSource)
+        openSelectedRssSourceAction(rssSource)
     }
 
     override fun edit(rssSource: RssSource) {

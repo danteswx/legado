@@ -1427,7 +1427,18 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
         }
         menu.findItem(R.id.menu_login)?.isVisible =
             ReadManga.bookSource != null
+        updateSourceActionMenuItem(menu.findItem(R.id.menu_login), ReadManga.bookSource)
         menu.findItem(R.id.menu_gray_manga).isChecked = AppConfig.enableMangaGray
+    }
+
+    private fun updateSourceActionMenuItem(item: MenuItem?, source: BookSource?) {
+        val hasLoginUrl = !source?.loginUrl.isNullOrBlank()
+        item?.setIcon(
+            if (hasLoginUrl) R.drawable.ic_lucide_user else R.drawable.ic_lucide_link_2
+        )
+        item?.title = getString(
+            if (hasLoginUrl) R.string.login else R.string.open_in_app_webview
+        )
     }
 
     private fun applyBookMangaReadConfig() {

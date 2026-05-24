@@ -1,7 +1,9 @@
 package io.legado.app.ui.main
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.w3c.dom.Element
 import java.io.File
@@ -74,6 +76,35 @@ class MainTopActionLayoutTest {
         expectedIcons.forEach { (id, icon) ->
             assertEquals(icon, menu.elementById(id).androidAttr("icon"))
         }
+    }
+
+    @Test
+    fun modernRssSourceActionFallsBackToInAppWebViewForSourcesWithoutLoginUrl() {
+        val rssFragment =
+            repoFile("app/src/main/java/io/legado/app/ui/main/rss/RssFragment.kt").readText()
+        val selectSourceBlock = rssFragment
+            .substringAfter("private fun selectSource(")
+            .substringBefore("private suspend fun presentSource")
+        val updateButtonBlock = rssFragment
+            .substringAfter("private fun updateRssSourceActionButtonState(")
+            .substringBefore("private fun selectSource(")
+        val openActionBlock = rssFragment
+            .substringAfter("private fun openSelectedRssSourceAction(")
+            .substringBefore("override fun openRss(")
+
+        assertFalse(
+            selectSourceBlock.contains(
+                "binding.btnRssSourceLogin.isVisible = !source.loginUrl.isNullOrBlank()"
+            )
+        )
+        assertTrue(updateButtonBlock.contains("binding.btnRssSourceLogin.visible()"))
+        assertTrue(updateButtonBlock.contains("R.drawable.ic_lucide_link_2"))
+        assertTrue(updateButtonBlock.contains("R.drawable.ic_lucide_user"))
+        assertTrue(updateButtonBlock.contains("R.string.open_in_app_webview"))
+        assertTrue(openActionBlock.contains("openRssSourceLink(rssSource)"))
+        assertTrue(openActionBlock.contains("startActivity<WebViewActivity>"))
+        assertTrue(openActionBlock.contains("putExtra(\"sourceType\", SourceType.rss)"))
+        assertTrue(openActionBlock.contains("putExtra(\"refetchAfterSuccess\", false)"))
     }
 
     private fun parseXml(file: File): Element =

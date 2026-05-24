@@ -70,7 +70,13 @@ class RssAdapter(
             R.menu.rss_main_item,
             modernMenuPopup,
             prepare = {
-                findItem(R.id.menu_login).isVisible = !rssSource.loginUrl.isNullOrBlank()
+                val hasLoginUrl = !rssSource.loginUrl.isNullOrBlank()
+                findItem(R.id.menu_login).apply {
+                    isVisible = true
+                    title = context.getString(
+                        if (hasLoginUrl) R.string.login else R.string.open_in_app_webview
+                    )
+                }
             }
         ) {
             when (it.itemId) {

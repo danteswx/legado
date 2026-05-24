@@ -199,8 +199,15 @@ class MangaMenu @JvmOverloads constructor(
     }
 
     private fun updateTopBarLoginAction() = binding.run {
-        titleBar.menu.findItem(R.id.menu_login)?.isVisible =
-            ReadManga.bookSource != null
+        val source = ReadManga.bookSource
+        val hasLoginUrl = !source?.loginUrl.isNullOrBlank()
+        titleBar.menu.findItem(R.id.menu_login)?.run {
+            isVisible = source != null
+            setIcon(if (hasLoginUrl) R.drawable.ic_lucide_user else R.drawable.ic_lucide_link_2)
+            title = context.getString(
+                if (hasLoginUrl) R.string.login else R.string.open_in_app_webview
+            )
+        }
         syncToolbarActionIconSize()
     }
 
