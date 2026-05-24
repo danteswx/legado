@@ -24,6 +24,7 @@ import io.legado.app.help.book.sync
 import io.legado.app.help.config.AppConfig
 import io.legado.app.model.CacheBook
 import io.legado.app.model.ReadBook
+import io.legado.app.model.ReadManga
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.CacheBookService
 import io.legado.app.utils.onEachParallel
@@ -206,6 +207,7 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
             appDb.bookChapterDao.delByBook(bookUrl)
             appDb.bookChapterDao.insert(*toc.toTypedArray())
             ReadBook.onChapterListUpdated(book)
+            ReadManga.onChapterListUpdated(book)
             addDownload(source, book)
         }.onFailure {
             currentCoroutineContext().ensureActive()

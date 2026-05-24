@@ -97,24 +97,27 @@ fun Fragment.startActivityForBook(
     book: Book,
     configIntent: Intent.() -> Unit = {},
 ) {
-    if (appDb.bookChapterDao.getChapterCount(book.bookUrl) <= 0) {
+    val latestBook = appDb.bookDao.getBook(book.bookUrl)
+        ?: appDb.bookDao.getBook(book.name, book.author)
+        ?: book
+    if (appDb.bookChapterDao.getChapterCount(latestBook.bookUrl) <= 0) {
         startActivity<BookTocLoadingActivity> {
-            putExtra("name", book.name)
-            putExtra("author", book.author)
-            putExtra("bookUrl", book.bookUrl)
+            putExtra("name", latestBook.name)
+            putExtra("author", latestBook.author)
+            putExtra("bookUrl", latestBook.bookUrl)
             apply(configIntent)
         }
         return
     }
     val cls = when {
-        book.isVideo -> VideoPlayerActivity::class.java
-        book.isAudio -> AudioPlayActivity::class.java
-        !book.isLocal && book.isImage && AppConfig.showMangaUi -> ReadMangaActivity::class.java
+        latestBook.isVideo -> VideoPlayerActivity::class.java
+        latestBook.isAudio -> AudioPlayActivity::class.java
+        !latestBook.isLocal && latestBook.isImage && AppConfig.showMangaUi -> ReadMangaActivity::class.java
         else -> ReadBookActivity::class.java
     }
     val intent = Intent(requireActivity(), cls)
     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    intent.putExtra("bookUrl", book.bookUrl)
+    intent.putExtra("bookUrl", latestBook.bookUrl)
     intent.apply(configIntent)
     startActivity(intent)
 }

@@ -50,24 +50,32 @@ class ReadMangaViewModel(application: Application) : BaseViewModel(application) 
             ReadManga.inBookshelf = intent.getBooleanExtra("inBookshelf", true)
             ReadManga.chapterChanged = intent.getBooleanExtra("chapterChanged", false)
             val bookUrl = intent.getStringExtra("bookUrl")
-            val book = when {
-                bookUrl.isNullOrEmpty() -> appDb.bookDao.lastReadBook
-                else -> appDb.bookDao.getBook(bookUrl)
-            } ?: ReadManga.book
+            val book = ReadMangaOpenBookResolver.resolve(
+                requestedBookUrl = bookUrl,
+                findLastReadBook = { appDb.bookDao.lastReadBook },
+                findBookByUrl = { appDb.bookDao.getBook(it) },
+                currentBook = { ReadManga.book }
+            )
+            var initialized = false
             when {
-                book != null -> initManga(book)
+                book != null -> {
+                    initManga(book)
+                    initialized = true
+                }
                 else -> {
                     ReadManga.loadFail(context.getString(R.string.no_book), false)
                     AppLog.put("未找到漫画书籍\nbookUrl:$bookUrl")
                 }
             }
-        }.onSuccess {
-            success?.invoke()
+            initialized
+        }.onSuccess { initialized ->
+            if (initialized) {
+                success?.invoke()
+                ReadManga.saveRead()
+            }
         }.onError {
             val msg = "初始化数据失败\n${it.localizedMessage}"
             AppLog.put(msg, it)
-        }.onFinally {
-            ReadManga.saveRead()
         }
     }
 

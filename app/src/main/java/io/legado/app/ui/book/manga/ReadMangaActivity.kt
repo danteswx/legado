@@ -323,6 +323,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        prepareForBookIntent(intent)
         viewModel.initData(intent) {
             applyBookMangaReadConfig()
         }
@@ -334,6 +335,20 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
             applyBookMangaReadConfig()
         }
         justInitData = true
+    }
+
+    private fun prepareForBookIntent(intent: Intent) {
+        val newBookUrl = intent.getStringExtra("bookUrl") ?: return
+        if (newBookUrl == ReadManga.book?.bookUrl) {
+            return
+        }
+        binding.infobar.isGone = true
+        binding.llLoading.isVisible = true
+        binding.llRetry.isGone = true
+        binding.flLoading.isVisible = true
+        loadMoreView.gone()
+        clearCommittedMangaProgressMinimapRatio()
+        mAdapter.submitList(emptyList())
     }
 
     override fun upContent() {
