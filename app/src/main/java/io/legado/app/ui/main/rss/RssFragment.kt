@@ -264,7 +264,14 @@ class RssFragment() : VMBaseFragment<RssViewModel>(R.layout.fragment_rss), MainF
             binding.btnRssSourceRefresh,
             binding.btnRssSourceLogin
         ).filter { it.isVisible }.sumOf { it.measuredWidth.takeIf { width -> width > 0 } ?: it.layoutParams.width }
-        val spacing = 36.dpToPx()
+        val visibleActionCount = listOf(
+            binding.btnRssSourceSearch,
+            binding.btnRssSourceStar,
+            binding.btnRssSourceRefresh,
+            binding.btnRssSourceLogin
+        ).count { it.isVisible }
+        val actionGap = resources.getDimensionPixelSize(R.dimen.main_top_action_button_gap)
+        val spacing = 16.dpToPx() + (visibleActionCount - 1).coerceAtLeast(0) * actionGap
         val maxWidth = (rowWidth - actionsWidth - spacing).coerceIn(96.dpToPx(), 190.dpToPx())
         binding.tvRssSourceSelect.maxWidth = maxWidth
     }

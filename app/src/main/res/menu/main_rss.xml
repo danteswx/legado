@@ -5,20 +5,20 @@
 
     <item
         android:id="@+id/menu_read_record"
-        android:icon="@drawable/ic_history"
+        android:icon="@drawable/ic_lucide_chart_bar"
         android:title="@string/history"
         app:showAsAction="always" />
 
     <item
         android:id="@+id/menu_rss_star"
         android:title="@string/favorite"
-        android:icon="@drawable/ic_star"
+        android:icon="@drawable/ic_lucide_star"
         app:showAsAction="always" />
 
     <item
         android:id="@+id/menu_group"
         android:title="@string/group"
-        android:icon="@drawable/ic_groups"
+        android:icon="@drawable/ic_lucide_tags"
         app:showAsAction="always">
 
         <menu />
@@ -28,7 +28,7 @@
     <item
         android:id="@+id/menu_rss_config"
         android:title="@string/setting"
-        android:icon="@drawable/ic_settings"
+        android:icon="@drawable/ic_lucide_settings"
         app:showAsAction="always"
         tools:ignore="AlwaysShowAction" />
 

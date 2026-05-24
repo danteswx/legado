@@ -501,7 +501,8 @@ class ExploreFragment() : VMBaseFragment<ExploreViewModel>(R.layout.fragment_exp
             binding.btnDiscoverTagFilter,
             binding.btnDiscoverMore
         ).count { it.isVisible }
-        val spacing = (16 + (visibleActionCount - 1).coerceAtLeast(0) * 10).dpToPx()
+        val actionGap = resources.getDimensionPixelSize(R.dimen.main_top_action_button_gap)
+        val spacing = 16.dpToPx() + (visibleActionCount - 1).coerceAtLeast(0) * actionGap
         val maxWidth = (rowWidth - actionsWidth - spacing).coerceIn(96.dpToPx(), 190.dpToPx())
         if (binding.tvDiscoverSourceSelect.maxWidth != maxWidth) {
             binding.tvDiscoverSourceSelect.maxWidth = maxWidth

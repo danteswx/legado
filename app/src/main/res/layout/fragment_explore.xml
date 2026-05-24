@@ -102,7 +102,7 @@
                         android:visibility="gone" />
 
                     <Space
-                        android:layout_width="10dp"
+                        android:layout_width="@dimen/main_top_action_button_gap"
                         android:layout_height="1dp" />
 
                     <androidx.appcompat.widget.AppCompatImageButton
@@ -117,7 +117,7 @@
                         android:tint="@color/primaryText" />
 
                     <Space
-                        android:layout_width="10dp"
+                        android:layout_width="@dimen/main_top_action_button_gap"
                         android:layout_height="1dp" />
 
                     <androidx.appcompat.widget.AppCompatImageButton
@@ -132,7 +132,7 @@
                         android:tint="@color/primaryText" />
 
                     <Space
-                        android:layout_width="10dp"
+                        android:layout_width="@dimen/main_top_action_button_gap"
                         android:layout_height="1dp" />
 
                     <androidx.appcompat.widget.AppCompatImageButton

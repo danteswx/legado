@@ -62,7 +62,7 @@
                         android:textColor="@color/primaryText"
                         android:textSize="20sp"
                         android:textStyle="bold"
-                        tools:text="默认订阅源" />
+                        tools:text="Default RSS source" />
 
                     <androidx.appcompat.widget.AppCompatImageView
                         android:id="@+id/iv_rss_source_arrow"
@@ -81,58 +81,58 @@
 
                 <androidx.appcompat.widget.AppCompatImageButton
                     android:id="@+id/btn_rss_source_search"
-                    android:layout_width="@dimen/bookshelf_action_button_size"
-                    android:layout_height="@dimen/bookshelf_action_button_size"
+                    android:layout_width="@dimen/discover_top_action_button_size"
+                    android:layout_height="@dimen/discover_top_action_button_size"
                     android:background="@drawable/bg_discover_embedded_action"
                     android:contentDescription="@string/search"
-                    android:padding="@dimen/bookshelf_action_button_padding"
+                    android:padding="@dimen/discover_top_action_button_padding"
                     android:scaleType="centerInside"
                     android:src="@drawable/ic_lucide_search"
                     android:tint="@color/primaryText"
                     android:visibility="gone" />
 
                 <Space
-                    android:layout_width="10dp"
+                    android:layout_width="@dimen/main_top_action_button_gap"
                     android:layout_height="1dp" />
 
                 <androidx.appcompat.widget.AppCompatImageButton
                     android:id="@+id/btn_rss_source_star"
-                    android:layout_width="@dimen/bookshelf_action_button_size"
-                    android:layout_height="@dimen/bookshelf_action_button_size"
+                    android:layout_width="@dimen/discover_top_action_button_size"
+                    android:layout_height="@dimen/discover_top_action_button_size"
                     android:background="@drawable/bg_discover_embedded_action"
                     android:contentDescription="@string/favorite"
-                    android:padding="@dimen/bookshelf_action_button_padding"
+                    android:padding="@dimen/discover_top_action_button_padding"
                     android:scaleType="centerInside"
                     android:src="@drawable/ic_lucide_star"
                     android:tint="@color/primaryText" />
 
                 <Space
-                    android:layout_width="10dp"
+                    android:layout_width="@dimen/main_top_action_button_gap"
                     android:layout_height="1dp" />
 
                 <androidx.appcompat.widget.AppCompatImageButton
                     android:id="@+id/btn_rss_source_refresh"
-                    android:layout_width="@dimen/bookshelf_action_button_size"
-                    android:layout_height="@dimen/bookshelf_action_button_size"
+                    android:layout_width="@dimen/discover_top_action_button_size"
+                    android:layout_height="@dimen/discover_top_action_button_size"
                     android:background="@drawable/bg_discover_embedded_action"
                     android:contentDescription="@string/refresh"
-                    android:padding="@dimen/bookshelf_action_button_padding"
+                    android:padding="@dimen/discover_top_action_button_padding"
                     android:scaleType="centerInside"
                     android:src="@drawable/ic_lucide_refresh_cw"
                     android:tint="@color/primaryText"
                     android:visibility="gone" />
 
                 <Space
-                    android:layout_width="10dp"
+                    android:layout_width="@dimen/main_top_action_button_gap"
                     android:layout_height="1dp" />
 
                 <androidx.appcompat.widget.AppCompatImageButton
                     android:id="@+id/btn_rss_source_login"
-                    android:layout_width="@dimen/bookshelf_action_button_size"
-                    android:layout_height="@dimen/bookshelf_action_button_size"
+                    android:layout_width="@dimen/discover_top_action_button_size"
+                    android:layout_height="@dimen/discover_top_action_button_size"
                     android:background="@drawable/bg_discover_embedded_action"
                     android:contentDescription="@string/login"
-                    android:padding="@dimen/bookshelf_action_button_padding"
+                    android:padding="@dimen/discover_top_action_button_padding"
                     android:scaleType="centerInside"
                     android:src="@drawable/ic_lucide_link_2"
                     android:tint="@color/primaryText" />
