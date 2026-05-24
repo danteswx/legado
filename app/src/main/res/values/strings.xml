@@ -1862,6 +1862,7 @@
     <string name="cover_collection_mode">Cover mode</string>
     <string name="cover_collection_mode_random">Random</string>
     <string name="cover_collection_mode_sequence">Sequential</string>
+    <string name="cover_collection_mode_mixed">Mixed</string>
     <string name="cover_collection_name">Collection name</string>
     <string name="color_format_error">Invalid color format</string>
     <string name="unknown">Unknown</string>

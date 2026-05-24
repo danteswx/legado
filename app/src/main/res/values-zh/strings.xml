@@ -1756,6 +1756,7 @@
     <string name="cover_collection_mode">封面模式</string>
     <string name="cover_collection_mode_random">随机</string>
     <string name="cover_collection_mode_sequence">顺序</string>
+    <string name="cover_collection_mode_mixed">混合</string>
     <string name="cover_collection_name">图集名称</string>
     <string name="color_format_error">颜色格式不正确</string>
     <string name="unknown">未知</string>

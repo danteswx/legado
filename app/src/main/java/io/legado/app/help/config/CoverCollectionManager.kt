@@ -26,6 +26,7 @@ object CoverCollectionManager {
 
     const val MODE_RANDOM = "random"
     const val MODE_SEQUENCE = "sequence"
+    const val MODE_MIXED = "mixed"
 
     private const val indexFileName = "collections.json"
     private val imageExtensions = setOf("jpg", "jpeg", "png", "webp", "bmp")
@@ -122,12 +123,38 @@ object CoverCollectionManager {
         clearAssignments(collection.id)
     }
 
+    fun isMixedMode(): Boolean {
+        val isNight = AppConfig.isNightTheme
+        return appCtx.getPrefString(
+            if (isNight) PreferKey.coverCollectionModeNight else PreferKey.coverCollectionModeDay,
+            MODE_RANDOM
+        ) == MODE_MIXED
+    }
+
+    fun selectionKey(): String {
+        val isNight = AppConfig.isNightTheme
+        val collectionId = appCtx.getPrefString(
+            if (isNight) PreferKey.coverCollectionNight else PreferKey.coverCollectionDay
+        ).orEmpty()
+        val mode = appCtx.getPrefString(
+            if (isNight) PreferKey.coverCollectionModeNight else PreferKey.coverCollectionModeDay,
+            MODE_RANDOM
+        ).orEmpty()
+        return "$isNight:$collectionId:$mode"
+    }
+
     fun selectedCollectionCover(book: Book): String? {
-        return selectedCollectionCover(coverKey(book))
+        return selectedCollectionCover(
+            bookKey = coverKey(book),
+            hasOriginalCover = book.getDisplayCover().isRealCoverPath()
+        )
     }
 
     fun selectedCollectionCover(searchBook: SearchBook): String? {
-        return selectedCollectionCover(coverKey(searchBook))
+        return selectedCollectionCover(
+            bookKey = coverKey(searchBook),
+            hasOriginalCover = searchBook.coverUrl.isRealCoverPath()
+        )
     }
 
     fun coverKey(book: Book): String {
@@ -147,7 +174,27 @@ object CoverCollectionManager {
         return (bookKey.hashCode() and Int.MAX_VALUE) % imageCount
     }
 
-    private fun selectedCollectionCover(bookKey: String): String? {
+    fun String?.isRealCoverPath(): Boolean {
+        val value = this?.trim().orEmpty()
+        if (value.isBlank() || value.equals("use_default_cover", ignoreCase = true)) {
+            return false
+        }
+        val lowerValue = value.lowercase()
+        return when {
+            lowerValue.startsWith("http://") ||
+                    lowerValue.startsWith("https://") ||
+                    lowerValue.startsWith("content://") ||
+                    lowerValue.startsWith("android.resource://") ||
+                    lowerValue.startsWith("file:///android_asset/") -> true
+            lowerValue.startsWith("file://") -> runCatching {
+                File(Uri.parse(value).path.orEmpty()).isFile
+            }.getOrDefault(false)
+            File(value).isAbsolute -> File(value).isFile
+            else -> true
+        }
+    }
+
+    private fun selectedCollectionCover(bookKey: String, hasOriginalCover: Boolean): String? {
         val isNight = AppConfig.isNightTheme
         val collectionId = appCtx.getPrefString(
             if (isNight) PreferKey.coverCollectionNight else PreferKey.coverCollectionDay
@@ -158,6 +205,9 @@ object CoverCollectionManager {
             if (isNight) PreferKey.coverCollectionModeNight else PreferKey.coverCollectionModeDay,
             MODE_RANDOM
         ) ?: MODE_RANDOM
+        if (mode == MODE_MIXED && hasOriginalCover) {
+            return null
+        }
         val path = when (mode) {
             MODE_SEQUENCE -> assignSequential(collection, bookKey)
             else -> collection.images[stableImageIndex(bookKey, collection.images.size)]

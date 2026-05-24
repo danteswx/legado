@@ -1543,6 +1543,7 @@ class ReadMangaActivity : VMBaseActivity<ActivityMangaBinding, ReadMangaViewMode
                     ReadManga.book?.save()
                     ReadManga.inBookshelf = true
                     setResult(RESULT_OK)
+                    super.finish()
                 }
                 noButton { viewModel.removeFromBookshelf { super.finish() } }
             }

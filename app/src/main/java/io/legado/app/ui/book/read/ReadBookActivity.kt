@@ -2088,6 +2088,8 @@ class ReadBookActivity : BaseReadBookActivity(),
                     SourceCallBack.callBackBook(SourceCallBack.ADD_BOOK_SHELF, ReadBook.bookSource, ReadBook.book)
                     ReadBook.inBookshelf = true
                     setResult(RESULT_OK)
+                    callBackBookEnd()
+                    super.finish()
                 }
                 noButton {
                     callBackBookEnd()

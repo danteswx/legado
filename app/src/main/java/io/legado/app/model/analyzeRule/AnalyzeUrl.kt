@@ -205,10 +205,11 @@ class AnalyzeUrl(
         //page
         page?.let {
             val matcher = pagePattern.matcher(ruleUrl)
+            val pageIndex = page.coerceAtLeast(1)
             while (matcher.find()) {
                 val pages = matcher.group(1)!!.split(",")
-                ruleUrl = if (page < pages.size) { //pages[pages.size - 1]等同于pages.last()
-                    ruleUrl.replace(matcher.group(), pages[page - 1].trim { it <= ' ' })
+                ruleUrl = if (pageIndex <= pages.size) { //pages[pages.size - 1]等同于pages.last()
+                    ruleUrl.replace(matcher.group(), pages[pageIndex - 1].trim { it <= ' ' })
                 } else {
                     ruleUrl.replace(matcher.group(), pages.last().trim { it <= ' ' })
                 }
