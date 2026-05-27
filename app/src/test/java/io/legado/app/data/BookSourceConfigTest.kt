@@ -32,6 +32,10 @@ class BookSourceConfigTest {
         assertTrue(loginCheckJs.contains("_cf_chl_opt"))
         assertTrue(loginCheckJs.contains("cf_chl"))
         assertTrue(loginCheckJs.contains("Just a moment"))
+        assertTrue(
+            "UAA source should return the displayed WebView page instead of refetching after verification",
+            loginCheckJs.contains("startBrowserAwait(url, \\\"Cloudflare\\\", false)")
+        )
     }
 
     @Test

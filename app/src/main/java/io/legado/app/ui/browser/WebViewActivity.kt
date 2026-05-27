@@ -191,7 +191,7 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
             R.id.menu_copy_url -> sendToClip(viewModel.baseUrl)
             R.id.menu_ok -> {
                 if (viewModel.sourceVerificationEnable) {
-                    returnVerificationResultAndFinish()
+                    returnVerificationResultAndFinish(forceCurrentPage = true)
                 } else {
                     finish()
                 }
@@ -316,10 +316,10 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
         }
     }
 
-    private fun returnVerificationResultAndFinish() {
+    private fun returnVerificationResultAndFinish(forceCurrentPage: Boolean = false) {
         if (hasReturnedVerificationResult) return
         hasReturnedVerificationResult = true
-        viewModel.saveVerificationResult(currentWebView) {
+        viewModel.saveVerificationResult(currentWebView, forceCurrentPage) {
             finish()
         }
     }
@@ -471,7 +471,7 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
                 view.evaluateJavascript("!!window._cf_chl_opt") {
                     if (it == "true") {
                         isCloudflareChallenge = true
-                    } else if (isCloudflareChallenge && viewModel.sourceVerificationEnable) {
+                    } else if (isCloudflareChallenge && viewModel.shouldAutoReturnAfterCloudflareChallenge()) {
                         returnVerificationResultAndFinish()
                     } else if (viewModel.shouldAutoReturnCloudflarePage(url)) {
                         returnVerificationResultAndFinish()
