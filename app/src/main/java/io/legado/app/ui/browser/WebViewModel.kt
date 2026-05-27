@@ -124,31 +124,61 @@ class WebViewModel(application: Application) : BaseViewModel(application) {
             return success.invoke()
         }
         if (refetchAfterSuccess) {
-            execute {
-                val url = intent!!.getStringExtra("url")!!
-                val source = appDb.bookSourceDao.getBookSource(sourceOrigin)
-                if (html == null) {
-                    html = AnalyzeUrl(
-                        url,
-                        headerMapF = headerMap,
-                        source = source,
-                        coroutineContext = coroutineContext
-                    ).getStrResponseAwait(useWebView = false).body
-                }
-                SourceVerificationHelp.setResult(sourceOrigin, html ?: "", baseUrl)
-            }.onSuccess {
+            saveRefetchedVerificationResult(webView, success)
+        } else {
+            saveCurrentWebViewVerificationResult(webView, success)
+        }
+    }
+
+    private fun saveRefetchedVerificationResult(webView: WebView, success: () -> Unit) {
+        execute {
+            val url = intent!!.getStringExtra("url")!!
+            val source = appDb.bookSourceDao.getBookSource(sourceOrigin)
+            if (html == null) {
+                val response = AnalyzeUrl(
+                    url,
+                    headerMapF = headerMap,
+                    source = source,
+                    coroutineContext = coroutineContext
+                ).getStrResponseAwait(useWebView = false)
+                response.url to (response.body ?: "")
+            } else {
+                baseUrl to html.orEmpty()
+            }
+        }.onSuccess { result ->
+            if (result.second.isBlank() || result.second.isCloudflareVerificationBody()) {
+                saveCurrentWebViewVerificationResult(webView, success)
+            } else {
+                html = result.second
+                SourceVerificationHelp.setResult(sourceOrigin, result.second, result.first)
                 success.invoke()
             }
-        } else {
-            webView.evaluateJavascript("document.documentElement.outerHTML") {
-                execute {
-                    html = StringEscapeUtils.unescapeJson(it).trim('"')
-                }.onSuccess {
-                    SourceVerificationHelp.setResult(sourceOrigin, html ?: "",  webView.url ?: "")
-                    success.invoke()
-                }
+        }.onError {
+            saveCurrentWebViewVerificationResult(webView, success)
+        }
+    }
+
+    private fun saveCurrentWebViewVerificationResult(webView: WebView, success: () -> Unit) {
+        webView.evaluateJavascript("document.documentElement.outerHTML") {
+            execute {
+                html = StringEscapeUtils.unescapeJson(it).trim('"')
+            }.onSuccess {
+                SourceVerificationHelp.setResult(sourceOrigin, html ?: "", webView.url ?: "")
+                success.invoke()
             }
         }
+    }
+
+    private fun String.isCloudflareVerificationBody(): Boolean {
+        return contains("_cf_chl_opt", ignoreCase = true) ||
+            contains("cf_chl", ignoreCase = true) ||
+            contains("cf-chl", ignoreCase = true) ||
+            contains("challenge-platform", ignoreCase = true) ||
+            contains("Just a moment", ignoreCase = true) ||
+            contains("Checking your browser", ignoreCase = true) ||
+            contains("cf_clearance", ignoreCase = true) ||
+            contains("cf-ray", ignoreCase = true) ||
+            contains("Attention Required", ignoreCase = true)
     }
 
     fun disableSource(block: () -> Unit) {

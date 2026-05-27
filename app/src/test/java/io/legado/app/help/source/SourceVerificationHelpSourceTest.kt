@@ -54,6 +54,25 @@ class SourceVerificationHelpSourceTest {
         assertTrue(webViewModel.contains("URLUtil.isNetworkUrl(url)"))
     }
 
+    @Test
+    fun browserVerificationFallsBackToCurrentWebViewHtmlWhenRefetchIsEmpty() {
+        val webViewModel =
+            repoFile("app/src/main/java/io/legado/app/ui/browser/WebViewModel.kt")
+                .readText()
+
+        assertTrue(webViewModel.contains("saveRefetchedVerificationResult(webView, success)"))
+        assertTrue(webViewModel.contains("saveCurrentWebViewVerificationResult(webView, success)"))
+        assertTrue(webViewModel.contains("if (result.second.isBlank() || result.second.isCloudflareVerificationBody())"))
+        assertTrue(webViewModel.contains("result.second.isCloudflareVerificationBody()"))
+        assertTrue(webViewModel.contains("private fun String.isCloudflareVerificationBody()"))
+        assertTrue(webViewModel.contains(".onError {"))
+        assertTrue(webViewModel.contains("SourceVerificationHelp.setResult(sourceOrigin, result.second, result.first)"))
+        assertFalse(
+            "Refetch should not save a blank body as a successful verification result",
+            webViewModel.contains("SourceVerificationHelp.setResult(sourceOrigin, html ?: \"\", baseUrl)")
+        )
+    }
+
     private fun repoFile(relativePath: String): File {
         return generateSequence(File("").absoluteFile) { it.parentFile }
             .map { File(it, relativePath) }
