@@ -304,7 +304,11 @@ fun Context.share(text: String, title: String = getString(R.string.share)) {
     }
 }
 
-fun Context.share(file: File, type: String = "text/*") {
+fun Context.share(
+    file: File,
+    type: String = "text/*",
+    title: String = getString(R.string.share)
+) {
     val fileUri = FileProvider.getUriForFile(this, AppConst.authority, file)
     val intent = Intent(Intent.ACTION_SEND)
     intent.type = type
@@ -314,7 +318,7 @@ fun Context.share(file: File, type: String = "text/*") {
     startActivity(
         Intent.createChooser(
             intent,
-            getString(R.string.share_selected_source)
+            title
         )
     )
 }

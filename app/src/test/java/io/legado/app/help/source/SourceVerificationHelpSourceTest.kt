@@ -32,6 +32,28 @@ class SourceVerificationHelpSourceTest {
         assertTrue(jsExtensions.contains("headerMapF = analyzeUrl?.headerMap"))
     }
 
+    @Test
+    fun cloudflareBrowserVerificationAutoReturnsWhenChallengeAlreadyPassed() {
+        val webViewActivity =
+            repoFile("app/src/main/java/io/legado/app/ui/browser/WebViewActivity.kt")
+                .readText()
+        val webViewModel =
+            repoFile("app/src/main/java/io/legado/app/ui/browser/WebViewModel.kt")
+                .readText()
+
+        assertTrue(webViewActivity.contains("hasReturnedVerificationResult"))
+        assertTrue(webViewActivity.contains("returnVerificationResultAndFinish()"))
+        assertTrue(webViewActivity.contains("viewModel.shouldAutoReturnCloudflarePage(url)"))
+        assertTrue(webViewActivity.contains("isCloudflareChallenge = true"))
+        assertTrue(webViewActivity.contains("isCloudflareChallenge && viewModel.sourceVerificationEnable"))
+
+        assertTrue(webViewModel.contains("fun shouldAutoReturnCloudflarePage(url: String?)"))
+        assertTrue(webViewModel.contains("sourceVerificationEnable && refetchAfterSuccess"))
+        assertTrue(webViewModel.contains("intent?.getStringExtra(\"title\")"))
+        assertTrue(webViewModel.contains(".contains(\"cloudflare\", ignoreCase = true)"))
+        assertTrue(webViewModel.contains("URLUtil.isNetworkUrl(url)"))
+    }
+
     private fun repoFile(relativePath: String): File {
         return generateSequence(File("").absoluteFile) { it.parentFile }
             .map { File(it, relativePath) }

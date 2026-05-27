@@ -14,6 +14,7 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.databinding.DialogCacheChaptersBinding
 import io.legado.app.help.book.isAudio
+import io.legado.app.help.book.isImage
 import io.legado.app.help.book.isVideo
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.accentColor
@@ -22,6 +23,7 @@ import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.gone
 import io.legado.app.utils.setLayout
+import io.legado.app.utils.share
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.legado.app.utils.visible
@@ -45,6 +47,7 @@ class CacheChapterDialog :
         requireArguments().getParcelable<Book>("book")!!
     }
     private var chapterLoadJob: Job? = null
+    private var exportShareJob: Job? = null
     private var filter = CacheChapterFilter.ALL
 
     override fun onStart() {
@@ -82,6 +85,9 @@ class CacheChapterDialog :
         }
         btnCacheSelected.setOnClickListener { cacheSelectedChapters() }
         btnDeleteSelected.setOnClickListener { deleteSelectedChapters() }
+        val canExportShare = !book.isAudio && !book.isVideo && !book.isImage
+        btnExportShare.gone(!canExportShare)
+        btnExportShare.setOnClickListener { exportShareBook() }
         updateFilterButtons()
         updateSelectionBar()
     }
@@ -126,7 +132,7 @@ class CacheChapterDialog :
         val selectedCount = adapter.getSelectedItems().size
         if (adapter.selectionMode) {
             selectionBar.visible()
-            tvHint.gone()
+            hintBar.gone()
             tvSelectionCount.text = getString(R.string.cache_manage_selected_count, selectedCount)
             btnCacheSelected.isEnabled = selectedCount > 0
             btnDeleteSelected.isEnabled = selectedCount > 0
@@ -134,7 +140,7 @@ class CacheChapterDialog :
             btnDeleteSelected.alpha = if (selectedCount > 0) 1f else 0.45f
         } else {
             selectionBar.gone()
-            tvHint.visible()
+            hintBar.visible()
         }
     }
 
@@ -206,6 +212,32 @@ class CacheChapterDialog :
                 }
             }.onFailure {
                 toastOnUi(getString(R.string.cache_manage_cache_failed, it.localizedMessage))
+            }
+        }
+    }
+
+    private fun exportShareBook() {
+        if (exportShareJob?.isActive == true) return
+        binding.rotateLoading.visible()
+        binding.btnExportShare.isEnabled = false
+        binding.btnExportShare.alpha = 0.45f
+        toastOnUi(R.string.cache_manage_export_share_running)
+        exportShareJob = lifecycleScope.launch {
+            try {
+                val file = viewModel.createDownloadAllTxtShareFile(book)
+                callback?.onCacheChanged()
+                loadChapters(searchView.query?.toString())
+                requireContext().share(
+                    file,
+                    "text/plain",
+                    getString(R.string.cache_manage_export_share)
+                )
+            } catch (it: Throwable) {
+                toastOnUi(getString(R.string.cache_manage_export_share_failed, it.localizedMessage))
+            } finally {
+                binding.rotateLoading.gone()
+                binding.btnExportShare.isEnabled = true
+                binding.btnExportShare.alpha = 1f
             }
         }
     }

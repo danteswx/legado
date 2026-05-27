@@ -1695,6 +1695,10 @@
     <string name="cache_manage_cache_selected">缓存</string>
     <string name="cache_manage_cache_selected_done">已提交 %1$d 章缓存</string>
     <string name="cache_manage_cache_failed">缓存失败：%1$s</string>
+    <string name="cache_manage_export_share">导出分享</string>
+    <string name="cache_manage_export_share_running">正在下载全部章节并准备 TXT...</string>
+    <string name="cache_manage_export_share_failed">导出分享失败：%1$s</string>
+    <string name="cache_manage_export_share_text_only">仅文字书籍支持导出 TXT</string>
     <string name="cache_manage_delete_selected_confirm">删除所选 %1$d 章缓存？</string>
     <string name="cache_manage_add_bookshelf">入架</string>
     <string name="cache_manage_use_cache">用缓存</string>

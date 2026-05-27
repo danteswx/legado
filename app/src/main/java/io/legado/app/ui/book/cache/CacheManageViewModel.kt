@@ -11,20 +11,25 @@ import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
+import io.legado.app.data.entities.BookSource
 import io.legado.app.help.exoplayer.ExoPlayerHelper
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.CacheBookManifest
 import io.legado.app.help.book.CacheManifestHelper
+import io.legado.app.help.book.ContentProcessor
+import io.legado.app.help.book.getExportFileName
 import io.legado.app.help.book.getBookSource
 import io.legado.app.help.book.isAudio
 import io.legado.app.help.book.isImage
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isVideo
+import io.legado.app.help.config.AppConfig
 import io.legado.app.model.CacheBook
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.analyzeRule.AnalyzeUrl.Companion.getMediaRequest
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.utils.GSON
+import io.legado.app.utils.HtmlFormatter
 import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.externalCache
 import io.legado.app.utils.fromJsonArray
@@ -41,6 +46,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import splitties.init.appCtx
 import java.io.File
+import java.nio.charset.Charset
 
 class CacheManageViewModel(application: Application) : BaseViewModel(application) {
 
@@ -213,6 +219,86 @@ class CacheManageViewModel(application: Application) : BaseViewModel(application
             CacheBook.start(appCtx, book, start, end)
         }
         return indexes.size
+    }
+
+    suspend fun createDownloadAllTxtShareFile(book: Book): File {
+        return withContext(Dispatchers.IO) {
+            if (book.isMedia || book.isImage || book.isLocal) {
+                throw IllegalStateException(context.getString(R.string.cache_manage_export_share_text_only))
+            }
+            val source = book.getBookSource()
+                ?: throw IllegalStateException(context.getString(R.string.book_source_not_found))
+            val chapters = ensureChapterListForExport(book, source)
+            if (chapters.isEmpty()) {
+                throw IllegalStateException(context.getString(R.string.chapter_list_empty))
+            }
+            val outDir = File(appCtx.externalCache, "share_txt").apply {
+                if (!exists()) mkdirs()
+            }
+            val outFile = File(outDir, book.getExportFileName("txt")).apply {
+                if (exists()) delete()
+            }
+            val charset = Charset.forName(AppConfig.exportCharset)
+            val useReplace = AppConfig.exportUseReplace && book.getUseReplaceRule()
+            val contentProcessor = ContentProcessor.get(book.name, book.origin)
+            outFile.bufferedWriter(charset).use { bw ->
+                bw.write(book.name)
+                bw.newLine()
+                bw.write(context.getString(R.string.author_show, book.getRealAuthor()))
+                bw.newLine()
+                bw.write(
+                    context.getString(
+                        R.string.intro_show,
+                        "\n" + HtmlFormatter.format(book.getDisplayIntro())
+                    )
+                )
+                chapters.forEach { chapter ->
+                    currentCoroutineContext().ensureActive()
+                    val content = if (chapter.isVolume) {
+                        ""
+                    } else {
+                        ensureTxtChapterContent(source, book, chapter)
+                    }
+                    val exportText = contentProcessor.getContent(
+                        book = book,
+                        chapter = chapter.copy(isVip = false),
+                        content = content,
+                        includeTitle = !AppConfig.exportNoChapterName,
+                        useReplace = useReplace,
+                        chineseConvert = false,
+                        reSegment = false
+                    ).toString()
+                    bw.write("\n\n")
+                    bw.write(exportText)
+                }
+            }
+            refreshManifest(book)
+            outFile
+        }
+    }
+
+    private suspend fun ensureChapterListForExport(
+        book: Book,
+        source: BookSource
+    ): List<BookChapter> {
+        var chapters = appDb.bookChapterDao.getChapterList(book.bookUrl)
+        if (chapters.isEmpty()) {
+            chapters = WebBook.getChapterListAwait(source, book).getOrThrow()
+            if (chapters.isNotEmpty()) {
+                appDb.bookChapterDao.insert(*chapters.toTypedArray())
+                appDb.bookDao.update(book)
+            }
+        }
+        return chapters
+    }
+
+    private suspend fun ensureTxtChapterContent(
+        source: BookSource,
+        book: Book,
+        chapter: BookChapter
+    ): String {
+        BookHelp.getContent(book, chapter)?.let { return it }
+        return WebBook.getContentAwait(source, book, chapter, needSave = true)
     }
 
     suspend fun cacheAudioChapters(

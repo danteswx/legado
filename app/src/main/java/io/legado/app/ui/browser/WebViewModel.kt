@@ -83,6 +83,13 @@ class WebViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
+    fun shouldAutoReturnCloudflarePage(url: String?): Boolean {
+        val title = intent?.getStringExtra("title") ?: return false
+        return sourceVerificationEnable && refetchAfterSuccess &&
+            title.contains("cloudflare", ignoreCase = true) &&
+            URLUtil.isNetworkUrl(url)
+    }
+
     fun saveImage(webPic: String?, path: String) {
         webPic ?: return
         execute {

@@ -79,6 +79,7 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
     private var customWebViewCallback: WebChromeClient.CustomViewCallback? = null
     private var webPic: String? = null
     private var isCloudflareChallenge = false
+    private var hasReturnedVerificationResult = false
     private var isFullScreen = false
     private var isfullscreen = false
     private var wasScreenOff = false
@@ -190,9 +191,7 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
             R.id.menu_copy_url -> sendToClip(viewModel.baseUrl)
             R.id.menu_ok -> {
                 if (viewModel.sourceVerificationEnable) {
-                    viewModel.saveVerificationResult(currentWebView) {
-                        finish()
-                    }
+                    returnVerificationResultAndFinish()
                 } else {
                     finish()
                 }
@@ -309,13 +308,19 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
     private fun close() {
         if (!isCloudflareChallenge) {
             if (viewModel.sourceVerificationEnable) {
-                viewModel.saveVerificationResult(currentWebView) {
-                    finish()
-                }
+                returnVerificationResultAndFinish()
             }
             else {
                 finish()
             }
+        }
+    }
+
+    private fun returnVerificationResultAndFinish() {
+        if (hasReturnedVerificationResult) return
+        hasReturnedVerificationResult = true
+        viewModel.saveVerificationResult(currentWebView) {
+            finish()
         }
     }
 
@@ -467,9 +472,9 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
                     if (it == "true") {
                         isCloudflareChallenge = true
                     } else if (isCloudflareChallenge && viewModel.sourceVerificationEnable) {
-                        viewModel.saveVerificationResult(currentWebView) {
-                            finish()
-                        }
+                        returnVerificationResultAndFinish()
+                    } else if (viewModel.shouldAutoReturnCloudflarePage(url)) {
+                        returnVerificationResultAndFinish()
                     }
                 }
             }

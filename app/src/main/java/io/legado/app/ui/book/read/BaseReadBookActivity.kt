@@ -13,6 +13,7 @@ import androidx.activity.viewModels
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
+import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.AppConst.charsets
@@ -30,6 +31,7 @@ import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.ThemeStore
 import io.legado.app.model.CacheBook
 import io.legado.app.model.ReadBook
+import io.legado.app.ui.book.cache.CacheManageViewModel
 import io.legado.app.ui.book.read.config.BgTextConfigDialog
 import io.legado.app.ui.book.read.config.ClickActionConfigDialog
 import io.legado.app.ui.book.read.config.PaddingConfigDialog
@@ -45,8 +47,12 @@ import io.legado.app.utils.isTv
 import io.legado.app.utils.setLightStatusBar
 import io.legado.app.utils.setNavigationBarColorAuto
 import io.legado.app.utils.setOnApplyWindowInsetsListenerCompat
+import io.legado.app.utils.share
 import io.legado.app.utils.showDialogFragment
+import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -58,6 +64,7 @@ abstract class BaseReadBookActivity :
 
     override val binding by viewBinding(ActivityBookReadBinding::inflate)
     override val viewModel by viewModels<ReadBookViewModel>()
+    private val cacheManageViewModel by viewModels<CacheManageViewModel>()
     protected val menuLayoutIsVisible
         get() = bottomDialog > 0 || binding.readMenu.isVisible || binding.searchMenu.bottomMenuVisible
 
@@ -295,6 +302,19 @@ abstract class BaseReadBookActivity :
                             if (it.isEmpty()) book.totalChapterNum else it.toInt()
                         }
                         CacheBook.start(this@BaseReadBookActivity, book, start - 1, end - 1)
+                    }
+                }
+                neutralButton(R.string.cache_manage_export_share) {
+                    toastOnUi(R.string.cache_manage_export_share_running)
+                    lifecycleScope.launch {
+                        try {
+                            val file = cacheManageViewModel.createDownloadAllTxtShareFile(book)
+                            share(file, "text/plain", getString(R.string.cache_manage_export_share))
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Throwable) {
+                            toastOnUi(getString(R.string.cache_manage_export_share_failed, e.localizedMessage))
+                        }
                     }
                 }
                 cancelButton()

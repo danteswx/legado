@@ -1801,6 +1801,10 @@
     <string name="cache_manage_cache_selected">Cache</string>
     <string name="cache_manage_cache_selected_done">Queued %1$d chapter(s)</string>
     <string name="cache_manage_cache_failed">Cache failed: %1$s</string>
+    <string name="cache_manage_export_share">Export share</string>
+    <string name="cache_manage_export_share_running">Downloading all chapters and preparing TXT...</string>
+    <string name="cache_manage_export_share_failed">Export share failed: %1$s</string>
+    <string name="cache_manage_export_share_text_only">Only text books can be exported as TXT</string>
     <string name="cache_manage_delete_selected_confirm">Delete cache for %1$d selected chapter(s)?</string>
     <string name="cache_manage_add_bookshelf">Add</string>
     <string name="cache_manage_use_cache">Use cache</string>
