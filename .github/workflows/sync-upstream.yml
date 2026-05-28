@@ -1,0 +1,46 @@
+
+name: Sync Upstream
+
+on:
+  schedule:
+    # 每6小时检查一次
+    - cron: "0 6 1 * *"
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream
+        run: |
+          git remote add upstream https://github.com/Nowaterisenough/legado.git
+          git fetch upstream --tags
+
+      - name: Sync main branch
+        run: |
+          git checkout main
+          git merge upstream/main --allow-unrelated-histories --no-edit || true
+
+      - name: Push branch
+        run: |
+          git push origin main
+
+      - name: Push tags
+        run: |
+          git push origin --tags
