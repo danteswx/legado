@@ -1,46 +1,26 @@
-
-name: Sync Upstream
+name: 同步上游 Releases
 
 on:
-  schedule:
-    # 每6小时检查一次
-    - cron: "0 6 1 * *"
-
+  # 手动触发
   workflow_dispatch:
-
-permissions:
-  contents: write
+  # 每天凌晨 2 点自动同步
+  schedule:
+    - cron: '0 2 * * *'
 
 jobs:
-  sync:
+  sync-releases:
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: write  # 必须开启，才能上传 Release
     steps:
-      - name: Checkout fork
-        uses: actions/checkout@v4
+      - name: 同步 Releases
+        uses: appleniki/sync-releases@main
         with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Configure Git
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-      - name: Add upstream
-        run: |
-          git remote add upstream https://github.com/Nowaterisenough/legado.git
-          git fetch upstream --tags
-
-      - name: Sync main branch
-        run: |
-          git checkout master
-          git merge upstream/master --allow-unrelated-histories --no-edit || true
-
-      - name: Push branch
-        run: |
-          git push origin master
-
-      - name: Push tags
-        run: |
-          git push origin --tags
+          # 上游原仓库（固定不动）
+          upstream_repo: Nowaterisenough/legado
+          # 你的 Fork 仓库（自动读取，无需修改）
+          target_repo: ${{ github.repository }}
+          # GitHub Token（自动使用）
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # 同步最新 200 个 Release（足够用）
+          max_releases: 200
