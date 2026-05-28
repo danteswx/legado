@@ -1,26 +1,22 @@
-name: 同步上游 Releases
+name: Sync Upstream Releases
 
 on:
-  # 手动触发
-  workflow_dispatch:
-  # 每天凌晨 2 点自动同步
+  workflow_dispatch:   # 手动触发
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '0 2 * * *' # 每天 02:00 自动同步
 
 jobs:
-  sync-releases:
+  sync:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # 必须开启，才能上传 Release
+      contents: write # 必须，才能创建/更新 release
     steps:
-      - name: 同步 Releases
-        uses: appleniki/sync-releases@main
+      - name: Sync releases from upstream
+        uses: aminya/sync-releases@v1
         with:
-          # 上游原仓库（固定不动）
-          upstream_repo: Nowaterisenough/legado
-          # 你的 Fork 仓库（自动读取，无需修改）
-          target_repo: ${{ github.repository }}
-          # GitHub Token（自动使用）
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          # 同步最新 200 个 Release（足够用）
-          max_releases: 200
+          source: Nowaterisenough/legado       # 上游源仓库
+          destination: ${{ github.repository }} # 你的 fork
+          token: ${{ secrets.GITHUB_TOKEN }}    # 访问上游（公开仓库够用）
+          destination-token: ${{ secrets.GITHUB_TOKEN }} # 写到你的仓库
+          # 可选：只同步 tag 存在的，避免垃圾 release
+          skip-empty-releases: true
