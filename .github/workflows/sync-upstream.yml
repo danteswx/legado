@@ -18,5 +18,3 @@ jobs:
           destination: ${{ github.repository }} # 你的 fork
           token: ${{ secrets.GITHUB_TOKEN }}    # 访问上游（公开仓库够用）
           destination-token: ${{ secrets.GITHUB_TOKEN }} # 写到你的仓库
-          # 可选：只同步 tag 存在的，避免垃圾 release
-          skip-empty-releases: true
