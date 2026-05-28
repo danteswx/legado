@@ -21,7 +21,7 @@ jobs:
           TARGET: ${{ github.repository }}
         run: |
           set -e
-          # 拉取上游所有 releases（含 draft/prerelease）
+          # 拉取上游所有 releases
           curl -sL "https://api.github.com/repos/$UPSTREAM/releases?per_page=100" > releases.json
 
           # 遍历每一个 release
@@ -29,32 +29,37 @@ jobs:
             TAG=$(echo "$r" | jq -r .tag_name)
             echo "===== Processing $TAG ====="
 
-            # 检查目标仓库是否已存在该 tag
+            # 检查目标是否已有该 release
             if ! gh api "repos/$TARGET/releases/tags/$TAG" >/dev/null 2>&1; then
               echo "Creating release $TAG in $TARGET"
 
-              # 提取 release 信息
+              # 提取字段
               NAME=$(echo "$r" | jq -r .name)
               BODY=$(echo "$r" | jq -r .body)
               PRERELEASE=$(echo "$r" | jq -r .prerelease)
               DRAFT=$(echo "$r" | jq -r .draft)
 
-              # 创建 release（先建 tag，避免依赖分支）
+              # 写入临时 notes 文件（避免换行/特殊字符问题）
+              echo "$BODY" > notes.txt
+
+              # 创建 release：用 --notes-file 代替 --body
               gh release create "$TAG" \
                 --repo "$TARGET" \
                 --title "$NAME" \
-                --body "$BODY" \
-                --prerelease="$PRERELEASE" \
-                --draft="$DRAFT"
+                --notes-file notes.txt \
+                $([ "$PRERELEASE" = "true" ] && echo --prerelease) \
+                $([ "$DRAFT" = "true" ] && echo --draft)
+
+              rm -f notes.txt
 
               # 上传资产
               echo "$r" | jq -c '.assets[]' | while read -r asset; do
                 URL=$(echo "$asset" | jq -r .browser_download_url)
-                NAME=$(echo "$asset" | jq -r .name)
-                echo "Downloading $NAME"
-                curl -L -o "$NAME" "$URL"
-                gh release upload "$TAG" "$NAME" --repo "$TARGET"
-                rm -f "$NAME"
+                ANAME=$(echo "$asset" | jq -r .name)
+                echo "Downloading $ANAME"
+                curl -L -o "$ANAME" "$URL"
+                gh release upload "$TAG" "$ANAME" --repo "$TARGET"
+                rm -f "$ANAME"
               done
             else
               echo "Release $TAG already exists, skip"
