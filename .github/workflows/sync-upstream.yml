@@ -1,20 +1,62 @@
 name: Sync Upstream Releases
 
 on:
-  workflow_dispatch:   # 手动触发
+  workflow_dispatch:
   schedule:
-    - cron: '0 2 * * *' # 每天 02:00 自动同步
+    - cron: '0 2 * * *'
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # 必须，才能创建/更新 release
+      contents: write
     steps:
-      - name: Sync releases from upstream
-        uses: aminya/sync-releases@v1
-        with:
-          source: Nowaterisenough/legado       # 上游源仓库
-          destination: ${{ github.repository }} # 你的 fork
-          token: ${{ secrets.GITHUB_TOKEN }}    # 访问上游（公开仓库够用）
-          destination-token: ${{ secrets.GITHUB_TOKEN }} # 写到你的仓库
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync releases from Nowaterisenough/legado
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPSTREAM: Nowaterisenough/legado
+          TARGET: ${{ github.repository }}
+        run: |
+          set -e
+          # 拉取上游所有 releases（含 draft/prerelease）
+          curl -sL "https://api.github.com/repos/$UPSTREAM/releases?per_page=100" > releases.json
+
+          # 遍历每一个 release
+          jq -c '.[]' releases.json | while read -r r; do
+            TAG=$(echo "$r" | jq -r .tag_name)
+            echo "===== Processing $TAG ====="
+
+            # 检查目标仓库是否已存在该 tag
+            if ! gh api "repos/$TARGET/releases/tags/$TAG" >/dev/null 2>&1; then
+              echo "Creating release $TAG in $TARGET"
+
+              # 提取 release 信息
+              NAME=$(echo "$r" | jq -r .name)
+              BODY=$(echo "$r" | jq -r .body)
+              PRERELEASE=$(echo "$r" | jq -r .prerelease)
+              DRAFT=$(echo "$r" | jq -r .draft)
+
+              # 创建 release（先建 tag，避免依赖分支）
+              gh release create "$TAG" \
+                --repo "$TARGET" \
+                --title "$NAME" \
+                --body "$BODY" \
+                --prerelease="$PRERELEASE" \
+                --draft="$DRAFT"
+
+              # 上传资产
+              echo "$r" | jq -c '.assets[]' | while read -r asset; do
+                URL=$(echo "$asset" | jq -r .browser_download_url)
+                NAME=$(echo "$asset" | jq -r .name)
+                echo "Downloading $NAME"
+                curl -L -o "$NAME" "$URL"
+                gh release upload "$TAG" "$NAME" --repo "$TARGET"
+                rm -f "$NAME"
+              done
+            else
+              echo "Release $TAG already exists, skip"
+            fi
+          done
